@@ -1,3 +1,4 @@
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using MudBlazor.Services;
@@ -48,6 +49,10 @@ try
         })
         .AddIdentityCookies();
 
+    // Every endpoint requires a signed-in user unless it opts out with [AllowAnonymous].
+    builder.Services.AddAuthorizationBuilder()
+        .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
     builder.Services.AddIdentityCore<ApplicationUser>(options =>
@@ -60,6 +65,7 @@ try
         .AddDefaultTokenProviders();
 
     builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+    builder.Services.AddAdminSeeding(builder.Configuration);
 
     var app = builder.Build();
 
@@ -83,7 +89,7 @@ try
     app.UseAntiforgery();
 
     app.MapCrmHealthChecks();
-    app.MapStaticAssets();
+    app.MapStaticAssets().AllowAnonymous();
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
 

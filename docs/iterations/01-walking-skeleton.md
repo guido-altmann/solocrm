@@ -24,9 +24,9 @@
 - [x] `UseForwardedHeaders` konfiguriert, Data Protection persistiert nach `/app/keys` (Pfad per Konfiguration)
 
 ## Schritt 3 – Auth
-- [ ] Selbstregistrierung deaktivieren (Seite und Endpoint entfernen)
-- [ ] Admin-Seed beim Start aus `Admin__Email` / `Admin__InitialPassword`, falls noch kein User existiert
-- [ ] Alle Seiten außer Login erfordern Authentifizierung (Fallback-Policy)
+- [x] Selbstregistrierung deaktivieren (Seite und Endpoint entfernen)
+- [x] Admin-Seed beim Start aus `Admin__Email` / `Admin__InitialPassword`, falls noch kein User existiert
+- [x] Alle Seiten außer Login erfordern Authentifizierung (Fallback-Policy)
 
 ## Schritt 4 – Fachlicher Durchstich: Contact
 - [ ] Entität `Contact` (Felder gemäß SPEC 2.3, zunächst ohne `OrganizationId` und `Source`) + EF-Konfiguration

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Persistence;
 using SoloCrm.Infrastructure.Persistence.Interceptors;
 
@@ -29,6 +30,17 @@ public static class DependencyInjection
             .AddInterceptors(sp.GetRequiredService<TimestampInterceptor>()));
 
         services.AddSingleton<ICrmDbContextFactory, CrmDbContextFactory>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Seeds the admin user from the "Admin" section on startup. Requires ASP.NET Core Identity to be registered.
+    /// </summary>
+    public static IServiceCollection AddAdminSeeding(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<AdminOptions>(configuration.GetSection(AdminOptions.SectionName));
+        services.AddHostedService<AdminUserSeeder>();
 
         return services;
     }
