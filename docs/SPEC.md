@@ -266,7 +266,7 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 **US-01 · Kontakt per Quick-Add anlegen** · It. 1
 - AK1: Pflicht ist nur Vor- oder Nachname.
 - AK2: Nach dem Speichern ist der Kontakt sofort in Liste und Suche auffindbar.
-- AK3: Ein AuditEntry `Created` wird geschrieben.
+- AK3 (It. 2): Ein AuditEntry `Created` wird geschrieben (setzt den `AuditInterceptor` voraus).
 
 **US-02 · Kontakt einer Organisation zuordnen** · It. 2
 - AK1: Autocomplete auf bestehende Organisationen.
@@ -523,8 +523,8 @@ public static class CreateContact
 
 | It. | Ziel | Stories | Definition of Done |
 |---|---|---|---|
-| **1** | Walking Skeleton | US-01, US-21 (Login) | Solution-Struktur, CI grün, Contact-CRUD minimal, Deployment auf Coolify mit HTTPS, Backup eingerichtet, Data-Protection-Keys persistent, Migration beim Deploy |
-| **2** | Kerndomäne | US-02 – US-09 | Organization, Opportunity inkl. `Pricing`/`Duration` (Berechnung `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet), Stages, Pipeline-Board, Archivierung; Audit-Interceptor aktiv |
+| **1** | Walking Skeleton | US-01 (AK1–AK2), US-21 (Login) | Solution-Struktur, CI grün, Contact-CRUD minimal, Deployment auf Coolify mit HTTPS, Backup eingerichtet, Data-Protection-Keys persistent, Migration beim Deploy |
+| **2** | Kerndomäne | US-01 (AK3), US-02 – US-09 | Organization, Opportunity inkl. `Pricing`/`Duration` (Berechnung `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet), Stages, Pipeline-Board, Archivierung; Audit-Interceptor aktiv (inkl. AuditEntry `Created` für Kontakte) |
 | **3** | Timeline & Tasks | US-10 – US-12 | Activities, Tasks, Timeline-Aggregation, Heute-Ansicht |
 | **4** | Suche & Komfort | US-13 – US-15 | Command Palette, Inline-Editing, Tags, Tastenkürzel |
 | **5** | Integration | US-16 – US-18 | CSV-Import, REST-API + API-Keys, Outbox + Webhooks |
@@ -609,3 +609,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.1 | 2026-09-25 | Erstentwurf |
 | 0.2 | 2026-09-25 | Opportunity: Preismodelle (Stunden-/Tagessatz, Festpreis, Retainer) als Value Object `Pricing`, Laufzeit mit Einheit als `Duration`, MRR; Ausblick Datenanreicherung (Kap. 9) |
 | 0.3 | 2026-09-25 | 7.3: Handler nutzen `ICrmDbContextFactory` statt eines injizierten `ICrmDbContext` |
+| 0.4 | 2026-09-25 | US-01 AK3 (AuditEntry `Created`) nach Iteration 2 verschoben, da der `AuditInterceptor` erst dort entsteht |
