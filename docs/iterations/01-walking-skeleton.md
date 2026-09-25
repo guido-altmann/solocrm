@@ -8,13 +8,13 @@
 ---
 
 ## Schritt 1 – Solution-Grundgerüst
-- [ ] `SoloCrm.sln` mit den Projekten gemäß SPEC 7.2 (src + tests) anlegen
-- [ ] `SoloCrm.Web` aus dem Template `blazor` mit `--interactivity Server --auth Individual` erzeugen und auf PostgreSQL umstellen (SQLite/SQL-Server-Reste entfernen)
-- [ ] `Directory.Build.props`: `net10.0`, `Nullable`, `ImplicitUsings`, `TreatWarningsAsErrors`, `LangVersion latest`
-- [ ] `Directory.Packages.props` (Central Package Management) mit allen Paketen dieser Iteration
-- [ ] `.editorconfig`, `.gitignore`, `global.json` (SDK-Version pinnen)
-- [ ] Projektreferenzen gemäß Abhängigkeitsregel
-- [ ] MudBlazor einbinden (Provider, Theme mit Hell-/Dunkelmodus, `MainLayout` mit Navigation gemäß SPEC 3.4; Identity-Seiten dürfen vorerst im Template-Stil bleiben)
+- [x] `SoloCrm.sln` mit den Projekten gemäß SPEC 7.2 (src + tests) anlegen
+- [x] `SoloCrm.Web` aus dem Template `blazor` mit `--interactivity Server --auth Individual` erzeugen und auf PostgreSQL umstellen (SQLite/SQL-Server-Reste entfernen)
+- [x] `Directory.Build.props`: `net10.0`, `Nullable`, `ImplicitUsings`, `TreatWarningsAsErrors`, `LangVersion latest`
+- [x] `Directory.Packages.props` (Central Package Management) mit allen Paketen dieser Iteration
+- [x] `.editorconfig`, `.gitignore`, `global.json` (SDK-Version pinnen)
+- [x] Projektreferenzen gemäß Abhängigkeitsregel
+- [x] MudBlazor einbinden (Provider, Theme mit Hell-/Dunkelmodus, `MainLayout` mit Navigation gemäß SPEC 3.4; Identity-Seiten dürfen vorerst im Template-Stil bleiben)
 
 ## Schritt 2 – Querschnitts-Bausteine
 - [ ] `Domain`: Basisklasse `Entity` (Id als UUIDv7, `CreatedAt`, `UpdatedAt`, Domain-Event-Liste)

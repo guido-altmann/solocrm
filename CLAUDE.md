@@ -23,7 +23,7 @@ docker compose -f deploy/docker-compose.dev.yml up -d
 # Build & Test
 dotnet build
 dotnet test
-dotnet test --filter "Category!=Integration"   # schnell, ohne Docker
+dotnet test --filter-not-trait "Category=Integration"   # schnell, ohne Docker (xunit.v3 / Microsoft.Testing.Platform)
 
 # Migrationen (immer aus dem Repo-Root)
 dotnet ef migrations add <Name> -p src/SoloCrm.Infrastructure -s src/SoloCrm.Web -o Persistence/Migrations

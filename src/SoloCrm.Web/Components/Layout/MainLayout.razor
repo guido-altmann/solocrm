@@ -1,0 +1,62 @@
+@inherits LayoutComponentBase
+
+<MudThemeProvider @ref="_themeProvider" Theme="SoloCrmTheme.Instance" @bind-IsDarkMode="_isDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       aria-label="Navigation ein-/ausblenden" OnClick="ToggleDrawer" />
+        <MudText Typo="Typo.h6" Class="ml-2">SoloCRM</MudText>
+        <MudSpacer />
+        @* TODO(US-13): open the command palette on focus / Ctrl+K *@
+        <MudTextField T="string" Placeholder="Suchen…" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" ReadOnly="true" Disabled="true"
+                      Class="d-none d-sm-flex mx-4" Style="max-width: 360px;" />
+        @* TODO(US-01): open the quick-add dialog *@
+        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Inherit" Disabled="true"
+                       aria-label="Schnell anlegen" />
+        <MudToggleIconButton @bind-Toggled="_isDarkMode"
+                             Icon="@Icons.Material.Filled.DarkMode" Color="Color.Inherit"
+                             ToggledIcon="@Icons.Material.Filled.LightMode" ToggledColor="Color.Inherit"
+                             aria-label="Hell-/Dunkelmodus umschalten" />
+        <UserMenu />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="1"
+               Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md">
+        <NavMenu />
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Ein unerwarteter Fehler ist aufgetreten.
+    <a href="." class="reload">Neu laden</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private MudThemeProvider? _themeProvider;
+    private bool _drawerOpen = true;
+    private bool _isDarkMode;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _themeProvider is not null)
+        {
+            _isDarkMode = await _themeProvider.GetSystemDarkModeAsync();
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+}

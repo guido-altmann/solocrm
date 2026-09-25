@@ -1,0 +1,15 @@
+@inherits LayoutComponentBase
+
+@* Identity pages are statically rendered (SSR) and keep the Bootstrap-based template styling for now. *@
+<HeadContent>
+    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+</HeadContent>
+
+<div class="container py-4" style="max-width: 960px;">
+    <header class="d-flex align-items-center justify-content-between mb-4">
+        <a href="/" class="h4 mb-0 text-decoration-none">SoloCRM</a>
+    </header>
+    <main>
+        @Body
+    </main>
+</div>
