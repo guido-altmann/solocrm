@@ -1,5 +1,6 @@
 ﻿@page "/Account/LoginWithRecoveryCode"
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@attribute [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting(SoloCrm.Web.Hosting.LoginRateLimiting.PolicyName)]
 
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Identity

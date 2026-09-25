@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using SoloCrm.Web.Hosting;
 using static SoloCrm.IntegrationTests.Web.CrmWebApplicationFactory;
 
 namespace SoloCrm.IntegrationTests.Web;
@@ -68,22 +69,46 @@ public sealed partial class AuthorizationTests(PostgresFixture postgres) : IClas
         var ct = TestContext.Current.CancellationToken;
         var client = CreateClient();
 
-        var loginPage = await client.GetStringAsync("/Account/Login", ct);
-        var token = AntiforgeryTokenRegex().Match(loginPage).Groups[1].Value;
-        token.Should().NotBeEmpty();
-
-        var login = await client.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["_handler"] = "login",
-            ["__RequestVerificationToken"] = token,
-            ["Input.Email"] = AdminEmail,
-            ["Input.Password"] = AdminPassword,
-        }), ct);
+        var login = await PostLoginAsync(client, AdminPassword, ct);
         login.StatusCode.Should().Be(HttpStatusCode.Redirect);
 
         var home = await client.GetAsync("/", ct);
 
         home.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Login_TooManyAttempts_ReturnsTooManyRequests()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = CreateClient();
+
+        for (var i = 0; i < LoginRateLimiting.PermitLimit; i++)
+        {
+            var attempt = await PostLoginAsync(client, "wrong-password", ct);
+            attempt.StatusCode.Should().Be(HttpStatusCode.OK, "attempt {0} is within the limit", i + 1);
+        }
+
+        var rejected = await PostLoginAsync(client, AdminPassword, ct);
+
+        rejected.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        rejected.Headers.RetryAfter.Should().NotBeNull();
+        (await client.GetAsync("/Account/Login", ct)).StatusCode.Should().Be(HttpStatusCode.OK, "rendering the form is not limited");
+    }
+
+    private static async Task<HttpResponseMessage> PostLoginAsync(HttpClient client, string password, CancellationToken ct)
+    {
+        var loginPage = await client.GetStringAsync("/Account/Login", ct);
+        var token = AntiforgeryTokenRegex().Match(loginPage).Groups[1].Value;
+        token.Should().NotBeEmpty();
+
+        return await client.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["_handler"] = "login",
+            ["__RequestVerificationToken"] = token,
+            ["Input.Email"] = AdminEmail,
+            ["Input.Password"] = password,
+        }), ct);
     }
 
     private HttpClient CreateClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

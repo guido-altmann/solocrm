@@ -37,6 +37,7 @@ try
     builder.Services.AddReverseProxySupport(builder.Configuration);
     builder.Services.AddPersistentDataProtection(builder.Configuration);
     builder.Services.AddCrmHealthChecks();
+    builder.Services.AddLoginRateLimiting();
 
     builder.Services.AddCascadingAuthenticationState();
     builder.Services.AddScoped<IdentityRedirectManager>();
@@ -85,6 +86,7 @@ try
     app.UseSerilogRequestLogging();
     app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
     app.UseHttpsRedirection();
+    app.UseRateLimiter();
 
     app.UseAntiforgery();
 

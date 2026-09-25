@@ -27,6 +27,7 @@
 - [x] Selbstregistrierung deaktivieren (Seite und Endpoint entfernen)
 - [x] Admin-Seed beim Start aus `Admin__Email` / `Admin__InitialPassword`, falls noch kein User existiert
 - [x] Alle Seiten außer Login erfordern Authentifizierung (Fallback-Policy)
+- [x] Rate-Limiting für Login-Formulare (5 POSTs/Minute pro IP, 429 mit `Retry-After`)
 
 ## Schritt 4 – Fachlicher Durchstich: Contact
 - [ ] Entität `Contact` (Felder gemäß SPEC 2.3, zunächst ohne `OrganizationId` und `Source`) + EF-Konfiguration
