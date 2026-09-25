@@ -2,7 +2,7 @@
 
 **Ziel:** Ein minimales, aber vollständiges System läuft end-to-end: Code → CI → Container → Coolify → HTTPS → Postgres mit Backup. Fachlich gibt es nur Login und eine einfache Kontaktliste mit Quick-Add.
 
-**Stories:** US-01 (Kontakt per Quick-Add), US-21 AK1 (Login, Single-User)
+**Stories:** US-01 AK1–AK2 (Kontakt per Quick-Add; AK3 folgt in Iteration 2), US-21 AK1 (Login, Single-User)
 **Referenzen:** `docs/SPEC.md` Kap. 2.2, 2.3 (Contact), 7; ADR-001 bis ADR-004, ADR-009
 
 ---
@@ -30,11 +30,11 @@
 - [x] Rate-Limiting für Login-Formulare (5 POSTs/Minute pro IP, 429 mit `Retry-After`)
 
 ## Schritt 4 – Fachlicher Durchstich: Contact
-- [ ] Entität `Contact` (Felder gemäß SPEC 2.3, zunächst ohne `OrganizationId` und `Source`) + EF-Konfiguration
-- [ ] Use Cases `CreateContact` und `GetContacts` (Paging, einfache `ILIKE`-Suche auf Name/E-Mail)
-- [ ] Seite `/contacts` mit `MudDataGrid` (serverseitiges Paging) und Suchfeld
-- [ ] Quick-Add-Dialog (Button + Shortcut `N`) gemäß US-01
-- [ ] Erste Migration `InitialCreate`
+- [x] Entität `Contact` (Felder gemäß SPEC 2.3, zunächst ohne `OrganizationId` und `Source`) + EF-Konfiguration
+- [x] Use Cases `CreateContact` und `GetContacts` (Paging, einfache `ILIKE`-Suche auf Name/E-Mail)
+- [x] Seite `/contacts` mit `MudDataGrid` (serverseitiges Paging) und Suchfeld
+- [x] Quick-Add-Dialog (Button + Shortcut `N`) gemäß US-01
+- [x] Erste Migration `InitialCreate`
 
 ## Schritt 5 – Tests
 - [ ] Unit-Tests für `CreateContact.Validator` und den Handler (Happy Path, fehlender Name)

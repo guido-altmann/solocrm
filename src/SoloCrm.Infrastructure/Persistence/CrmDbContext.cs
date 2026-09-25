@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Domain.Common;
+using SoloCrm.Domain.Contacts;
 using SoloCrm.Infrastructure.Identity;
 
 namespace SoloCrm.Infrastructure.Persistence;
@@ -9,9 +10,12 @@ namespace SoloCrm.Infrastructure.Persistence;
 public class CrmDbContext(DbContextOptions options)
     : IdentityDbContext<ApplicationUser>(options), ICrmDbContext
 {
+    public DbSet<Contact> Contacts => Set<Contact>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+        builder.HasPostgresExtension("citext");
         builder.ApplyConfigurationsFromAssembly(typeof(CrmDbContext).Assembly);
         ConfigureEntityConventions(builder);
     }

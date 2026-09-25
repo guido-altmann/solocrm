@@ -1,0 +1,94 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Contacts
+@using SoloCrm.Domain.Contacts
+@inject ICommandHandler<CreateContact.Command, CreateContact.Result> CreateContactHandler
+
+<form @onsubmit="SaveAsync">
+    <MudDialog>
+        <DialogContent>
+            <MudStack Spacing="2">
+                <MudTextField @bind-Value="_firstName" Label="Vorname" Immediate="true" AutoFocus="true"
+                              MaxLength="@Contact.FirstNameMaxLength"
+                              Error="@HasError(nameof(CreateContact.Command.FirstName))"
+                              ErrorText="@ErrorText(nameof(CreateContact.Command.FirstName))" />
+                <MudTextField @bind-Value="_lastName" Label="Nachname" Immediate="true"
+                              MaxLength="@Contact.LastNameMaxLength"
+                              Error="@HasError(nameof(CreateContact.Command.LastName))"
+                              ErrorText="@ErrorText(nameof(CreateContact.Command.LastName))" />
+                <MudTextField @bind-Value="_email" Label="E-Mail" InputType="InputType.Email" Immediate="true"
+                              MaxLength="@Contact.EmailMaxLength"
+                              Error="@HasError(nameof(CreateContact.Command.Email))"
+                              ErrorText="@ErrorText(nameof(CreateContact.Command.Email))" />
+                @if (_generalError is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_generalError</MudAlert>
+                }
+            </MudStack>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel" Disabled="_saving">Abbrechen</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving">
+                Speichern
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</form>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    private string? _firstName;
+    private string? _lastName;
+    private string? _email;
+    private bool _saving;
+    private IReadOnlyDictionary<string, string[]> _fieldErrors = new Dictionary<string, string[]>();
+    private string? _generalError;
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _fieldErrors = new Dictionary<string, string[]>();
+        _generalError = null;
+
+        try
+        {
+            var result = await CreateContactHandler.Handle(
+                new CreateContact.Command(_firstName, _lastName, _email),
+                CancellationToken.None);
+
+            if (result.IsSuccess)
+            {
+                MudDialog.Close(DialogResult.Ok(result.Value.Id));
+                return;
+            }
+
+            switch (result.Error)
+            {
+                case ValidationError validation:
+                    _fieldErrors = validation.Errors;
+                    break;
+                case var error when error == CreateContact.Errors.DuplicateEmail:
+                    _fieldErrors = new Dictionary<string, string[]>
+                    {
+                        [nameof(CreateContact.Command.Email)] = [error.Message],
+                    };
+                    break;
+                default:
+                    _generalError = result.Error.Message;
+                    break;
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private bool HasError(string field) => _fieldErrors.ContainsKey(field);
+
+    private string? ErrorText(string field) =>
+        _fieldErrors.TryGetValue(field, out var messages) ? string.Join(" ", messages) : null;
+}

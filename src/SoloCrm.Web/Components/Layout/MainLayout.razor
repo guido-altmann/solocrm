@@ -1,4 +1,7 @@
 @inherits LayoutComponentBase
+@implements IAsyncDisposable
+@inject QuickAddService QuickAdd
+@inject IJSRuntime JS
 
 <MudThemeProvider @ref="_themeProvider" Theme="SoloCrmTheme.Instance" @bind-IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
@@ -16,9 +19,10 @@
                       AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined"
                       Margin="Margin.Dense" ReadOnly="true" Disabled="true"
                       Class="d-none d-sm-flex mx-4" Style="max-width: 360px;" />
-        @* TODO(US-01): open the quick-add dialog *@
-        <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Inherit" Disabled="true"
-                       aria-label="Schnell anlegen" />
+        <MudTooltip Text="Neuer Kontakt (N)">
+            <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Inherit"
+                           aria-label="Schnell anlegen" OnClick="QuickAdd.OpenContactAsync" />
+        </MudTooltip>
         <MudToggleIconButton @bind-Toggled="_isDarkMode"
                              Icon="@Icons.Material.Filled.DarkMode" Color="Color.Inherit"
                              ToggledIcon="@Icons.Material.Filled.LightMode" ToggledColor="Color.Inherit"
@@ -48,15 +52,55 @@
     private MudThemeProvider? _themeProvider;
     private bool _drawerOpen = true;
     private bool _isDarkMode;
+    private IJSObjectReference? _keyboard;
+    private DotNetObjectReference<MainLayout>? _selfReference;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && _themeProvider is not null)
+        if (!firstRender)
+        {
+            return;
+        }
+
+        if (_themeProvider is not null)
         {
             _isDarkMode = await _themeProvider.GetSystemDarkModeAsync();
             StateHasChanged();
         }
+
+        _selfReference = DotNetObjectReference.Create(this);
+        _keyboard = await JS.InvokeAsync<IJSObjectReference>("import", "./js/keyboard.js");
+        await _keyboard.InvokeVoidAsync("register", _selfReference);
+    }
+
+    /// <summary>Called by keyboard.js for global shortcuts (SPEC 3.2).</summary>
+    [JSInvokable]
+    public async Task OnShortcut(string key)
+    {
+        // TODO(US-06): context-dependent quick-add (opportunity, note) once those exist.
+        if (key == "n")
+        {
+            await QuickAdd.OpenContactAsync();
+        }
     }
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_keyboard is not null)
+        {
+            try
+            {
+                await _keyboard.InvokeVoidAsync("unregister");
+                await _keyboard.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit is gone; the browser has already discarded the listener.
+            }
+        }
+
+        _selfReference?.Dispose();
+    }
 }

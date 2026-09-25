@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using SoloCrm.Infrastructure.Persistence;
 
@@ -17,7 +19,7 @@ public sealed class CrmWebApplicationFactory(string connectionString, string? ad
 
     public string ConnectionString { get; } = connectionString;
 
-    /// <summary>Creates a fresh database with the current model (no migrations exist yet).</summary>
+    /// <summary>Creates a fresh database and applies all migrations.</summary>
     public static async Task<string> CreateDatabaseAsync(PostgresFixture postgres, CancellationToken ct)
     {
         var connectionString = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
@@ -26,7 +28,7 @@ public sealed class CrmWebApplicationFactory(string connectionString, string? ad
         }.ConnectionString;
 
         await using var db = CreateDbContext(connectionString);
-        await db.Database.EnsureCreatedAsync(ct);
+        await db.Database.MigrateAsync(ct);
 
         return connectionString;
     }
@@ -34,7 +36,13 @@ public sealed class CrmWebApplicationFactory(string connectionString, string? ad
     public static CrmDbContext CreateDbContext(string connectionString) => new(new DbContextOptionsBuilder<CrmDbContext>()
         .UseNpgsql(connectionString)
         .UseSnakeCaseNamingConvention()
+        .UseApplicationServiceProvider(IdentityServices)
         .Options);
+
+    // The Identity model (e.g. the passkey table) depends on IdentityOptions; must match Program.cs.
+    private static readonly IServiceProvider IdentityServices = new ServiceCollection()
+        .Configure<IdentityOptions>(options => options.Stores.SchemaVersion = IdentitySchemaVersions.Version3)
+        .BuildServiceProvider();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

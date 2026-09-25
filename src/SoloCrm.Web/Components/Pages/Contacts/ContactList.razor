@@ -1,0 +1,78 @@
+@page "/contacts"
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Contacts
+@implements IDisposable
+@inject IQueryHandler<GetContacts.Query, GetContacts.Result> GetContactsHandler
+@inject QuickAddService QuickAdd
+@inject ISnackbar Snackbar
+
+<PageTitle>Kontakte · SoloCRM</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Kontakte</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
+               OnClick="QuickAdd.OpenContactAsync">
+        Neuer Kontakt
+    </MudButton>
+</MudStack>
+
+<MudDataGrid @ref="_grid" T="GetContacts.Item" ServerData="LoadAsync" SortMode="SortMode.None"
+             RowsPerPage="GetContacts.DefaultPageSize" Hover="true" Dense="true" Elevation="1">
+    <ToolBarContent>
+        <MudTextField T="string" Value="_search" ValueChanged="OnSearchChanged" Placeholder="Name oder E-Mail suchen…"
+                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" DebounceInterval="300" Clearable="true" Class="mt-0" Style="max-width: 400px;" />
+    </ToolBarContent>
+    <Columns>
+        <TemplateColumn T="GetContacts.Item" Title="Name">
+            <CellTemplate>@FormatName(context.Item)</CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="c => c.Email" Title="E-Mail" />
+        <PropertyColumn Property="c => c.Phone" Title="Telefon" />
+        <PropertyColumn Property="c => c.JobTitle" Title="Rolle" />
+    </Columns>
+    <NoRecordsContent>
+        <MudText>@(string.IsNullOrWhiteSpace(_search) ? "Noch keine Kontakte vorhanden." : "Keine Kontakte gefunden.")</MudText>
+    </NoRecordsContent>
+    <PagerContent>
+        <MudDataGridPager T="GetContacts.Item" PageSizeOptions="[25, 50, 100]" RowsPerPageString="Zeilen pro Seite:" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<GetContacts.Item>? _grid;
+    private string? _search;
+
+    protected override void OnInitialized() => QuickAdd.ContactCreated += OnContactCreated;
+
+    private async Task<GridData<GetContacts.Item>> LoadAsync(GridState<GetContacts.Item> state, CancellationToken cancellationToken)
+    {
+        var result = await GetContactsHandler.Handle(
+            new GetContacts.Query(_search, state.Page, state.PageSize),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return new GridData<GetContacts.Item> { Items = [], TotalItems = 0 };
+        }
+
+        return new GridData<GetContacts.Item> { Items = result.Value.Items, TotalItems = result.Value.TotalCount };
+    }
+
+    private async Task OnSearchChanged(string? search)
+    {
+        _search = search;
+        await ReloadAsync();
+    }
+
+    private Task OnContactCreated(Guid contactId) => InvokeAsync(ReloadAsync);
+
+    private Task ReloadAsync() => _grid?.ReloadServerData() ?? Task.CompletedTask;
+
+    private static string FormatName(GetContacts.Item contact) =>
+        string.Join(" ", new[] { contact.FirstName, contact.LastName }.Where(n => n is not null));
+
+    public void Dispose() => QuickAdd.ContactCreated -= OnContactCreated;
+}

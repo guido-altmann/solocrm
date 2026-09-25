@@ -10,6 +10,7 @@ using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Persistence;
 using SoloCrm.Web.Components;
 using SoloCrm.Web.Components.Account;
+using SoloCrm.Web.Components.Shared;
 using SoloCrm.Web.Hosting;
 
 Log.Logger = new LoggerConfiguration()
@@ -30,6 +31,7 @@ try
         .AddInteractiveServerComponents();
 
     builder.Services.AddMudServices();
+    builder.Services.AddScoped<QuickAddService>();
 
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);

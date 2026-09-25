@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using SoloCrm.Domain.Contacts;
+
 namespace SoloCrm.Application.Abstractions;
 
 /// <summary>
@@ -5,6 +8,8 @@ namespace SoloCrm.Application.Abstractions;
 /// </summary>
 public interface ICrmDbContext : IAsyncDisposable, IDisposable
 {
+    DbSet<Contact> Contacts { get; }
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
