@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
-using SoloCrm.Web.Data;
+using SoloCrm.Infrastructure.Identity;
 
 namespace SoloCrm.Web.Components.Account;
 

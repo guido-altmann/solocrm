@@ -49,6 +49,9 @@ dotnet_naming_style.underscore_camel.capitalization = camel_case
 # Async
 dotnet_diagnostic.CA2007.severity = none   # no ConfigureAwait in ASP.NET Core apps
 
+# C#-only codebase: VB keyword collisions (e.g. type name "Error") are irrelevant
+dotnet_diagnostic.CA1716.severity = none
+
 # Generated code (EF migrations)
 [**/Migrations/*.cs]
 generated_code = true

@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
 using SoloCrm.Web.Components.Account.Pages;
 using SoloCrm.Web.Components.Account.Pages.Manage;
-using SoloCrm.Web.Data;
+using SoloCrm.Infrastructure.Identity;
 
 namespace Microsoft.AspNetCore.Routing;
 

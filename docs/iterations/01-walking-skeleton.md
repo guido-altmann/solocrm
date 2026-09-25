@@ -17,11 +17,11 @@
 - [x] MudBlazor einbinden (Provider, Theme mit Hell-/Dunkelmodus, `MainLayout` mit Navigation gemäß SPEC 3.4; Identity-Seiten dürfen vorerst im Template-Stil bleiben)
 
 ## Schritt 2 – Querschnitts-Bausteine
-- [ ] `Domain`: Basisklasse `Entity` (Id als UUIDv7, `CreatedAt`, `UpdatedAt`, Domain-Event-Liste)
-- [ ] `Application`: `Result<T>`, `ICommandHandler<,>` / `IQueryHandler<,>`, `ICrmDbContext`, Handler-Registrierung per Assembly-Scan
-- [ ] `Infrastructure`: `CrmDbContext` (inkl. Identity-Tabellen), `snake_case`-Naming, `TimestampInterceptor` (nutzt `TimeProvider`)
-- [ ] Serilog (JSON auf stdout), Health Checks `/health/live` und `/health/ready` (inkl. Postgres)
-- [ ] `UseForwardedHeaders` konfiguriert, Data Protection persistiert nach `/app/keys` (Pfad per Konfiguration)
+- [x] `Domain`: Basisklasse `Entity` (Id als UUIDv7, `CreatedAt`, `UpdatedAt`, Domain-Event-Liste)
+- [x] `Application`: `Result<T>`, `ICommandHandler<,>` / `IQueryHandler<,>`, `ICrmDbContext`, Handler-Registrierung per Assembly-Scan
+- [x] `Infrastructure`: `CrmDbContext` (inkl. Identity-Tabellen), `snake_case`-Naming, `TimestampInterceptor` (nutzt `TimeProvider`)
+- [x] Serilog (JSON auf stdout), Health Checks `/health/live` und `/health/ready` (inkl. Postgres)
+- [x] `UseForwardedHeaders` konfiguriert, Data Protection persistiert nach `/app/keys` (Pfad per Konfiguration)
 
 ## Schritt 3 – Auth
 - [ ] Selbstregistrierung deaktivieren (Seite und Endpoint entfernen)

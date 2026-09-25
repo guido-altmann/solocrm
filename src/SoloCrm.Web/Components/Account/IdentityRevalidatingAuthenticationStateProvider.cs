@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
-using SoloCrm.Web.Data;
+using SoloCrm.Infrastructure.Identity;
 
 namespace SoloCrm.Web.Components.Account;
 

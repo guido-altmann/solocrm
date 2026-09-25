@@ -473,10 +473,14 @@ public static class CreateContact
 
     public sealed class Validator : AbstractValidator<Command> { /* … */ }
 
-    public sealed class Handler(ICrmDbContext db, IValidator<Command> validator)
+    public sealed class Handler(ICrmDbContextFactory dbFactory, IValidator<Command> validator)
         : ICommandHandler<Command, Result>
     {
-        public async Task<Result<Result>> Handle(Command cmd, CancellationToken ct) { /* … */ }
+        public async Task<Result<Result>> Handle(Command cmd, CancellationToken ct)
+        {
+            await using var db = await dbFactory.CreateDbContextAsync(ct);
+            /* … */
+        }
     }
 }
 ```
@@ -484,6 +488,7 @@ public static class CreateContact
 - Registrierung per Assembly-Scan (Scrutor oder eigenes Reflection-Snippet).
 - Rückgabe als `Result<T>` (eigener, kleiner Typ) statt Exceptions für fachliche Fehler.
 - `ICrmDbContext` ist ein Interface in Application und wird in Infrastructure implementiert. Handler arbeiten direkt mit EF Core; bewusst **kein** Repository-Layer.
+- Handler erhalten den Kontext über `ICrmDbContextFactory` (Application-Abstraktion über EFs `IDbContextFactory<CrmDbContext>`) und erzeugen pro Aufruf einen kurzlebigen Kontext, weil Scoped-Lifetimes in Blazor Server pro Circuit gelten (7.5).
 
 ### 7.4 Persistenz-Mechaniken (Lernkern)
 | Mechanik | Umsetzung |
@@ -603,3 +608,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 |---|---|---|
 | 0.1 | 2026-09-25 | Erstentwurf |
 | 0.2 | 2026-09-25 | Opportunity: Preismodelle (Stunden-/Tagessatz, Festpreis, Retainer) als Value Object `Pricing`, Laufzeit mit Einheit als `Duration`, MRR; Ausblick Datenanreicherung (Kap. 9) |
+| 0.3 | 2026-09-25 | 7.3: Handler nutzen `ICrmDbContextFactory` statt eines injizierten `ICrmDbContext` |
