@@ -37,10 +37,10 @@
 - [x] Erste Migration `InitialCreate`
 
 ## Schritt 5 – Tests
-- [ ] Unit-Tests für `CreateContact.Validator` und den Handler (Happy Path, fehlender Name)
-- [ ] Integrationstest mit Testcontainers-Postgres: Migration läuft, Kontakt wird angelegt, `CreatedAt` ist gesetzt
-- [ ] Architekturtest: Abhängigkeitsregel (Domain → nichts, Application → nur Domain)
-- [ ] bUnit-Test für den Quick-Add-Dialog (Validierungsfehler wird angezeigt)
+- [x] Unit-Tests für `CreateContact.Validator` und den Handler (Happy Path, fehlender Name)
+- [x] Integrationstest mit Testcontainers-Postgres: Migration läuft, Kontakt wird angelegt, `CreatedAt` ist gesetzt
+- [x] Architekturtest: Abhängigkeitsregel (Domain → nichts, Application → nur Domain)
+- [x] bUnit-Test für den Quick-Add-Dialog (Validierungsfehler wird angezeigt)
 
 ## Schritt 6 – Container & lokale Umgebung
 - [x] `deploy/docker-compose.dev.yml` mit Postgres (Volume, Port 5432) und optional Seq (Seq bewusst weggelassen: noch kein Serilog-Seq-Sink)
