@@ -25,7 +25,7 @@ dotnet build
 dotnet test
 dotnet test --filter-not-trait "Category=Integration"   # schnell, ohne Docker (xunit.v3 / Microsoft.Testing.Platform)
 
-# Migrationen (immer aus dem Repo-Root)
+# Migrationen (immer aus dem Repo-Root; dotnet-ef ist als lokales Tool gepinnt: einmalig `dotnet tool restore`)
 dotnet ef migrations add <Name> -p src/SoloCrm.Infrastructure -s src/SoloCrm.Web -o Persistence/Migrations
 dotnet ef database update     -p src/SoloCrm.Infrastructure -s src/SoloCrm.Web
 

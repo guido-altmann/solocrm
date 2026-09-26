@@ -44,9 +44,9 @@
 
 ## Schritt 6 – Container & lokale Umgebung
 - [x] `deploy/docker-compose.dev.yml` mit Postgres (Volume, Port 5432) und optional Seq (Seq bewusst weggelassen: noch kein Serilog-Seq-Sink)
-- [ ] Multi-Stage-`Dockerfile` (restore mit Layer-Caching → publish → `aspnet:10.0`, non-root, Port 8080, `HEALTHCHECK`)
-- [ ] `efbundle` im Build erzeugen und ins Image kopieren; Startskript `entrypoint.sh`: Migration ausführen, dann App starten
-- [ ] Lokaler Test: `docker build` + Start gegen die Dev-DB
+- [x] Multi-Stage-`Dockerfile` (restore mit Layer-Caching → publish → `aspnet:10.0`, non-root, Port 8080, `HEALTHCHECK`)
+- [x] `efbundle` im Build erzeugen und ins Image kopieren; Startskript `entrypoint.sh`: Migration ausführen, dann App starten
+- [x] Lokaler Test: `docker build` + Start gegen die Dev-DB
 
 ## Schritt 7 – CI/CD & Coolify
 - [ ] GitHub Actions: `build-test.yml` (restore, build, test inkl. Integrationstests) bei Push und PR
