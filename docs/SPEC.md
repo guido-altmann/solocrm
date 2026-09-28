@@ -112,7 +112,7 @@ erDiagram
 | RemotePercentage | int? | | 0–100 |
 | Source | enum `LeadSource` | | |
 | LostReason | enum `LostReason`? | | nur bei Stage-Status `Lost`: `Price`, `Timing`, `OtherCandidate`, `ProjectCancelled`, `NoResponse`, `DeclinedByMe`, `Other` |
-| ClosedAt | DateTimeOffset? | | gesetzt beim Wechsel auf `Won` / `Lost` |
+| ClosedAt | DateTimeOffset? | | gesetzt beim Wechsel auf `Won` / `Lost`; beim Wiedereröffnen (Wechsel zurück auf eine offene Stage) werden `ClosedAt` und `LostReason` geleert |
 
 **Value Object `Pricing`** (EF Core Complex Type, siehe ADR-011)
 | Feld | Typ | Hinweis |
@@ -524,10 +524,10 @@ public static class CreateContact
 | It. | Ziel | Stories | Definition of Done |
 |---|---|---|---|
 | **1** | Walking Skeleton | US-01 (AK1–AK2), US-21 (Login) | Solution-Struktur, CI grün, Contact-CRUD minimal, Deployment auf Coolify mit HTTPS, Backup eingerichtet, Data-Protection-Keys persistent, Migration beim Deploy |
-| **2** | Kerndomäne | US-01 (AK3), US-02 – US-09 | Organization, Opportunity inkl. `Pricing`/`Duration` (Berechnung `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet), Stages, Pipeline-Board, Archivierung; Audit-Interceptor aktiv (inkl. AuditEntry `Created` für Kontakte) |
-| **3** | Timeline & Tasks | US-10 – US-12 | Activities, Tasks, Timeline-Aggregation, Heute-Ansicht |
+| **2** | Kerndomäne | US-01 (AK3), US-02 – US-09 | Organization, Opportunity inkl. `Pricing`/`Duration` (Berechnung `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet), Stages, Pipeline-Board, Archivierung; Audit-Interceptor aktiv (inkl. AuditEntry `Created` für Kontakte); Outbox-Interceptor schreibt Domain Events |
+| **3** | Timeline & Tasks | US-10 – US-12 | Activities, Tasks, Timeline-Aggregation, Heute-Ansicht; Einstellungen für Preis-Defaults und Schwellwert „eingeschlafen“ |
 | **4** | Suche & Komfort | US-13 – US-15 | Command Palette, Inline-Editing, Tags, Tastenkürzel |
-| **5** | Integration | US-16 – US-18 | CSV-Import, REST-API + API-Keys, Outbox + Webhooks |
+| **5** | Integration | US-16 – US-18 | CSV-Import, REST-API + API-Keys, Outbox-Verarbeitung + Webhooks |
 | **6** | DSGVO & Politur | US-19 – US-21 (2FA) | Export/Löschung, 2FA, README, Screenshots, ADRs final |
 
 **Backlog nach MVP** (nicht priorisiert):
@@ -612,3 +612,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.4 | 2026-09-25 | US-01 AK3 (AuditEntry `Created`) nach Iteration 2 verschoben, da der `AuditInterceptor` erst dort entsteht |
 | 0.5 | 2026-09-28 | 7.6/Kap. 10: Image-Build via GitHub Actions → GHCR, Migrationen per Entrypoint, Repo öffentlich; Env-Variable `Serilog__MinimumLevel__Default` |
 | 0.6 | 2026-09-28 | Kap. 10: Projektname entschieden (SoloCRM), Domain bleibt privat; Abschluss Iteration 1 (ADR-009 Accepted) |
+| 0.7 | 2026-09-28 | Planung It. 2: Outbox-Schreiben nach It. 2 vorgezogen (Verarbeitung bleibt It. 5); Wiedereröffnen abgeschlossener Anfragen geregelt; Oberfläche für Preis-Defaults in It. 3 |
