@@ -52,9 +52,9 @@
 - [x] GitHub Actions: `build-test.yml` (restore, build, test inkl. Integrationstests) bei Push und PR
 - [x] GitHub Actions: `docker.yml` (Image bauen und nach GHCR pushen bei Push auf `main`) – *falls Coolify-Build nicht gewählt wird*
 - [x] `deploy/coolify.md`: Schritt-für-Schritt-Anleitung (Postgres-Ressource, App-Ressource, Env-Variablen, Volume `/app/keys`, Domain + HTTPS, Healthcheck-Pfad, Backup-Schedule nach S3)
-- [ ] Deployment manuell durchführen (Guido) und Login + Quick-Add in Produktion verifizieren
-- [ ] Redeploy testen: **Session bleibt erhalten** (Beweis für persistente Data-Protection-Keys)
-- [ ] Backup auslösen und Restore in eine Test-DB einmal durchspielen
+- [x] Deployment manuell durchführen (Guido) und Login + Quick-Add in Produktion verifizieren
+- [x] Redeploy testen: **Session bleibt erhalten** (Beweis für persistente Data-Protection-Keys)
+- [x] Backup auslösen und Restore in eine Test-DB einmal durchspielen
 
 ## Schritt 8 – Abschluss
 - [ ] README (Kurzbeschreibung, Screenshot, Quickstart lokal, Links zu SPEC und ADRs)

@@ -133,16 +133,23 @@ Ab jetzt stößt der Workflow **Docker** nach jedem erfolgreichen Push das Deplo
 Einmalig durchspielen, damit der Restore-Weg nachweislich funktioniert. Coolify erzeugt Backups mit `pg_dump` im Custom-Format.
 
 1. In der DB-Ressource **Backup Now**, danach die neueste Datei aus dem S3-Bucket (oder unter *Backups → Executions*) herunterladen.
-2. Datei in den Postgres-Container kopieren und in eine separate Test-DB einspielen (**Server-Shell**, siehe oben):
+2. Datei vom lokalen Rechner auf den Server kopieren (**lokales Terminal**):
+
+   ```bash
+   scp ./<datei>.dmp user@server:/tmp/backup.dmp
+   ```
+
+3. Datei in den Postgres-Container kopieren und in eine separate Test-DB einspielen (**Server-Shell**, siehe oben):
 
    ```bash
    DB=<postgres-container-uuid>
-   docker cp ./backup.dmp "$DB":/tmp/backup.dmp
+   docker cp /tmp/backup.dmp "$DB":/tmp/backup.dmp
+   rm /tmp/backup.dmp
    docker exec "$DB" createdb -U solocrm solocrm_restore_test
    docker exec "$DB" pg_restore -U solocrm -d solocrm_restore_test --no-owner --no-acl /tmp/backup.dmp
    ```
 
-3. Inhalt prüfen:
+4. Inhalt prüfen:
 
    ```bash
    docker exec "$DB" psql -U solocrm -d solocrm_restore_test \
@@ -151,7 +158,7 @@ Einmalig durchspielen, damit der Restore-Weg nachweislich funktioniert. Coolify 
    ```
 
    Die Anzahl der Kontakte und die Migrationen müssen der Produktionsdatenbank entsprechen.
-4. Aufräumen:
+5. Aufräumen:
 
    ```bash
    docker exec "$DB" dropdb -U solocrm solocrm_restore_test

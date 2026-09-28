@@ -18,5 +18,10 @@ Self-Hosting auf eigenem Server mit Coolify (Traefik als Reverse Proxy). Die Pos
 - **Rolling Updates (2026-09-28):** Während eines Redeploys laufen alter und neuer Container kurz parallel, Traefik verteilt ohne Sticky Sessions auf beide. Der Blazor-Client verbindet sich deshalb ohne SignalR-Negotiation direkt per WebSocket (`wwwroot/js/blazor-start.js`), sodass die Circuit-Verbindung aus genau einer Anfrage besteht. Verworfen: Sticky Sessions in Traefik (zusätzliche Coolify-Konfiguration außerhalb des Repos, hilft nicht, wenn der alte Container verschwindet); Fallback-Transports (SSE/Long Polling) entfallen dadurch bewusst, WebSockets sind über Traefik verfügbar.
 - Betriebsanleitung: `deploy/coolify.md`.
 
+## Verifikation (2026-09-28)
+- Deployment über GitHub Actions → GHCR → Coolify läuft; HTTPS unter eigener Domain, Login und Quick-Add in Produktion geprüft.
+- Redeploy ohne Logout (Data-Protection-Keys auf Volume `/app/keys` persistent), UI nach Rolling Update ohne manuellen Reload interaktiv.
+- Backup über Coolify nach S3 erstellt und in eine separate Test-DB zurückgespielt (`pg_restore`); Kontakte und Migrationshistorie vollständig.
+
 ## Konsequenzen
 - Status auf *Accepted* setzen, sobald der Walking Skeleton erfolgreich deployt und ein Restore getestet ist.
