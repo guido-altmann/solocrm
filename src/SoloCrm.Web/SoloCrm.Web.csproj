@@ -3,6 +3,9 @@
   <PropertyGroup>
     <UserSecretsId>solocrm-web</UserSecretsId>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <!-- The SDK only infers this from .razor files present at restore time. The Dockerfile restores
+         from project files alone (layer caching), which would drop _framework/blazor.web.js from publish. -->
+    <RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
   </PropertyGroup>
 
   <ItemGroup>

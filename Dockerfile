@@ -19,6 +19,9 @@ COPY src/ src/
 RUN dotnet publish src/SoloCrm.Web/SoloCrm.Web.csproj -c Release --no-restore -o /app/publish \
     -p:UseAppHost=false
 
+# Without the Blazor framework script the UI renders statically and no button reacts; fail the build instead.
+RUN test -f /app/publish/wwwroot/_framework/blazor.web.js
+
 # The bundle only needs a syntactically valid connection string to build the host;
 # the real one is read from ConnectionStrings__Crm when the bundle runs.
 RUN ConnectionStrings__Crm="Host=build-only" dotnet ef migrations bundle \
