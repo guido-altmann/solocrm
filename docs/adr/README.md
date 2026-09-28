@@ -10,7 +10,7 @@
 | [006](0006-audit-und-timeline-per-interceptor.md) | Audit und Timeline per EF-Interceptor | Accepted |
 | [007](0007-suche-postgres-volltext-trigram.md) | Suche mit Postgres-Volltext + Trigram | Accepted |
 | [008](0008-hintergrundjobs-hangfire.md) | Hintergrundjobs mit Hangfire | Proposed |
-| [009](0009-deployment-coolify.md) | Deployment auf Coolify | Proposed |
+| [009](0009-deployment-coolify.md) | Deployment auf Coolify | Accepted |
 | [010](0010-outbox-pattern-webhooks.md) | Transactional Outbox für Webhooks | Accepted |
 | [011](0011-value-objects-pricing-duration.md) | Preismodell und Laufzeit als Value Objects | Accepted |
 

@@ -57,9 +57,9 @@
 - [x] Backup auslösen und Restore in eine Test-DB einmal durchspielen
 
 ## Schritt 8 – Abschluss
-- [ ] README (Kurzbeschreibung, Screenshot, Quickstart lokal, Links zu SPEC und ADRs)
-- [ ] ADR-009 auf *Accepted* setzen, offene Punkte entschieden und dokumentiert
-- [ ] Offene Fragen in SPEC Kap. 9 aktualisieren
+- [x] README (Kurzbeschreibung, Screenshot, Quickstart lokal, Links zu SPEC und ADRs)
+- [x] ADR-009 auf *Accepted* setzen, offene Punkte entschieden und dokumentiert
+- [x] Offene Fragen in SPEC Kap. 10 aktualisieren
 
 ## Definition of Done
 - CI grün (Build + alle Tests)

@@ -578,7 +578,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 - Outbox/Webhooks (It. 5) so bauen, dass neue Event-Typen wie `enrichment.requested` trivial ergänzbar sind.
 
 ## 10. Offene Fragen
-- [ ] Finaler Projektname / Domain?
+- [x] Finaler Projektname / Domain? → Name bleibt **SoloCRM**; die Produktivdomain wird nicht im öffentlichen Repo dokumentiert (Doku nutzt `crm.example.de`)
 - [x] Image-Build in GitHub Actions (GHCR) oder direkt durch Coolify? → GitHub Actions → GHCR (ADR-009)
 - [x] Migrations-Strategie beim Deploy (siehe 7.6) → `efbundle` im Entrypoint (ADR-009)
 - [ ] Welche HubSpot-Felder werden beim Import tatsächlich benötigt? (Export sichten)
@@ -611,3 +611,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.3 | 2026-09-25 | 7.3: Handler nutzen `ICrmDbContextFactory` statt eines injizierten `ICrmDbContext` |
 | 0.4 | 2026-09-25 | US-01 AK3 (AuditEntry `Created`) nach Iteration 2 verschoben, da der `AuditInterceptor` erst dort entsteht |
 | 0.5 | 2026-09-28 | 7.6/Kap. 10: Image-Build via GitHub Actions → GHCR, Migrationen per Entrypoint, Repo öffentlich; Env-Variable `Serilog__MinimumLevel__Default` |
+| 0.6 | 2026-09-28 | Kap. 10: Projektname entschieden (SoloCRM), Domain bleibt privat; Abschluss Iteration 1 (ADR-009 Accepted) |
