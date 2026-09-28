@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** Entwurf v0.2 · **Stand:** 2026-09-25 · **Owner:** Guido Altmann
+> **Status:** Entwurf v0.5 · **Stand:** 2026-09-28 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, konkrete Iterationsaufträge in `docs/iterations/`.
 
@@ -509,13 +509,13 @@ public static class CreateContact
 - Drag & Drop der Pipeline über `MudDropContainer`.
 
 ### 7.6 Deployment (Coolify)
-- **Image:** Multi-Stage-Dockerfile (`sdk` → `aspnet`, non-root, Port 8080), gebaut in GitHub Actions und nach GHCR gepusht; Coolify zieht das Image. Alternativ baut Coolify direkt aus dem Repo.
+- **Image:** Multi-Stage-Dockerfile (`sdk` → `aspnet`, non-root, Port 8080), gebaut in GitHub Actions (nur nach grünem CI auf `main`) und nach GHCR gepusht; Coolify zieht das Image, ausgelöst per Deploy-Webhook.
 - **Datenbank:** Postgres als Coolify-Ressource mit aktivierten, geplanten S3-Backups.
 - **Persistente Volumes:** `/app/keys` für ASP.NET Data-Protection-Keys (kritisch: sonst Logout bei jedem Deploy).
 - **Reverse Proxy:** Traefik (Coolify); `UseForwardedHeaders` mit `KnownNetworks` bzw. `KnownProxies` passend konfiguriert; WebSockets für SignalR aktiv.
-- **Migrationen:** `efbundle` im Image; Ausführung vor dem App-Start (Startbefehl-Wrapper oder Coolify-Pre-Deployment-Command). Die Variante wird im Walking Skeleton verifiziert und in ADR-009 festgehalten.
+- **Migrationen:** `efbundle` im Image; Ausführung vor dem App-Start durch `deploy/entrypoint.sh` (siehe ADR-009).
 - **Health Checks:** Coolify-Healthcheck auf `/health/ready`.
-- **Konfiguration (Env):** `ConnectionStrings__Crm`, `Admin__Email`, `Admin__InitialPassword`, `Serilog__MinimumLevel`, `App__BaseUrl`.
+- **Konfiguration (Env):** `ConnectionStrings__Crm`, `Admin__Email`, `Admin__InitialPassword`, `Serilog__MinimumLevel__Default`, `App__BaseUrl`. Anleitung: `deploy/coolify.md`.
 
 ---
 
@@ -579,10 +579,10 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 
 ## 10. Offene Fragen
 - [ ] Finaler Projektname / Domain?
-- [ ] Image-Build in GitHub Actions (GHCR) oder direkt durch Coolify?
-- [ ] Migrations-Strategie beim Deploy (siehe 7.6) – im Walking Skeleton klären.
+- [x] Image-Build in GitHub Actions (GHCR) oder direkt durch Coolify? → GitHub Actions → GHCR (ADR-009)
+- [x] Migrations-Strategie beim Deploy (siehe 7.6) → `efbundle` im Entrypoint (ADR-009)
 - [ ] Welche HubSpot-Felder werden beim Import tatsächlich benötigt? (Export sichten)
-- [ ] Repo öffentlich ab Iteration 1 oder erst ab MVP?
+- [x] Repo öffentlich ab Iteration 1 oder erst ab MVP? → öffentlich ab Iteration 1
 - [ ] Datenanreicherung: in der App (Hangfire-Job + LLM-API) oder ausgelagert in n8n?
 - [ ] Brauche ich Stundensatz-Varianten (z. B. Remote- vs. Vor-Ort-Satz) oder reicht ein Satz pro Anfrage?
 
@@ -610,3 +610,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.2 | 2026-09-25 | Opportunity: Preismodelle (Stunden-/Tagessatz, Festpreis, Retainer) als Value Object `Pricing`, Laufzeit mit Einheit als `Duration`, MRR; Ausblick Datenanreicherung (Kap. 9) |
 | 0.3 | 2026-09-25 | 7.3: Handler nutzen `ICrmDbContextFactory` statt eines injizierten `ICrmDbContext` |
 | 0.4 | 2026-09-25 | US-01 AK3 (AuditEntry `Created`) nach Iteration 2 verschoben, da der `AuditInterceptor` erst dort entsteht |
+| 0.5 | 2026-09-28 | 7.6/Kap. 10: Image-Build via GitHub Actions → GHCR, Migrationen per Entrypoint, Repo öffentlich; Env-Variable `Serilog__MinimumLevel__Default` |

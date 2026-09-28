@@ -13,9 +13,9 @@ Self-Hosting auf eigenem Server mit Coolify (Traefik als Reverse Proxy). Die Pos
 - Health Checks `/health/live` und `/health/ready`.
 - Postgres-Backups über Coolify-Scheduler nach S3.
 
-## Offene Punkte (im Walking Skeleton klären)
-- Image-Build: GitHub Actions → GHCR **oder** Build durch Coolify aus dem Repo.
-- Migrationen: Startskript (`efbundle && dotnet SoloCrm.Web.dll`) **oder** Coolify-Pre-Deployment-Command.
+- **Image-Build (entschieden 2026-09-28):** GitHub Actions baut das Image nur für Commits auf `main` mit grünem CI (`docker.yml` per `workflow_run`) und pusht nach `ghcr.io/guido-altmann/solocrm` (Tags `latest`, `sha-<commit>`). Coolify zieht das öffentliche Image; das Deployment wird per Coolify-Deploy-Webhook angestoßen. Begründung: Nur getestete Images werden deployt, der Server muss keine SDK-Builds ausführen, Rollback per Image-Tag.
+- **Migrationen (entschieden 2026-09-28):** `deploy/entrypoint.sh` führt `efbundle` vor dem App-Start im selben Container aus. Begründung: unabhängig von Coolify-Features, lokal mit `docker run` identisch testbar; schlägt eine Migration fehl, startet die App nicht und der Healthcheck verhindert den Wechsel auf den neuen Container.
+- Betriebsanleitung: `deploy/coolify.md`.
 
 ## Konsequenzen
 - Status auf *Accepted* setzen, sobald der Walking Skeleton erfolgreich deployt und ein Restore getestet ist.
