@@ -21,6 +21,18 @@ Coolify: pull Image ──► Container-Start: entrypoint.sh ──► efbundle 
 - S3-kompatibler Storage für Backups (Bucket, Access Key, Secret Key, Endpoint, Region)
 - Mindestens ein erfolgreicher Lauf des Workflows **Docker**, damit das Image in GHCR existiert
 
+## Wo werden Befehle ausgeführt?
+
+In dieser Anleitung gibt es zwei Arten von Befehlen:
+
+- **Container-Terminal (Coolify-UI):** in der jeweiligen Ressource unter *Terminal*. Man ist bereits *im* Container, Befehle werden direkt eingegeben, **ohne** `docker exec …`. Beispiel im Postgres-Container:
+  ```sh
+  psql -U solocrm -d solocrm -c 'select user_name, email_confirmed from "AspNetUsers";'
+  ```
+- **Server-Shell:** per SSH auf dem Host, auf dem Coolify läuft (oder in Coolify unter *Servers → Terminal*). Hier wird ein Container per `docker exec <container> …` angesprochen. Nötig für alles, was Dateien zwischen Host und Container bewegt (`docker cp`). Den Container-Namen zeigt `docker ps`; er entspricht der UUID der Ressource in Coolify.
+
+`solocrm` steht jeweils für den in der Postgres-Ressource konfigurierten Benutzer bzw. die Datenbank.
+
 ## 1. GHCR-Package prüfen
 
 Nach dem ersten Lauf von **Docker** unter *GitHub → Profil → Packages → solocrm → Package settings*:
@@ -80,6 +92,8 @@ Anschließend **Backup Now** auslösen und prüfen, dass die Datei im Bucket ank
    | `Serilog__MinimumLevel__Default` | `Information` | optional, zur Fehlersuche `Debug` |
    | `App__BaseUrl` | `https://crm.example.de` | für spätere absolute Links (Webhooks, Mails) |
 
+   **Sonderzeichen in Werten:** Coolify reicht die Variablen über eine Docker-Compose-`.env`-Datei weiter. Dabei werden `$` (Variablen-Interpolation) und `\` (Escape-Zeichen, wird z. B. verdoppelt) verändert, Anführungszeichen (`"`, `'`, `` ` ``) und Leerzeichen am Rand können mit in den Wert geraten. Diese Zeichen in Passwörtern vermeiden oder die Variable als **Is Literal** markieren. Was tatsächlich ankommt, zeigt `printenv <Variable>` im Terminal des App-Containers (siehe unten).
+
    `ASPNETCORE_ENVIRONMENT` nicht setzen (Default `Production`: HSTS, keine Developer-Exception-Page).
    `ForwardedHeaders__KnownNetworks` ist per Default auf die privaten Netze (u. a. `10.0.0.0/8` des Coolify-Netzwerks) gesetzt und muss nur angepasst werden, wenn Traefik in einem anderen Netz läuft.
 7. **Deploy**. In den Logs des Containers sollten zuerst `Applying database migrations...` und danach die JSON-Logs der App erscheinen.
@@ -101,6 +115,7 @@ Ab jetzt stößt der Workflow **Docker** nach jedem erfolgreichen Push das Deplo
 - [ ] `https://crm.example.de/health/ready` liefert `200` (ohne Login erreichbar)
 - [ ] Aufruf per `http://` wird auf `https://` umgeleitet, Zertifikat gültig
 - [ ] Login mit `Admin__Email` / `Admin__InitialPassword` funktioniert, danach Passwort ändern
+- [ ] UI ist interaktiv: Hell-/Dunkelmodus-Umschalter reagiert (sonst siehe *Fehlersuche*)
 - [ ] `/contacts`: Kontakt per Quick-Add (`N`) anlegen, anschließend über die Suche finden
 - [ ] Response-Header enthält `Strict-Transport-Security`
 - [ ] Kein Redirect-Loop und Auth-Cookie mit Flag `Secure` (Forwarded Headers greifen, die App erkennt HTTPS hinter Traefik)
@@ -118,7 +133,7 @@ Ab jetzt stößt der Workflow **Docker** nach jedem erfolgreichen Push das Deplo
 Einmalig durchspielen, damit der Restore-Weg nachweislich funktioniert. Coolify erzeugt Backups mit `pg_dump` im Custom-Format.
 
 1. In der DB-Ressource **Backup Now**, danach die neueste Datei aus dem S3-Bucket (oder unter *Backups → Executions*) herunterladen.
-2. Datei in den Postgres-Container kopieren und in eine separate Test-DB einspielen (auf dem Server):
+2. Datei in den Postgres-Container kopieren und in eine separate Test-DB einspielen (**Server-Shell**, siehe oben):
 
    ```bash
    DB=<postgres-container-uuid>
@@ -146,6 +161,18 @@ Einmalig durchspielen, damit der Restore-Weg nachweislich funktioniert. Coolify 
 Datum und Ergebnis des Restore-Tests in ADR-009 festhalten.
 
 **Echter Restore (Notfall):** App-Ressource stoppen, `solocrm` droppen und neu anlegen, `pg_restore` wie oben in `solocrm` ausführen, App starten. `efbundle` spielt beim Start nur noch fehlende Migrationen ein.
+
+## Fehlersuche
+
+**Login meldet „Invalid login attempt“, obwohl der Admin laut Log angelegt wurde**
+- Meist wurde das Passwort beim Weiterreichen verändert (siehe *Sonderzeichen in Werten*). Im Terminal des App-Containers `printenv Admin__InitialPassword` ausführen und genau diesen Wert zum Login verwenden, danach das Passwort in der App ändern.
+- Steht im Log `Admin seed skipped: a user already exists`, wurden `Admin__*` ignoriert, weil schon ein Benutzer existiert (z. B. nach nachträglich geänderten Env-Werten). Neu anlegen lassen: im Postgres-Terminal `psql -U solocrm -d solocrm -c 'delete from "AspNetUsers";'`, dann die App neu starten. Nur solange keine weiteren Benutzerdaten existieren.
+
+**Seiten werden angezeigt, aber kein Button reagiert**
+- Die interaktive Blazor-Verbindung kommt nicht zustande. In den Browser-DevTools (Netzwerk) prüfen:
+  - `_framework/blazor.web.<hash>.js` muss mit `200` laden (nicht `302` auf die Login-Seite; das deutete auf ein Image ohne Framework-Skript hin, der Docker-Build prüft das inzwischen).
+  - `_blazor/negotiate` muss `200` liefern und die anschließende WebSocket-Verbindung (`_blazor?id=…`) mit `101` aufgebaut werden.
+- Ein vorgeschalteter Proxy/CDN (z. B. Cloudflare) darf WebSockets nicht blockieren und Skripte nicht umschreiben (Rocket Loader aus).
 
 ## Rollback
 

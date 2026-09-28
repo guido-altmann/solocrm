@@ -55,7 +55,8 @@ internal sealed partial class AdminUserSeeder(
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Admin seed skipped: a user already exists")]
+    // Information on purpose: explains why changed Admin__* settings have no effect.
+    [LoggerMessage(Level = LogLevel.Information, Message = "Admin seed skipped: a user already exists")]
     private static partial void LogAdminSeedSkipped(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Admin user {UserId} created")]
