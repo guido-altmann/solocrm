@@ -15,6 +15,7 @@ Self-Hosting auf eigenem Server mit Coolify (Traefik als Reverse Proxy). Die Pos
 
 - **Image-Build (entschieden 2026-09-28):** GitHub Actions baut das Image nur für Commits auf `main` mit grünem CI (`docker.yml` per `workflow_run`) und pusht nach `ghcr.io/guido-altmann/solocrm` (Tags `latest`, `sha-<commit>`). Coolify zieht das öffentliche Image; das Deployment wird per Coolify-Deploy-Webhook angestoßen. Begründung: Nur getestete Images werden deployt, der Server muss keine SDK-Builds ausführen, Rollback per Image-Tag.
 - **Migrationen (entschieden 2026-09-28):** `deploy/entrypoint.sh` führt `efbundle` vor dem App-Start im selben Container aus. Begründung: unabhängig von Coolify-Features, lokal mit `docker run` identisch testbar; schlägt eine Migration fehl, startet die App nicht und der Healthcheck verhindert den Wechsel auf den neuen Container.
+- **Rolling Updates (2026-09-28):** Während eines Redeploys laufen alter und neuer Container kurz parallel, Traefik verteilt ohne Sticky Sessions auf beide. Der Blazor-Client verbindet sich deshalb ohne SignalR-Negotiation direkt per WebSocket (`wwwroot/js/blazor-start.js`), sodass die Circuit-Verbindung aus genau einer Anfrage besteht. Verworfen: Sticky Sessions in Traefik (zusätzliche Coolify-Konfiguration außerhalb des Repos, hilft nicht, wenn der alte Container verschwindet); Fallback-Transports (SSE/Long Polling) entfallen dadurch bewusst, WebSockets sind über Traefik verfügbar.
 - Betriebsanleitung: `deploy/coolify.md`.
 
 ## Konsequenzen

@@ -172,7 +172,10 @@ Datum und Ergebnis des Restore-Tests in ADR-009 festhalten.
 - Die interaktive Blazor-Verbindung kommt nicht zustande. In den Browser-DevTools (Netzwerk) prüfen:
   - `_framework/blazor.web.<hash>.js` muss mit `200` laden (nicht `302` auf die Login-Seite; das deutete auf ein Image ohne Framework-Skript hin, der Docker-Build prüft das inzwischen).
   - `_blazor/negotiate` muss `200` liefern und die anschließende WebSocket-Verbindung (`_blazor?id=…`) mit `101` aufgebaut werden.
-- Ein vorgeschalteter Proxy/CDN (z. B. Cloudflare) darf WebSockets nicht blockieren und Skripte nicht umschreiben (Rocket Loader aus).
+- Ein vorgeschalteter Proxy/CDN (z. B. Cloudflare) darf WebSockets nicht blockieren und Skripte nicht umschreiben (Rocket Loader aus). Da der Client ausschließlich WebSockets nutzt (ADR-009), gibt es keinen Fallback auf andere Transports.
+
+**Nach einem Redeploy ist die Liste leer („Noch keine Kontakte vorhanden.“), erst F5 zeigt die Daten**
+- Symptom einer Circuit-Verbindung, die während des Rolling Updates zwischen altem und neuem Container aufgeteilt wurde. Behoben durch den WebSocket-only-Start in `wwwroot/js/blazor-start.js`; tritt es erneut auf, im Seitenquelltext prüfen, dass `blazor.web.js` mit `autostart="false"` und direkt danach `js/blazor-start.js` eingebunden sind.
 
 ## Rollback
 
