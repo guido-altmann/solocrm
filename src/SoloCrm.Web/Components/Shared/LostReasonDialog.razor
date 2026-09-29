@@ -1,0 +1,46 @@
+@using SoloCrm.Domain.Opportunities
+
+<form @onsubmit="Confirm">
+    <MudDialog>
+        <DialogContent>
+            <MudText Class="mb-2">Warum wurde „@Title“ verloren?</MudText>
+            <MudSelect T="LostReason?" @bind-Value="_reason" Label="Absagegrund" Required="true" AutoFocus="true"
+                       Error="_showError" ErrorText="Bitte einen Absagegrund wählen.">
+                @foreach (var reason in Enum.GetValues<LostReason>())
+                {
+                    <MudSelectItem T="LostReason?" Value="reason">@Labels.For(reason)</MudSelectItem>
+                }
+            </MudSelect>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel">Abbrechen</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled">Speichern</MudButton>
+        </DialogActions>
+    </MudDialog>
+</form>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Title of the request, shown in the question.</summary>
+    [Parameter]
+    public string Title { get; set; } = "";
+
+    private LostReason? _reason;
+    private bool _showError;
+
+    /// <summary>The reason is mandatory (US-08 AK1); canceling leaves the request where it was.</summary>
+    private void Confirm()
+    {
+        if (_reason is not { } reason)
+        {
+            _showError = true;
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(reason));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

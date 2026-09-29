@@ -53,11 +53,11 @@
 - [x] Live-Anzeige von `EstimatedValue` und bei Retainern zusätzlich MRR (AK5), berechnet über denselben Domain-Service
 
 ## Schritt 6 – Pipeline (US-07, US-08)
-- [ ] `GetPipelineBoard`: offene Stages mit Karten (Titel, Endkunde/Vermittler, Preis im Modellformat), je Spalte Summe `EstimatedValue` und ggf. Summe MRR
-- [ ] `MoveOpportunity` (Stage-Wechsel über `ChangeStage`): schreibt AuditEntry und `OpportunityStageChanged` (US-07 AK1)
-- [ ] Seite `/pipeline` mit `MudDropContainer`; Won/Lost als Drop-Zonen
-- [ ] Dialog Absagegrund beim Wechsel auf `Lost` (Pflicht, Abbrechen setzt die Karte zurück) (US-08 AK1)
-- [ ] Gewonnene/verlorene Anfragen verlassen das aktive Board (AK2); Filter „Abgeschlossene“ zeigt Won und Lost (AK3)
+- [x] `GetPipelineBoard`: offene Stages mit Karten (Titel, Endkunde/Vermittler, Preis im Modellformat), je Spalte Summe `EstimatedValue` und ggf. Summe MRR
+- [x] `MoveOpportunity` (Stage-Wechsel über `ChangeStage`): schreibt AuditEntry und `OpportunityStageChanged` (US-07 AK1)
+- [x] Seite `/pipeline` mit `MudDropContainer`; Won/Lost als Drop-Zonen
+- [x] Dialog Absagegrund beim Wechsel auf `Lost` (Pflicht, Abbrechen setzt die Karte zurück) (US-08 AK1)
+- [x] Gewonnene/verlorene Anfragen verlassen das aktive Board (AK2); Filter „Abgeschlossene“ zeigt Won und Lost (AK3)
 
 ## Schritt 7 – Stages verwalten (US-09)
 - [ ] Seite `/settings` mit Abschnitt Stages: anlegen, umbenennen, umsortieren (Drag & Drop oder Pfeile)
@@ -90,6 +90,7 @@
 9. **Neue Anfragen starten in einer offenen Stage.** Der Status einer Anfrage wird aus `ClosedAt`/`LostReason` abgeleitet. Beim Wechsel zwischen zwei Lost-Stages bleiben `ClosedAt` und der Absagegrund erhalten, bei Won → Lost ist ein neuer Grund Pflicht. Die Auslastung wird bei Festpreis und Retainer geleert.
 10. **Nullable Complex Types verifiziert** (EF Core 10.0.12 + Npgsql 10.0.3): Migration, Speichern, Laden und `null` funktionieren. Zwei Stolpersteine: (a) Properties ohne Setter werden nicht gemappt (Lösung: `private init`), (b) bei einem `null`-Complex-Type meldet der ChangeTracker für die inneren Properties CLR-Defaults (`0`, `Hourly`), und `ComplexPropertyEntry` hat kein `OriginalValue`. Der `AuditInterceptor` ermittelt die ursprüngliche Null-Belegung deshalb über `OriginalValues.ToObject()` und vergleicht Werte statt `IsModified`.
 11. **Anfrage-Dialog:** Anlegen und Bearbeiten in einem Dialog (Bearbeiten inkl. Stage-Wahl, Absagegrund und Archivieren). Ohne Preismodell bzw. Währung gelten `DefaultPricingModel`/`DefaultCurrency` aus den Einstellungen. Endkunde und Vermittler werden nur aus bestehenden Organisationen gewählt („Neu anlegen“ gibt es in It. 2 nur beim Kontakt, US-02).
+12. **Pipeline-Layout:** Die Won/Lost-Drop-Zonen liegen als Leiste über den offenen Spalten, damit sie beim Ziehen ohne horizontales Scrollen erreichbar sind. Mit „Abgeschlossene anzeigen“ zeigen sie ihre Karten. Summen werden je Währung ausgewiesen (keine Umrechnung, SPEC 8 Backlog). Ein Klick auf eine Karte öffnet den Bearbeiten-Dialog.
 
 ## Definition of Done
 - CI grün (Build + alle Tests); `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet

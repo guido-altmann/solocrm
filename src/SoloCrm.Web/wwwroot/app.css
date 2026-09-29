@@ -66,3 +66,62 @@ h1:focus {
         right: 0.75rem;
         top: 0.5rem;
     }
+
+/* Pipeline board (SPEC 3.3 S2): horizontally scrolling columns */
+.pipeline-board {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    overflow-x: auto;
+    padding-bottom: 8px;
+}
+
+.pipeline-column {
+    flex: 0 0 280px;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--mud-palette-background-gray);
+}
+
+.pipeline-closed {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.pipeline-closed-zone {
+    flex: 1 1 0;
+    min-width: 0;
+    background-color: var(--mud-palette-background-gray);
+}
+
+.pipeline-zone.pipeline-zone-closed {
+    min-height: 56px;
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.pipeline-zone-closed .pipeline-card { width: 260px; }
+
+.pipeline-column-won { border-top: 3px solid var(--mud-palette-success) !important; }
+
+.pipeline-column-lost { border-top: 3px solid var(--mud-palette-error) !important; }
+
+.pipeline-column-header { padding: 8px 12px 4px; }
+
+.pipeline-zone {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 120px;
+    padding: 8px;
+}
+
+.pipeline-zone-hint {
+    margin: auto;
+    color: var(--mud-palette-text-secondary);
+}
+
+.pipeline-can-drop { outline: 2px dashed var(--mud-palette-primary); outline-offset: -4px; }
+
+.pipeline-card { cursor: pointer; }

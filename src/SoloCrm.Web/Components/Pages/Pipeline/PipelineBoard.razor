@@ -1,0 +1,210 @@
+@page "/pipeline"
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Pipeline
+@using SoloCrm.Domain.Opportunities
+@implements IDisposable
+@inject IQueryHandler<GetPipelineBoard.Query, GetPipelineBoard.Result> BoardHandler
+@inject ICommandHandler<MoveOpportunity.Command, MoveOpportunity.Result> MoveHandler
+@inject QuickAddService QuickAdd
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Pipeline · SoloCRM</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+    <MudText Typo="Typo.h4">Pipeline</MudText>
+    <MudSpacer />
+    <MudSwitch T="bool" Value="_includeClosed" ValueChanged="OnIncludeClosedChanged" Color="Color.Primary"
+               Label="Abgeschlossene anzeigen" />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+               OnClick="QuickAdd.OpenOpportunityAsync">
+        Neue Anfrage
+    </MudButton>
+</MudStack>
+
+@if (_board is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudDropContainer @ref="_container" T="GetPipelineBoard.Card" Items="Cards" ItemDropped="OnDroppedAsync"
+                      ItemsSelector="@((card, zone) => card.StageId.ToString() == zone)"
+                      CanDropClass="pipeline-can-drop">
+        <ChildContent>
+            @* Won/lost zones stay visible above the scrolling columns, so they can be reached while dragging. *@
+            <div class="pipeline-closed">
+                @foreach (var column in _board.Columns.Where(c => c.Status != StageStatus.Open))
+                {
+                    <MudPaper Elevation="0" Outlined="true" Class="@($"pipeline-closed-zone pipeline-column-{column.Status.ToString().ToLowerInvariant()}")">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="px-3 pt-2">
+                            <MudIcon Icon="@(column.Status == StageStatus.Won ? Icons.Material.Filled.EmojiEvents : Icons.Material.Filled.DoNotDisturbOn)"
+                                     Size="Size.Small" Color="@(column.Status == StageStatus.Won ? Color.Success : Color.Error)" />
+                            <MudText Typo="Typo.subtitle1"><b class="pipeline-stage-name">@column.Name</b></MudText>
+                            @if (_includeClosed)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@column.Cards.Count</MudChip>
+                            }
+                            <MudSpacer />
+                            @if (column.EstimatedValueTotals.Count > 0)
+                            {
+                                <MudText Typo="Typo.caption">Σ @FormatTotals(column.EstimatedValueTotals)</MudText>
+                            }
+                        </MudStack>
+                        <MudDropZone T="GetPipelineBoard.Card" Identifier="@column.StageId.ToString()" Class="pipeline-zone pipeline-zone-closed">
+                            @if (!_includeClosed)
+                            {
+                                <MudText Typo="Typo.caption" Class="pipeline-zone-hint">Hierher ziehen</MudText>
+                            }
+                        </MudDropZone>
+                    </MudPaper>
+                }
+            </div>
+            <div class="pipeline-board">
+                @foreach (var column in _board.Columns.Where(c => c.Status == StageStatus.Open))
+                {
+                    <MudPaper Elevation="0" Outlined="true" Class="pipeline-column">
+                        <div class="pipeline-column-header">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                                <MudText Typo="Typo.subtitle1"><b class="pipeline-stage-name">@column.Name</b></MudText>
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Text">@column.Cards.Count</MudChip>
+                            </MudStack>
+                            @if (column.EstimatedValueTotals.Count > 0)
+                            {
+                                <MudText Typo="Typo.caption" Class="d-block">Σ @FormatTotals(column.EstimatedValueTotals)</MudText>
+                            }
+                            @if (column.MonthlyRecurringTotals.Count > 0)
+                            {
+                                <MudText Typo="Typo.caption" Class="d-block">MRR @FormatTotals(column.MonthlyRecurringTotals)/Monat</MudText>
+                            }
+                        </div>
+                        <MudDropZone T="GetPipelineBoard.Card" Identifier="@column.StageId.ToString()" Class="pipeline-zone" />
+                    </MudPaper>
+                }
+            </div>
+        </ChildContent>
+        <ItemRenderer>
+            <MudCard Elevation="1" Class="pipeline-card" @onclick="() => EditAsync(context.Id)">
+                <MudCardContent Class="pa-3">
+                    <MudText Typo="Typo.body1"><b>@context.Title</b></MudText>
+                    @if (context.ClientName is not null || context.AgencyName is not null)
+                    {
+                        <MudText Typo="Typo.body2">
+                            @context.ClientName
+                            @if (context.AgencyName is not null)
+                            {
+                                <span class="mud-text-secondary">@(context.ClientName is null ? "" : " · ")via @context.AgencyName</span>
+                            }
+                        </MudText>
+                    }
+                    @if (context.PricingDisplay is not null)
+                    {
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mt-1">
+                            <MudText Typo="Typo.body2">@context.PricingDisplay</MudText>
+                            @if (context.EstimatedValue is { } value)
+                            {
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">≈ @Currency.Format(decimal.Round(value, 0), context.Currency!)</MudText>
+                            }
+                        </MudStack>
+                    }
+                    @if (context.LostReason is { } reason)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Error">@Labels.For(reason)</MudText>
+                    }
+                </MudCardContent>
+            </MudCard>
+        </ItemRenderer>
+    </MudDropContainer>
+}
+
+@code {
+    private static readonly DialogOptions WideOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true };
+
+    private MudDropContainer<GetPipelineBoard.Card>? _container;
+    private GetPipelineBoard.Result? _board;
+    private bool _includeClosed;
+
+    private IEnumerable<GetPipelineBoard.Card> Cards => _board?.Columns.SelectMany(c => c.Cards) ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        QuickAdd.OpportunityCreated += OnOpportunityCreated;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await BoardHandler.Handle(new GetPipelineBoard.Query(_includeClosed), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        _board = result.Value;
+        StateHasChanged();
+        _container?.Refresh();
+    }
+
+    private async Task OnIncludeClosedChanged(bool includeClosed)
+    {
+        _includeClosed = includeClosed;
+        await LoadAsync();
+    }
+
+    private async Task OnDroppedAsync(MudItemDropInfo<GetPipelineBoard.Card> drop)
+    {
+        var card = drop.Item!;
+        if (!Guid.TryParse(drop.DropzoneIdentifier, out var stageId) || stageId == card.StageId)
+        {
+            return;
+        }
+
+        var column = _board!.Columns.Single(c => c.StageId == stageId);
+        LostReason? lostReason = null;
+        if (column.Status == StageStatus.Lost && card.LostReason is null)
+        {
+            var parameters = new DialogParameters<LostReasonDialog> { { d => d.Title, card.Title } };
+            var dialog = await DialogService.ShowAsync<LostReasonDialog>("Anfrage verloren", parameters,
+                new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true });
+            if (await dialog.Result is not { Canceled: false, Data: LostReason reason })
+            {
+                // Canceling puts the card back into its original column (US-08 AK1).
+                _container?.Refresh();
+                return;
+            }
+
+            lostReason = reason;
+        }
+
+        var result = await MoveHandler.Handle(new MoveOpportunity.Command(card.Id, stageId, lostReason), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+        }
+        else if (result.Value.Status != StageStatus.Open)
+        {
+            Snackbar.Add(result.Value.Status == StageStatus.Won ? $"„{card.Title}“ gewonnen." : $"„{card.Title}“ als verloren markiert.",
+                result.Value.Status == StageStatus.Won ? Severity.Success : Severity.Info);
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task EditAsync(Guid opportunityId)
+    {
+        var parameters = new DialogParameters<OpportunityDialog> { { d => d.OpportunityId, opportunityId } };
+        var dialog = await DialogService.ShowAsync<OpportunityDialog>("Anfrage bearbeiten", parameters, WideOptions);
+        if (await dialog.Result is { Canceled: false })
+        {
+            await LoadAsync();
+        }
+    }
+
+    private Task OnOpportunityCreated(Guid opportunityId) => InvokeAsync(LoadAsync);
+
+    private static string FormatTotals(IEnumerable<GetPipelineBoard.MoneyTotal> totals) =>
+        string.Join(" · ", totals.Select(t => Currency.Format(decimal.Round(t.Amount, 0), t.Currency)));
+
+    public void Dispose() => QuickAdd.OpportunityCreated -= OnOpportunityCreated;
+}

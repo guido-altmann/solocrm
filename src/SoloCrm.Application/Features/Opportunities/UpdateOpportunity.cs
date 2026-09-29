@@ -68,8 +68,7 @@ public static class UpdateOpportunity
                 return OpportunityErrors.StageNotFound;
             }
 
-            // Moving between lost stages keeps the existing reason.
-            if (stage.Status == StageStatus.Lost && command.LostReason is null && opportunity.Status != StageStatus.Lost)
+            if (command.LostReason is null && opportunity.RequiresLostReason(stage))
             {
                 return OpportunityErrors.LostReasonRequired;
             }

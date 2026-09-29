@@ -144,6 +144,16 @@ public sealed class Opportunity : ArchivableEntity, IAuditable, IHasExtraFields
         AddDomainEvent(new OpportunityStageChanged(Id, fromStageId, stage.Id, stage.Status));
     }
 
+    /// <summary>
+    /// Whether moving to <paramref name="stage"/> needs a new lost reason: the stage is lost and the
+    /// opportunity is not lost yet (between lost stages the existing reason is kept).
+    /// </summary>
+    public bool RequiresLostReason(Stage stage)
+    {
+        ArgumentNullException.ThrowIfNull(stage);
+        return stage.Status == StageStatus.Lost && Status != StageStatus.Lost;
+    }
+
     public decimal? EstimatedValue(ValuationSettings settings) =>
         OpportunityValuation.EstimatedValue(Pricing, Duration, Utilization, settings);
 

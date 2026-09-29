@@ -216,4 +216,17 @@ public sealed class OpportunityTests
         opportunity.ClearDomainEvents();
         return opportunity;
     }
+
+    [Fact]
+    public void RequiresLostReason_Stage_OnlyWhenNotLostYet()
+    {
+        var opportunity = CreateOpen();
+
+        opportunity.RequiresLostReason(_talks).Should().BeFalse();
+        opportunity.RequiresLostReason(_won).Should().BeFalse();
+        opportunity.RequiresLostReason(_lost).Should().BeTrue();
+
+        opportunity.ChangeStage(_lost, LostReason.Price, Now);
+        opportunity.RequiresLostReason(_lostToo).Should().BeFalse();
+    }
 }
