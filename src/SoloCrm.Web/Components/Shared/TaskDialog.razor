@@ -1,0 +1,118 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Tasks
+@using SoloCrm.Domain.Common
+@using SoloCrm.Domain.Tasks
+@inject ICommandHandler<CreateTask.Command, CreateTask.Result> CreateHandler
+@inject ICommandHandler<UpdateTask.Command, UpdateTask.Result> UpdateHandler
+@inject AppClock Clock
+
+@* Creates or edits a follow-up task (US-11 AK1). Without a preset link („Heute“) a link can be chosen. *@
+<form @onsubmit="SaveAsync">
+    <MudDialog>
+        <DialogContent>
+            <MudStack Spacing="2">
+                <MudTextField T="string" @bind-Value="_title" Label="Aufgabe" Immediate="true" AutoFocus="true" Required="true"
+                              MaxLength="@TaskItem.TitleMaxLength"
+                              Error="@_errors.Has(nameof(ITaskFields.Title))"
+                              ErrorText="@_errors.Text(nameof(ITaskFields.Title))" />
+                <MudDatePicker @bind-Date="_dueDate" Label="Fällig am" Clearable="true" Editable="true" DateFormat="dd.MM.yyyy"
+                               HelperText="leer = ohne Termin" />
+                <div class="d-flex flex-wrap gap-1">
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SetDue(0)">Heute</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SetDue(1)">Morgen</MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SetDue(7)">In einer Woche</MudChip>
+                </div>
+                @if (TaskId is null && LinkedTo is null)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mt-2">Bezug (optional)</MudText>
+                    <ContactAutocomplete @bind-Value="_contact" Label="Kontakt" />
+                    <OrganizationAutocomplete @bind-Value="_organization" Label="Organisation" Margin="Margin.Dense" />
+                    <OpportunityAutocomplete @bind-Value="_opportunity" Label="Anfrage" />
+                }
+                @if (_errors.General is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_errors.General</MudAlert>
+                }
+            </MudStack>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel" Disabled="_saving">Abbrechen</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving">
+                Speichern
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</form>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Edits this task; creates a new one when <c>null</c>.</summary>
+    [Parameter]
+    public Guid? TaskId { get; set; }
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public DateOnly? DueDate { get; set; }
+
+    /// <summary>Preset link of a detail view; <c>null</c> lets the user choose one.</summary>
+    [Parameter]
+    public LinkedRecords? LinkedTo { get; set; }
+
+    private readonly FormErrors _errors = new();
+    private string? _title;
+    private DateTime? _dueDate;
+    private ContactOption? _contact;
+    private OrganizationOption? _organization;
+    private RecordRef? _opportunity;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        _title = Title;
+        _dueDate = DueDate?.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private void SetDue(int daysFromToday) => _dueDate = Clock.Today.AddDays(daysFromToday).ToDateTime(TimeOnly.MinValue);
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            var dueDate = _dueDate is { } date ? DateOnly.FromDateTime(date) : (DateOnly?)null;
+            Result<Guid> result;
+            if (TaskId is { } id)
+            {
+                result = (await UpdateHandler.Handle(new UpdateTask.Command(id, _title, dueDate), CancellationToken.None))
+                    .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure);
+            }
+            else
+            {
+                var linkedTo = LinkedTo ?? new LinkedRecords(_contact?.Id, _organization?.Id, _opportunity?.Id);
+                result = (await CreateHandler.Handle(
+                        new CreateTask.Command(_title, dueDate, linkedTo.ContactId, linkedTo.OrganizationId, linkedTo.OpportunityId),
+                        CancellationToken.None))
+                    .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure);
+            }
+
+            if (result.IsSuccess)
+            {
+                MudDialog.Close(DialogResult.Ok(result.Value));
+                return;
+            }
+
+            _errors.Show(result.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

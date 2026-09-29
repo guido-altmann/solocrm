@@ -17,20 +17,6 @@ public enum QuickAddTarget
 /// </summary>
 public sealed class QuickAddService(IDialogService dialogService, ISnackbar snackbar, NavigationManager navigation)
 {
-    private static readonly DialogOptions Options = new()
-    {
-        MaxWidth = MaxWidth.Small,
-        FullWidth = true,
-        CloseOnEscapeKey = true,
-    };
-
-    private static readonly DialogOptions WideOptions = new()
-    {
-        MaxWidth = MaxWidth.Medium,
-        FullWidth = true,
-        CloseOnEscapeKey = true,
-    };
-
     private bool _isOpen;
 
     public event Func<Guid, Task>? ContactCreated;
@@ -84,7 +70,7 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
 
     public async Task OpenOpportunityAsync()
     {
-        if (await ShowAsync<OpportunityDialog>("Neue Anfrage", WideOptions) is { } id)
+        if (await ShowAsync<OpportunityDialog>("Neue Anfrage", DialogDefaults.Medium) is { } id)
         {
             snackbar.Add("Anfrage angelegt.", Severity.Success);
             await NotifyAsync(OpportunityCreated, id);
@@ -104,7 +90,7 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
         _isOpen = true;
         try
         {
-            var dialog = await dialogService.ShowAsync<TDialog>(title, options ?? Options);
+            var dialog = await dialogService.ShowAsync<TDialog>(title, options ?? DialogDefaults.Small);
             var result = await dialog.Result;
             return result is { Canceled: false, Data: Guid id } ? id : null;
         }

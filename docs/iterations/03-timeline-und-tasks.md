@@ -35,10 +35,10 @@
 - [ ] Quick-Add `N` in einer Detailansicht legt eine Notiz an (SPEC 3.2) – *folgt mit den Detailansichten (Schritt 5)*
 
 ## Schritt 3 – Tasks (US-11)
-- [ ] Use Cases `CreateTask`, `UpdateTask`, `CompleteTask`, `ReopenTask`, `DeleteTask`
-- [ ] Anlage aus der Detailansicht (Bezug vorbelegt) und aus „Heute“ (frei oder mit Bezug) (AK1)
-- [ ] Erledigen per Checkbox, danach Snackbar mit „Rückgängig“ für 5 s (AK2)
-- [ ] Offene Tasks eines Objekts in der Detailansicht; erledigte erscheinen in der Timeline
+- [x] Use Cases `CreateTask`, `UpdateTask`, `CompleteTask`, `ReopenTask`, `DeleteTask`
+- [ ] Anlage aus der Detailansicht (Bezug vorbelegt) und aus „Heute“ (frei oder mit Bezug) (AK1) – *Dialog steht, eingebunden in Schritt 5/6*
+- [x] Erledigen per Checkbox, danach Snackbar mit „Rückgängig“ für 5 s (AK2)
+- [ ] Offene Tasks eines Objekts in der Detailansicht; erledigte erscheinen in der Timeline – *`GetTasks`/`TaskList` stehen, eingebunden in Schritt 4/5*
 
 ## Schritt 4 – Timeline (Aggregation nach SPEC 2.5)
 - [ ] `GetTimeline(EntityType, EntityId, Before?, Limit)`: absteigend sortierter Strom aus Activities, Tasks (angelegt/erledigt) und AuditEntries; Paging per Cursor („Mehr laden“)

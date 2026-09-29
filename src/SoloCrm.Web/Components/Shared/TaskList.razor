@@ -1,0 +1,154 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Tasks
+@inject ICommandHandler<CompleteTask.Command, CompleteTask.Result> CompleteHandler
+@inject ICommandHandler<ReopenTask.Command, ReopenTask.Result> ReopenHandler
+@inject ICommandHandler<DeleteTask.Command, DeleteTask.Result> DeleteHandler
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AppClock Clock
+
+@* Open tasks with checkbox; completing saves at once and offers „Rückgängig“ for 5 s (US-11 AK2). *@
+@if (Tasks.Count == 0)
+{
+    @if (EmptyText is not null)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="py-1">@EmptyText</MudText>
+    }
+}
+else
+{
+    <MudList T="string" Dense="true" Class="task-list pa-0">
+        @foreach (var task in Tasks)
+        {
+            var overdue = task.IsOverdue(Clock.Today);
+            <MudListItem T="string" @key="task.Id" Class="task-item" data-task-id="@task.Id">
+                <div class="d-flex align-center gap-1">
+                    <MudCheckBox T="bool" Value="task.IsCompleted" ValueChanged="done => OnCheckedAsync(task, done)"
+                                 Size="Size.Small" Dense="true" aria-label="@($"„{task.Title}“ erledigen")" />
+                    <div class="flex-grow-1" style="min-width: 0;">
+                        <MudText Typo="Typo.body2" Class="task-title">@task.Title</MudText>
+                        <div class="d-flex flex-wrap gap-2">
+                            @if (task.DueDate is { } due)
+                            {
+                                <MudText Typo="Typo.caption" Color="@(overdue ? Color.Error : Color.Secondary)" Class="task-due">
+                                    <MudIcon Icon="@Icons.Material.Outlined.Event" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: -2px;" />
+                                    @Formats.DueDate(due, Clock.Today)
+                                </MudText>
+                            }
+                            @if (ShowLinks)
+                            {
+                                @if (task.Contact is { } contact)
+                                {
+                                    <MudLink Href="@Links.Contact(contact.Id)" Typo="Typo.caption">@contact.Name</MudLink>
+                                }
+                                @if (task.Organization is { } organization)
+                                {
+                                    <MudLink Href="@Links.Organization(organization.Id)" Typo="Typo.caption">@organization.Name</MudLink>
+                                }
+                                @if (task.Opportunity is { } opportunity)
+                                {
+                                    <MudLink Href="@Links.Opportunity(opportunity.Id)" Typo="Typo.caption">@opportunity.Name</MudLink>
+                                }
+                            }
+                        </div>
+                    </div>
+                    <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true" aria-label="Aktionen">
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Edit" OnClick="() => EditAsync(task)">Bearbeiten</MudMenuItem>
+                        <MudMenuItem Icon="@Icons.Material.Outlined.Delete" OnClick="() => DeleteAsync(task)">Löschen</MudMenuItem>
+                    </MudMenu>
+                </div>
+            </MudListItem>
+        }
+    </MudList>
+}
+
+@code {
+    public static readonly TimeSpan UndoDuration = TimeSpan.FromSeconds(5);
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TaskSummary> Tasks { get; set; } = [];
+
+    /// <summary>Shows the linked contact, organization and request (e.g. on „Heute“).</summary>
+    [Parameter]
+    public bool ShowLinks { get; set; }
+
+    [Parameter]
+    public string? EmptyText { get; set; }
+
+    /// <summary>Raised after completing, undoing, editing or deleting; the parent reloads its data.</summary>
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private async Task OnCheckedAsync(TaskSummary task, bool done)
+    {
+        if (!done)
+        {
+            return;
+        }
+
+        var result = await CompleteHandler.Handle(new CompleteTask.Command(task.Id), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add($"„{task.Title}“ erledigt.", Severity.Normal, config =>
+        {
+            config.Action = "Rückgängig";
+            config.ActionColor = Color.Primary;
+            config.VisibleStateDuration = (int)UndoDuration.TotalMilliseconds;
+            config.OnClick = _ => UndoAsync(task);
+        });
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task UndoAsync(TaskSummary task)
+    {
+        var result = await ReopenHandler.Handle(new ReopenTask.Command(task.Id), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        await InvokeAsync(() => OnChanged.InvokeAsync());
+    }
+
+    private async Task EditAsync(TaskSummary task)
+    {
+        var parameters = new DialogParameters<TaskDialog>
+        {
+            { d => d.TaskId, task.Id },
+            { d => d.Title, task.Title },
+            { d => d.DueDate, task.DueDate },
+        };
+        var dialog = await DialogService.ShowAsync<TaskDialog>("Aufgabe bearbeiten", parameters, DialogDefaults.Small);
+        if (await dialog.Result is { Canceled: false })
+        {
+            await OnChanged.InvokeAsync();
+        }
+    }
+
+    private async Task DeleteAsync(TaskSummary task)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Aufgabe löschen",
+            $"„{task.Title}“ endgültig löschen?",
+            yesText: "Löschen",
+            cancelText: "Abbrechen");
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        var result = await DeleteHandler.Handle(new DeleteTask.Command(task.Id), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        await OnChanged.InvokeAsync();
+    }
+}

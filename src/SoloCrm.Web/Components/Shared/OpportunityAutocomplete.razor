@@ -1,0 +1,46 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Opportunities
+@inject IQueryHandler<SearchOpportunities.Query, SearchOpportunities.Result> SearchHandler
+
+<MudAutocomplete T="RecordRef" Value="Value" ValueChanged="ValueChanged" Label="@Label"
+                 SearchFunc="SearchAsync" ToStringFunc="@(o => o?.Name)" Clearable="true" ResetValueOnEmptyText="true"
+                 DebounceInterval="200" MaxItems="null" Dense="true">
+    <ItemTemplate>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <span>@context.Name</span>
+            @if (_clients.TryGetValue(context.Id, out var client) && client is not null)
+            {
+                <MudText Typo="Typo.caption">@client</MudText>
+            }
+        </MudStack>
+    </ItemTemplate>
+</MudAutocomplete>
+
+@code {
+    private readonly Dictionary<Guid, string?> _clients = [];
+
+    [Parameter]
+    public RecordRef? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<RecordRef?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "Anfrage";
+
+    private async Task<IEnumerable<RecordRef>> SearchAsync(string? text, CancellationToken cancellationToken)
+    {
+        var result = await SearchHandler.Handle(new SearchOpportunities.Query(text), cancellationToken);
+        if (result.IsFailure)
+        {
+            return [];
+        }
+
+        foreach (var item in result.Value.Items)
+        {
+            _clients[item.Id] = item.ClientName;
+        }
+
+        return result.Value.Items.Select(i => new RecordRef(i.Id, i.Title));
+    }
+}
