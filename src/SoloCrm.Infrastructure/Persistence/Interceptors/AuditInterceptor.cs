@@ -57,21 +57,22 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
     {
         var entityType = entry.Metadata.ClrType.Name;
         var entityId = entry.Entity.Id;
-        var properties = FlattenProperties(entry).Where(p => !IgnoredProperties.Contains(p.Name));
+        var fields = Fields(entry).Where(f => !IgnoredProperties.Contains(f.Name));
 
         switch (entry.State)
         {
             case EntityState.Added:
-                var created = properties
-                    .Select(p => new AuditChange(p.Name, null, Format(p.Entry.CurrentValue)))
+                var created = fields
+                    .Select(f => new AuditChange(f.Name, null, Format(f.Current)))
                     .Where(c => c.New is not null && !IsDefaultNoise(c.New))
                     .ToList();
                 return new AuditEntry(entityType, entityId, AuditAction.Created, created, now);
 
             case EntityState.Modified:
-                var changes = properties
-                    .Where(p => p.Entry.IsModified)
-                    .Select(p => new AuditChange(p.Name, Format(p.Entry.OriginalValue), Format(p.Entry.CurrentValue)))
+                // Compared by value instead of IsModified: for a complex type that becomes null, EF reports
+                // unchanged CLR defaults (e.g. PricingModel.Hourly) as not modified.
+                var changes = fields
+                    .Select(f => new AuditChange(f.Name, Format(f.Original), Format(f.Current)))
                     .Where(c => c.Old != c.New)
                     .ToList();
                 if (changes.Count == 0)
@@ -85,8 +86,8 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
                 return new AuditEntry(entityType, entityId, action, changes, now);
 
             case EntityState.Deleted:
-                var deleted = properties
-                    .Select(p => new AuditChange(p.Name, Format(p.Entry.OriginalValue), null))
+                var deleted = fields
+                    .Select(f => new AuditChange(f.Name, Format(f.Original), null))
                     .Where(c => c.Old is not null)
                     .ToList();
                 return new AuditEntry(entityType, entityId, AuditAction.Deleted, deleted, now);
@@ -96,34 +97,49 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
         }
     }
 
-    private static IEnumerable<(string Name, PropertyEntry Entry)> FlattenProperties(EntityEntry entry)
+    private static IEnumerable<Field> Fields(EntityEntry entry)
     {
         foreach (var property in entry.Properties)
         {
-            yield return (property.Metadata.Name, property);
+            yield return new Field(property.Metadata.Name, property.OriginalValue, property.CurrentValue);
         }
 
+        if (!entry.ComplexProperties.Any())
+        {
+            yield break;
+        }
+
+        // ComplexPropertyEntry has no original value; the materialized original entity tells whether it was null.
+        var original = entry.State == EntityState.Added ? null : entry.OriginalValues.ToObject();
         foreach (var complex in entry.ComplexProperties)
         {
-            foreach (var nested in FlattenProperties(complex, complex.Metadata.Name))
+            var originalValue = original is null ? null : complex.Metadata.PropertyInfo?.GetValue(original);
+            foreach (var field in Fields(complex, complex.Metadata.Name, originalValue, complex.CurrentValue))
             {
-                yield return nested;
+                yield return field;
             }
         }
     }
 
-    private static IEnumerable<(string Name, PropertyEntry Entry)> FlattenProperties(ComplexPropertyEntry complex, string prefix)
+    /// <summary>
+    /// Members of a complex type that is <c>null</c> report CLR defaults in EF Core 10; they are recorded as <c>null</c>.
+    /// </summary>
+    private static IEnumerable<Field> Fields(ComplexPropertyEntry complex, string prefix, object? originalValue, object? currentValue)
     {
         foreach (var property in complex.Properties)
         {
-            yield return ($"{prefix}.{property.Metadata.Name}", property);
+            yield return new Field(
+                $"{prefix}.{property.Metadata.Name}",
+                originalValue is null ? null : property.OriginalValue,
+                currentValue is null ? null : property.CurrentValue);
         }
 
-        foreach (var nestedComplex in complex.ComplexProperties)
+        foreach (var nested in complex.ComplexProperties)
         {
-            foreach (var nested in FlattenProperties(nestedComplex, $"{prefix}.{nestedComplex.Metadata.Name}"))
+            var nestedOriginal = originalValue is null ? null : nested.Metadata.PropertyInfo?.GetValue(originalValue);
+            foreach (var field in Fields(nested, $"{prefix}.{nested.Metadata.Name}", nestedOriginal, nested.CurrentValue))
             {
-                yield return nested;
+                yield return field;
             }
         }
     }
@@ -145,4 +161,6 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
         IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
         _ => value.ToString(),
     };
+
+    private readonly record struct Field(string Name, object? Original, object? Current);
 }

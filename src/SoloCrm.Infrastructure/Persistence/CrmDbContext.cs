@@ -4,6 +4,7 @@ using SoloCrm.Application.Abstractions;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
+using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Settings;
 using SoloCrm.Infrastructure.Identity;
@@ -17,6 +18,10 @@ public class CrmDbContext(DbContextOptions options)
     public DbSet<Contact> Contacts => Set<Contact>();
 
     public DbSet<Organization> Organizations => Set<Organization>();
+
+    public DbSet<Opportunity> Opportunities => Set<Opportunity>();
+
+    public DbSet<Stage> Stages => Set<Stage>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 

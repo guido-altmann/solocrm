@@ -37,13 +37,13 @@
 - [x] `ArchiveContact`/`RestoreContact`; archivierte Kontakte erscheinen nicht in Liste und Suche (US-05 AK1)
 
 ## Schritt 4 – Opportunity-Domäne (ADR-011)
-- [ ] Value Objects `Pricing` und `Duration` (unveränderliche Records, Validierung per Factory: `Amount > 0`, `Value > 0`, ISO-4217-Code) + `Pricing.ToDisplayString()` („95 €/h“, „2.500 €/Monat“)
-- [ ] Enums `PricingModel`, `DurationUnit`, `LeadSource`, `LostReason`, `StageStatus`
-- [ ] Entität `Stage` + Seed der sechs Standard-Stages (SPEC 2.3) mit festen IDs in der Migration
-- [ ] Entität `Opportunity` (SPEC 2.3), FKs auf Client-/Agency-Organisation, Primary Contact und Stage; `Pricing`/`Duration` als nullable Complex Types
-- [ ] Domain-Service `OpportunityValuation`: `EstimatedValue` und `MonthlyRecurringValue` für alle vier Preismodelle, inkl. aller Regeln für fehlende Angaben
-- [ ] `Opportunity.ChangeStage(stage, lostReason, now)`: `Lost` erfordert einen Absagegrund, `Won`/`Lost` setzen `ClosedAt`; Event `OpportunityStageChanged`; Wiedereröffnen (Wechsel von `Won`/`Lost` auf eine offene Stage) ist erlaubt und leert `ClosedAt` und `LostReason`
-- [ ] Früh verifizieren: Nullable Complex Types mit EF Core 10 + Npgsql (Migration, Speichern, Laden, `null`). Bei Problemen: Fallback laut ADR-011 und ADR aktualisieren
+- [x] Value Objects `Pricing` und `Duration` (unveränderliche Records, Validierung per Factory: `Amount > 0`, `Value > 0`, ISO-4217-Code) + `Pricing.ToDisplayString()` („95 €/h“, „2.500 €/Monat“)
+- [x] Enums `PricingModel`, `DurationUnit`, `LeadSource`, `LostReason`, `StageStatus`
+- [x] Entität `Stage` + Seed der sechs Standard-Stages (SPEC 2.3) mit festen IDs in der Migration
+- [x] Entität `Opportunity` (SPEC 2.3), FKs auf Client-/Agency-Organisation, Primary Contact und Stage; `Pricing`/`Duration` als nullable Complex Types
+- [x] Domain-Service `OpportunityValuation`: `EstimatedValue` und `MonthlyRecurringValue` für alle vier Preismodelle, inkl. aller Regeln für fehlende Angaben
+- [x] `Opportunity.ChangeStage(stage, lostReason, now)`: `Lost` erfordert einen Absagegrund, `Won`/`Lost` setzen `ClosedAt`; Event `OpportunityStageChanged`; Wiedereröffnen (Wechsel von `Won`/`Lost` auf eine offene Stage) ist erlaubt und leert `ClosedAt` und `LostReason`
+- [x] Früh verifizieren: Nullable Complex Types mit EF Core 10 + Npgsql (Migration, Speichern, Laden, `null`). Bei Problemen: Fallback laut ADR-011 und ADR aktualisieren
 
 ## Schritt 5 – Anfragen erfassen (US-06)
 - [ ] Use Cases `CreateOpportunity`, `UpdateOpportunity`, `GetOpportunity`, `ArchiveOpportunity`/`RestoreOpportunity`
@@ -87,6 +87,8 @@
 6. **„Archivierte anzeigen“** blendet archivierte Einträge zusätzlich ein (mit Chip „Archiviert“), statt nur sie zu zeigen.
 7. **Quick-Add kontextabhängig:** `N` und der Plus-Button der App-Leiste legen auf `/organizations` eine Organisation an, sonst einen Kontakt (ab Schritt 5 auf `/pipeline` eine Anfrage).
 8. **Ein Kontakt-Dialog für Anlegen und Bearbeiten:** Der Quick-Add-Dialog zeigt Name, E-Mail und Organisation; weitere Felder sind hinter „Weitere Angaben“ eingeklappt. `CreateContact` akzeptiert ebenfalls Organisation („Neu anlegen“ inklusive) und Quelle. Die Listensuche umfasst zusätzlich den Firmennamen.
+9. **Neue Anfragen starten in einer offenen Stage.** Der Status einer Anfrage wird aus `ClosedAt`/`LostReason` abgeleitet. Beim Wechsel zwischen zwei Lost-Stages bleiben `ClosedAt` und der Absagegrund erhalten, bei Won → Lost ist ein neuer Grund Pflicht. Die Auslastung wird bei Festpreis und Retainer geleert.
+10. **Nullable Complex Types verifiziert** (EF Core 10.0.12 + Npgsql 10.0.3): Migration, Speichern, Laden und `null` funktionieren. Zwei Stolpersteine: (a) Properties ohne Setter werden nicht gemappt (Lösung: `private init`), (b) bei einem `null`-Complex-Type meldet der ChangeTracker für die inneren Properties CLR-Defaults (`0`, `Hourly`), und `ComplexPropertyEntry` hat kein `OriginalValue`. Der `AuditInterceptor` ermittelt die ursprüngliche Null-Belegung deshalb über `OriginalValues.ToObject()` und vergleicht Werte statt `IsModified`.
 
 ## Definition of Done
 - CI grün (Build + alle Tests); `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet

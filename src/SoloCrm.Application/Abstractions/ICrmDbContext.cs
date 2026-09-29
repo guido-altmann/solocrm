@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Domain.Contacts;
+using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Application.Abstractions;
@@ -12,6 +13,10 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
     DbSet<Contact> Contacts { get; }
 
     DbSet<Organization> Organizations { get; }
+
+    DbSet<Opportunity> Opportunities { get; }
+
+    DbSet<Stage> Stages { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
