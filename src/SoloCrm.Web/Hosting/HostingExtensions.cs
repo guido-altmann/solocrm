@@ -2,11 +2,12 @@ using System.Net;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using SoloCrm.Infrastructure.Persistence;
 
 namespace SoloCrm.Web.Hosting;
 
-internal static class HostingExtensions
+internal static partial class HostingExtensions
 {
     private const string ReadyTag = "ready";
 
@@ -78,4 +79,31 @@ internal static class HostingExtensions
 
         return endpoints;
     }
+
+    /// <summary>
+    /// Development only: applies pending EF Core migrations before the app starts, so a pulled schema change
+    /// needs no manual <c>dotnet ef database update</c>. Production migrates via <c>efbundle</c> in the
+    /// container entrypoint (ADR-009).
+    /// </summary>
+    public static async Task MigrateDatabaseInDevelopmentAsync(this WebApplication app)
+    {
+        if (!app.Environment.IsDevelopment())
+        {
+            return;
+        }
+
+        var factory = app.Services.GetRequiredService<IDbContextFactory<CrmDbContext>>();
+        await using var db = await factory.CreateDbContextAsync();
+        var pending = (await db.Database.GetPendingMigrationsAsync()).ToList();
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
+        LogApplyingMigrations(app.Logger, pending.Count, string.Join(", ", pending));
+        await db.Database.MigrateAsync();
+    }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Development: applying {Count} pending migration(s): {Migrations}")]
+    private static partial void LogApplyingMigrations(ILogger logger, int count, string migrations);
 }

@@ -72,6 +72,9 @@ try
 
     var app = builder.Build();
 
+    // Before the hosted services (admin seeding) start, which already need the schema.
+    await app.MigrateDatabaseInDevelopmentAsync();
+
     // Must run first so scheme, host and client IP reflect the original request behind Traefik.
     app.UseForwardedHeaders();
 

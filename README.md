@@ -38,9 +38,9 @@ Voraussetzungen: .NET SDK 10 (siehe `global.json`), Docker.
 # 1. Postgres starten
 docker compose -f deploy/docker-compose.dev.yml up -d
 
-# 2. Datenbank migrieren (dotnet-ef ist als lokales Tool gepinnt)
+# 2. Tools wiederherstellen (dotnet-ef ist als lokales Tool gepinnt).
+#    Die Datenbank migriert die App im Development-Modus beim Start selbst.
 dotnet tool restore
-dotnet ef database update -p src/SoloCrm.Infrastructure -s src/SoloCrm.Web
 
 # 3. Admin-Zugang festlegen (wird beim ersten Start angelegt)
 dotnet user-secrets set "Admin:Email" "you@example.com" --project src/SoloCrm.Web
