@@ -1,0 +1,182 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Activities
+@using SoloCrm.Domain.Activities
+@using SoloCrm.Domain.Common
+@inject ICommandHandler<LogActivity.Command, LogActivity.Result> LogHandler
+@inject AppClock Clock
+
+@* Input at the top of the timeline (SPEC 3.1 no. 5, US-10 AK1). Ctrl/Cmd+Enter saves. *@
+<MudPaper Outlined="true" Class="pa-3 activity-composer">
+    <MudChipSet T="ActivityType" SelectedValue="_type" SelectedValueChanged="OnTypeChanged"
+                SelectionMode="SelectionMode.SingleSelection" CheckMark="false" Size="Size.Small">
+        @foreach (var type in Enum.GetValues<ActivityType>())
+        {
+            <MudChip T="ActivityType" Value="type" Icon="@Labels.IconFor(type)" Text="@Labels.For(type)"
+                     Variant="Variant.Text" SelectedColor="Color.Primary" data-type="@type" />
+        }
+    </MudChipSet>
+
+    <MudTextField @ref="_bodyField" T="string" @bind-Value="_body" Placeholder="@Placeholder" Lines="3" MaxLines="12"
+                  Variant="Variant.Outlined" Immediate="true" Class="mt-2" OnKeyDown="OnBodyKeyDown"
+                  HelperText="Markdown möglich · Strg+Enter speichert" aria-label="Text der Aktivität"
+                  Error="@_errors.Has(nameof(LogActivity.Command.Body))"
+                  ErrorText="@_errors.Text(nameof(LogActivity.Command.Body))" />
+
+    <MudGrid Spacing="2" Class="mt-1">
+        <MudItem xs="12" sm="6">
+            <MudTextField T="string" @bind-Value="_subject" Label="Betreff (optional)" Margin="Margin.Dense"
+                          MaxLength="@Activity.SubjectMaxLength"
+                          Error="@_errors.Has(nameof(LogActivity.Command.Subject))"
+                          ErrorText="@_errors.Text(nameof(LogActivity.Command.Subject))" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudDatePicker @bind-Date="_date" Label="Datum" Placeholder="Heute" Clearable="true" Margin="Margin.Dense" Editable="true"
+                           DateFormat="dd.MM.yyyy" MaxDate="@Clock.Now.Date"
+                           Error="@_errors.Has(nameof(LogActivity.Command.OccurredAt))"
+                           ErrorText="@_errors.Text(nameof(LogActivity.Command.OccurredAt))" />
+        </MudItem>
+        <MudItem xs="6" sm="3">
+            <MudTimePicker @bind-Time="_time" Label="Uhrzeit" Placeholder="Jetzt" Clearable="true" Margin="Margin.Dense" Editable="true"
+                           AmPm="false" />
+        </MudItem>
+    </MudGrid>
+
+    @if (ExtraLinks.Count > 0)
+    {
+        <div class="d-flex flex-wrap gap-2 mt-1">
+            @foreach (var link in ExtraLinks)
+            {
+                <MudCheckBox T="bool" Value="_selectedExtraLinks.Contains(link)" Dense="true" Size="Size.Small"
+                             ValueChanged="selected => ToggleExtraLink(link, selected)" Label="@link.Label" />
+            }
+        </div>
+    }
+
+    @if (_errors.General is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_errors.General</MudAlert>
+    }
+
+    <div class="d-flex justify-end mt-2">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Disabled="_saving"
+                   StartIcon="@Icons.Material.Filled.Send" OnClick="SaveAsync">
+            @Labels.For(_type) speichern
+        </MudButton>
+    </div>
+</MudPaper>
+
+@code {
+    /// <summary>The record(s) of the current detail view; always part of the activity.</summary>
+    [Parameter, EditorRequired]
+    public LinkedRecords LinkedTo { get; set; } = LinkedRecords.None;
+
+    /// <summary>Optional additional records, e.g. primary contact and client of an opportunity.</summary>
+    [Parameter]
+    public IReadOnlyList<ActivityLinkOption> ExtraLinks { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<Guid> OnLogged { get; set; }
+
+    private readonly FormErrors _errors = new();
+    private readonly HashSet<ActivityLinkOption> _selectedExtraLinks = [];
+    private MudTextField<string>? _bodyField;
+    private ActivityType _type = ActivityType.Note;
+    private string? _body;
+    private string? _subject;
+    private DateTime? _date;
+    private TimeSpan? _time;
+    private bool _saving;
+
+    private string Placeholder => _type == ActivityType.Note ? "Notiz hinzufügen…" : $"{Labels.For(_type)} festhalten…";
+
+    /// <summary>Focuses the text input (quick-add <c>N</c> on a detail view).</summary>
+    public async Task FocusAsync()
+    {
+        if (_bodyField is not null)
+        {
+            await _bodyField.FocusAsync();
+        }
+    }
+
+    private void OnTypeChanged(ActivityType type) => _type = type;
+
+    private void ToggleExtraLink(ActivityLinkOption link, bool selected)
+    {
+        if (selected)
+        {
+            _selectedExtraLinks.Add(link);
+        }
+        else
+        {
+            _selectedExtraLinks.Remove(link);
+        }
+    }
+
+    private async Task OnBodyKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && (e.CtrlKey || e.MetaKey))
+        {
+            await SaveAsync();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_saving)
+        {
+            return;
+        }
+
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            var linkedTo = _selectedExtraLinks.Aggregate(LinkedTo, (links, extra) => links with
+            {
+                ContactId = links.ContactId ?? extra.ContactId,
+                OrganizationId = links.OrganizationId ?? extra.OrganizationId,
+            });
+
+            var command = new LogActivity.Command(
+                _type,
+                _body,
+                _subject,
+                OccurredAt(),
+                linkedTo.ContactId,
+                linkedTo.OrganizationId,
+                linkedTo.OpportunityId);
+
+            var result = await LogHandler.Handle(command, CancellationToken.None);
+            if (result.IsFailure)
+            {
+                _errors.Show(result.Error);
+                return;
+            }
+
+            (_body, _subject, _date, _time) = (null, null, null, null);
+            _selectedExtraLinks.Clear();
+            await OnLogged.InvokeAsync(result.Value.Id);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    /// <summary>
+    /// Empty date and time mean now (the server's clock). A past date without time is recorded at noon,
+    /// a time without date refers to today.
+    /// </summary>
+    private DateTimeOffset? OccurredAt()
+    {
+        if (_date is null && _time is null)
+        {
+            return null;
+        }
+
+        var today = Clock.Now.Date;
+        var date = _date?.Date ?? today;
+        var time = _time ?? (date == today ? Clock.Now.TimeOfDay : TimeSpan.FromHours(12));
+        return Clock.FromLocal(date + time);
+    }
+}

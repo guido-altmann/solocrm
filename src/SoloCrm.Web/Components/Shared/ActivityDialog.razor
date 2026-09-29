@@ -1,0 +1,109 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Activities
+@using SoloCrm.Domain.Activities
+@inject ICommandHandler<UpdateActivity.Command, UpdateActivity.Result> UpdateHandler
+@inject AppClock Clock
+
+@* Edits an activity (iteration 3, decision 3); the linked records stay unchanged. *@
+<form @onsubmit="SaveAsync">
+    <MudDialog>
+        <DialogContent>
+            <MudStack Spacing="2">
+                <MudSelect T="ActivityType" @bind-Value="_type" Label="Art"
+                           Error="@_errors.Has(nameof(UpdateActivity.Command.Type))"
+                           ErrorText="@_errors.Text(nameof(UpdateActivity.Command.Type))">
+                    @foreach (var type in Enum.GetValues<ActivityType>())
+                    {
+                        <MudSelectItem T="ActivityType" Value="type">@Labels.For(type)</MudSelectItem>
+                    }
+                </MudSelect>
+                <div class="d-flex gap-2">
+                    <MudDatePicker @bind-Date="_date" Label="Datum" Editable="true" DateFormat="dd.MM.yyyy" MaxDate="@Clock.Now.Date"
+                                   Error="@_errors.Has(nameof(UpdateActivity.Command.OccurredAt))"
+                                   ErrorText="@_errors.Text(nameof(UpdateActivity.Command.OccurredAt))" />
+                    <MudTimePicker @bind-Time="_time" Label="Uhrzeit" AmPm="false" Editable="true" />
+                </div>
+                <MudTextField T="string" @bind-Value="_subject" Label="Betreff (optional)" Immediate="true"
+                              MaxLength="@Activity.SubjectMaxLength"
+                              Error="@_errors.Has(nameof(UpdateActivity.Command.Subject))"
+                              ErrorText="@_errors.Text(nameof(UpdateActivity.Command.Subject))" />
+                <MudTextField T="string" @bind-Value="_body" Label="Text" Lines="6" MaxLines="20" Immediate="true"
+                              Variant="Variant.Outlined" AutoFocus="true" HelperText="Markdown möglich"
+                              Error="@_errors.Has(nameof(UpdateActivity.Command.Body))"
+                              ErrorText="@_errors.Text(nameof(UpdateActivity.Command.Body))" />
+                @if (_errors.General is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_errors.General</MudAlert>
+                }
+            </MudStack>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel" Disabled="_saving">Abbrechen</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving">
+                Speichern
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</form>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Guid ActivityId { get; set; }
+
+    [Parameter]
+    public ActivityType Type { get; set; }
+
+    /// <summary>In the configured time zone.</summary>
+    [Parameter]
+    public DateTimeOffset OccurredAt { get; set; }
+
+    [Parameter]
+    public string? Subject { get; set; }
+
+    [Parameter]
+    public string? Body { get; set; }
+
+    private readonly FormErrors _errors = new();
+    private ActivityType _type;
+    private DateTime? _date;
+    private TimeSpan? _time;
+    private string? _subject;
+    private string? _body;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        var local = Clock.ToLocal(OccurredAt);
+        (_type, _date, _time, _subject, _body) = (Type, local.Date, local.TimeOfDay, Subject, Body);
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            DateTimeOffset? occurredAt = _date is { } date ? Clock.FromLocal(date.Date + (_time ?? TimeSpan.Zero)) : null;
+            var result = await UpdateHandler.Handle(
+                new UpdateActivity.Command(ActivityId, _type, occurredAt, _subject, _body),
+                CancellationToken.None);
+
+            if (result.IsSuccess)
+            {
+                MudDialog.Close(DialogResult.Ok(result.Value.Id));
+                return;
+            }
+
+            _errors.Show(result.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

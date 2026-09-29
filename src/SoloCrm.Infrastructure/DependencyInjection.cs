@@ -21,6 +21,8 @@ public static class DependencyInjection
         }
 
         services.TryAddSingleton(TimeProvider.System);
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById(configuration["App:TimeZone"] is { Length: > 0 } id ? id : AppClock.DefaultTimeZoneId);
+        services.AddSingleton(sp => new AppClock(sp.GetRequiredService<TimeProvider>(), timeZone));
         services.AddSingleton<TimestampInterceptor>();
         services.AddSingleton<AuditInterceptor>();
         services.AddSingleton<OutboxInterceptor>();

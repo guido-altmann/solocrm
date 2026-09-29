@@ -1,3 +1,4 @@
+using SoloCrm.Domain.Activities;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
@@ -78,5 +79,23 @@ public static class Labels
         StageStatus.Open => "Offen",
         StageStatus.Won => "Gewonnen",
         _ => "Verloren",
+    };
+
+    public static string For(ActivityType type) => type switch
+    {
+        ActivityType.Note => "Notiz",
+        ActivityType.Call => "Anruf",
+        ActivityType.Meeting => "Meeting",
+        ActivityType.Email => "E-Mail",
+        _ => "Bewerbung",
+    };
+
+    public static string IconFor(ActivityType type) => type switch
+    {
+        ActivityType.Note => MudBlazor.Icons.Material.Outlined.StickyNote2,
+        ActivityType.Call => MudBlazor.Icons.Material.Outlined.Phone,
+        ActivityType.Meeting => MudBlazor.Icons.Material.Outlined.Groups,
+        ActivityType.Email => MudBlazor.Icons.Material.Outlined.Email,
+        _ => MudBlazor.Icons.Material.Outlined.Send,
     };
 }

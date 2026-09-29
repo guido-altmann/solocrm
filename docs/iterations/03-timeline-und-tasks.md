@@ -28,11 +28,11 @@
 - [x] Migration (additiv, siehe ADR-009)
 
 ## Schritt 2 – Activities erfassen (US-10)
-- [ ] Use Cases `LogActivity`, `UpdateActivity`, `DeleteActivity` (hartes Löschen mit AuditEntry, Entscheidung 3)
-- [ ] `Markdig` über `Directory.Packages.props` einbinden; Body als Markdown rendern (Roh-HTML deaktiviert, siehe Entscheidung 1)
-- [ ] Eingabe oben in der Timeline: „Notiz hinzufügen…“ mit Typ-Auswahl, Betreff optional, `OccurredAt` mit Default „jetzt“ und rückdatierbar (AK1)
-- [ ] Bezug automatisch aus dem Kontext (Detailansicht); bei Anfragen optional zusätzlich Kontakt/Organisation
-- [ ] Quick-Add `N` in einer Detailansicht legt eine Notiz an (SPEC 3.2)
+- [x] Use Cases `LogActivity`, `UpdateActivity`, `DeleteActivity` (hartes Löschen mit AuditEntry, Entscheidung 3)
+- [x] `Markdig` über `Directory.Packages.props` einbinden; Body als Markdown rendern (Roh-HTML deaktiviert, siehe Entscheidung 1)
+- [x] Eingabe oben in der Timeline: „Notiz hinzufügen…“ mit Typ-Auswahl, Betreff optional, `OccurredAt` mit Default „jetzt“ und rückdatierbar (AK1)
+- [x] Bezug automatisch aus dem Kontext (Detailansicht); bei Anfragen optional zusätzlich Kontakt/Organisation
+- [ ] Quick-Add `N` in einer Detailansicht legt eine Notiz an (SPEC 3.2) – *folgt mit den Detailansichten (Schritt 5)*
 
 ## Schritt 3 – Tasks (US-11)
 - [ ] Use Cases `CreateTask`, `UpdateTask`, `CompleteTask`, `ReopenTask`, `DeleteTask`
