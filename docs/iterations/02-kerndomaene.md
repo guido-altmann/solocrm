@@ -72,9 +72,9 @@
 - [x] bUnit: Anfrage-Dialog (dynamisches Label, Auslastung ein-/ausgeblendet, Live-Wert), Absagegrund-Dialog
 
 ## Schritt 9 – Abschluss
-- [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009)
-- [ ] ADR-011: Erfahrungen mit nullable Complex Types dokumentieren
-- [ ] README-Stand und Screenshot (Pipeline) aktualisieren
+- [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – *erzeugt und lokal verifiziert (Dev-DB mit Bestandskontakten migriert, Daten unverändert; `efbundle` aus dem Docker-Image migriert eine leere DB vollständig). Offen: Push und Deployment in Produktion (Guido).*
+- [x] ADR-011: Erfahrungen mit nullable Complex Types dokumentieren
+- [x] README-Stand und Screenshot (Pipeline) aktualisieren
 
 ## Entscheidungen (2026-09-28)
 1. **Outbox-Schreiben vorgezogen:** `OutboxMessage` + `OutboxInterceptor` entstehen in It. 2, damit `OpportunityStageChanged` (US-07 AK1) und die übrigen Events nicht verloren gehen. Verarbeitung und Webhooks bleiben in It. 5.

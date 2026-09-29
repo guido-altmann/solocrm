@@ -24,3 +24,11 @@ Anfragen werden mit unterschiedlichen Preismodellen angeboten: Stundensatz (Stan
 - Leichter: neue Preismodelle ergänzen (Enum + Formel + Tests), Anzeigeformatierung zentral (`Pricing.ToDisplayString()`).
 - Schwerer: Nullable Complex Types im Walking Skeleton / Iteration 2 früh verifizieren. Falls Probleme auftreten, Fallback auf Owned Entities (Option B) und diesen ADR aktualisieren.
 - Später prüfen: Währungsumrechnung, Satz-Varianten (Remote/Vor-Ort).
+
+## Erfahrungen (Iteration 2, 2026-09-29)
+Verifiziert mit EF Core 10.0.12 und Npgsql 10.0.3: Nullable Complex Types funktionieren für Migration, Speichern, Laden, `null` und den Wechsel zwischen Wert und `null` (Integrationstests `OpportunityPersistenceTests`). Der Fallback auf Owned Entities ist **nicht** nötig. Die Spalten liegen wie geplant in `opportunities` (`pricing_model`, `pricing_amount`, `pricing_currency`, `duration_value`, `duration_unit`, alle nullable) und werden zusätzlich durch Check-Constraints (`pricing_amount > 0`, `duration_value > 0`) abgesichert.
+
+Stolpersteine:
+- **Nur mappbare Properties:** Reine Getter (`{ get; }`) werden per Konvention nicht gemappt; die Konstruktorbindung scheitert dann. Lösung: `{ get; private init; }` – die Records bleiben nach außen unveränderlich.
+- **Change Tracking bei `null`:** Ist der Complex Type `null`, liefert der ChangeTracker für die inneren Properties CLR-Defaults (`0`, `PricingModel.Hourly`, `DurationUnit.Days`) statt `null`. `IsModified` ist dann für Properties mit unverändertem Default `false`, und `ComplexPropertyEntry` besitzt kein `OriginalValue`. Der `AuditInterceptor` ermittelt die ursprüngliche Null-Belegung deshalb über `entry.OriginalValues.ToObject()` und vergleicht die formatierten Werte, statt sich auf `IsModified` zu verlassen. Mitglieder eines `null`-Complex-Types werden im Audit als `null` protokolliert (Feldnamen `Pricing.Amount` usw.).
+- **Anzeige unabhängig von ICU:** `Pricing.ToDisplayString()` formatiert mit einer festen deutschen `NumberFormatInfo`; die ISO-4217-Prüfung nutzt eine feste Code-Liste statt Kulturdaten. So sind Tests und Container-Ausgabe identisch.
