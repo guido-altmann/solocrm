@@ -68,10 +68,10 @@
 - [x] Abschnitt „Heute“: Schwellwert „eingeschlafen“ in Tagen (`UpdateTodaySettings`) (US-12 AK2)
 
 ## Schritt 8 – Tests
-- [ ] Unit-Tests `Activity` (mindestens ein Bezug, Event), `TaskItem` (Complete/Reopen, Event, Überfällig-Logik)
-- [ ] Handler-Tests (Happy Path + Validierungsfehler) für alle neuen Use Cases
-- [ ] Integrationstests: Timeline-Aggregation je Objekttyp, Audit-Filter und Formatierung, Cursor-Paging, eingeschlafene Anfragen (Grenzfälle: keine Activity, genau N Tage, archiviert, geschlossen), Outbox-Events `activity.logged`/`task.completed`/`task.reopened`
-- [ ] bUnit: Timeline-Eingabe (Typ, Rückdatieren), Task-Checkbox mit Undo, Heute-Abschnitte
+- [x] Unit-Tests `Activity` (mindestens ein Bezug, Event), `TaskItem` (Complete/Reopen, Event, Überfällig-Logik)
+- [x] Handler-Tests (Happy Path + Validierungsfehler) für alle neuen Use Cases
+- [x] Integrationstests: Timeline-Aggregation je Objekttyp, Audit-Filter und Formatierung, Cursor-Paging, eingeschlafene Anfragen (Grenzfälle: keine Activity, genau N Tage, archiviert, geschlossen), Outbox-Events `activity.logged`/`task.completed`/`task.reopened`
+- [x] bUnit: Timeline-Eingabe (Typ, Rückdatieren), Task-Checkbox mit Undo, Heute-Abschnitte
 
 ## Schritt 9 – Abschluss
 - [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009)
