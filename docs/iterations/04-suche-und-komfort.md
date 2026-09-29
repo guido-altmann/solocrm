@@ -32,7 +32,7 @@
 - [ ] `Search(Text, Limit)`: Treffer über Kontakte (Name, E-Mail, Firma), Organisationen und Anfragen (Titel); Ranking kombiniert `ts_rank` und `similarity` (ADR-007); ab 2 Zeichen; Archivierte ausgeschlossen (US-05 AK1)
 - [ ] Tippfehlertoleranz: „Schmitt“ findet „Schmidt“ (AK3); Schwellwert für `similarity` festlegen und begründen
 - [ ] Firma bei Kontakten: Treffer über den Namen der zugeordneten Organisation (per Join, keine denormalisierte Spalte)
-- [ ] Listen- und Autocomplete-Suche (`GetContacts`, `GetOrganizations`, `SearchOrganizations`, `SearchOpportunities`) auf dieselbe Suche umstellen (siehe offene Frage 1)
+- [ ] Listen- und Autocomplete-Suche (`GetContacts`, `GetOrganizations`, `SearchOrganizations`, `SearchOpportunities`) auf dieselbe Suche umstellen (Entscheidung 1)
 - [ ] Integrationstest: Relevanz-Reihenfolge, Tippfehler, Archivierte, Laufzeit < 200 ms bei 10k Kontakten (NFR Kap. 6, `LargeDataset` aus It. 3 wiederverwenden)
 
 ## Schritt 3 – Command Palette (US-13)
@@ -46,20 +46,20 @@
 - [ ] `keyboard.js` um Sequenzen erweitern: `G` dann `H`/`P`/`K`/`O` (Zeitfenster z. B. 1 s)
 - [ ] `Ctrl/Cmd + K` global, auch in Eingabefeldern; alle übrigen Kürzel nur außerhalb von Eingabefeldern und Dialogen (wie `N`)
 - [ ] `Esc` bricht Inline-Edit ab und schließt Dialoge/Palette (einheitlich prüfen)
-- [ ] Übersicht der Tastenkürzel (siehe offene Frage 5)
+- [ ] Übersicht der Tastenkürzel per `?` als kleiner, statischer Dialog (Entscheidung 5)
 
 ## Schritt 5 – Tags: Domäne und Verwaltung (US-15)
-- [ ] Entität `Tag` (SPEC 2.3): `Name` (eindeutig, case-insensitive), `Color` (Hex); drei typisierte Join-Tabellen `contact_tags`, `organization_tags`, `opportunity_tags` (ADR-005), FKs mit `ON DELETE CASCADE`
-- [ ] Use Cases `CreateTag`, `RenameTag`, `ChangeTagColor`, `DeleteTag`, `GetTags` (mit Anzahl Zuordnungen), `SearchTags` (Autocomplete)
+- [ ] Entität `Tag` (SPEC 2.3): `Name` (eindeutig, case-insensitive), `Color` aus einer festen Palette mit geprüftem Kontrast, neue Tags bekommen reihum die nächste Farbe (Entscheidung 7); drei typisierte Join-Tabellen `contact_tags`, `organization_tags`, `opportunity_tags` (ADR-005), FKs mit `ON DELETE CASCADE`
+- [ ] Use Cases `CreateTag`, `RenameTag`, `ChangeTagColor` (Auswahl aus der Palette), `DeleteTag`, `GetTags` (mit Anzahl Zuordnungen), `SearchTags` (Autocomplete)
 - [ ] Zuordnen/Entfernen: `AssignTag`/`RemoveTag` je Objekttyp oder ein gemeinsamer Use Case mit `TimelineRecordType`
 - [ ] Abschnitt „Tags“ in `/settings`: umbenennen, Farbe ändern, löschen (mit Hinweis auf Anzahl Zuordnungen)
-- [ ] Audit: Tag-Zuordnungen protokollieren oder nicht (siehe offene Frage 3)
+- [ ] Audit: Tag-Zuordnungen werden auditiert (hinzugefügt/entfernt), erscheinen aber nicht in der Timeline (Entscheidung 3)
 - [ ] Migration (additiv)
 
 ## Schritt 6 – Tags: Oberfläche (US-15, US-04 AK2)
 - [ ] Chip-Eingabe in allen drei Detailansichten: Autocomplete auf bestehende Tags, „Neu anlegen: <Eingabe>“ legt den Tag inline an (AK1)
 - [ ] Tags als farbige Chips in den Listen (Kontakte, Organisationen) und auf Pipeline-Karten
-- [ ] Filter nach Tag in `/contacts` und `/organizations` (US-04 AK2), optional auf der Pipeline (siehe offene Frage 4)
+- [ ] Filter nach Tag in `/contacts` und `/organizations` (US-04 AK2): mehrere Tags, ODER-verknüpft; kein Pipeline-Filter (Entscheidung 4)
 - [ ] Kontrast der Tag-Farben im Hell- und Dunkelmodus prüfen (NFR Barrierearmut)
 
 ## Schritt 7 – Inline-Editing (US-14)
@@ -67,8 +67,8 @@
 - [ ] Klick auf ein Feld (oder `Enter`/`F2` per Tastatur) → Bearbeiten → `Enter`/Blur speichert, `Esc` bricht ab (SPEC 3.1 Nr. 3)
 - [ ] Validierung und Fehlermeldung am Feld; Fehler aus den bestehenden Validatoren und `…Errors.FieldOf` nutzen (AK1)
 - [ ] Anfrage: zusammengesetzte Felder als Gruppe bearbeiten (Preis = Modell + Betrag + Währung, Laufzeit = Zahl + Einheit), inklusive Live-Wert; Phasenwechsel auf `Lost` öffnet den Absagegrund-Dialog
-- [ ] Speichern über die bestehenden `Update…`-Handler (siehe offene Frage 2); danach Timeline neu laden (Änderungen erscheinen dort)
-- [ ] Umgang mit den Bearbeiten-Dialogen in der Detailansicht (siehe offene Frage 2)
+- [ ] Speichern über die bestehenden `Update…`-Handler mit allen aktuellen Werten („last write wins“, Entscheidung 2); danach Timeline neu laden (Änderungen erscheinen dort)
+- [ ] Bearbeiten-Dialog (Stift) aus den Detailansichten entfernen; Quick-Add, Listen und Pipeline behalten ihre Dialoge (Entscheidung 2)
 
 ## Schritt 8 – Tests
 - [ ] Unit-Tests `Tag` (Name, Farbe, Normalisierung)
@@ -83,14 +83,15 @@
 - [ ] README-Stand und Screenshot (Command Palette) aktualisieren
 - [ ] SPEC nachziehen (Entscheidungen, Tastenkürzel, Tag-Regeln)
 
-## Offene Fragen (vor dem Start zu klären)
-1. **Suche in den Listen:** Sollen Listen und Autocompletes ebenfalls die neue Volltext-/Trigram-Suche nutzen (einheitliche Treffer, Tippfehlertoleranz auch dort)? *Vorschlag: ja.*
-2. **Inline-Editing und Dialoge:** Ersetzt Inline-Editing den Bearbeiten-Dialog in der Detailansicht vollständig, oder bleibt der Stift als Alternative? Gespeichert wird über die bestehenden `Update…`-Handler mit allen aktuellen Werten (bei einem Single-User-System ist „last write wins“ vertretbar). *Vorschlag: Dialog in der Detailansicht entfernen; Quick-Add, Listen und Pipeline behalten ihre Dialoge.*
-3. **Tags im Audit/in der Timeline:** Sollen Zuordnungen auditiert werden (z. B. „Tag hinzugefügt: Azure“), und sollen sie in der Timeline erscheinen? *Vorschlag: auditieren, aber nicht in der Timeline anzeigen (SPEC 2.5 nennt Tags nicht).*
-4. **Tag-Filter:** Ein Tag oder mehrere (und wenn mehrere: UND oder ODER)? Auch auf der Pipeline? *Vorschlag: mehrere Tags mit ODER in Kontakte/Organisationen; Pipeline-Filter erst bei Bedarf.*
-5. **Tastenkürzel-Übersicht:** Eine Hilfe per `?` (Dialog mit allen Kürzeln)? *Vorschlag: ja, klein und statisch.*
-6. **Umlaute und Schreibvarianten:** Soll „Mueller“ auch „Müller“ finden (Extension `unaccent` plus eigene Suchkonfiguration), oder reicht die Trigram-Ähnlichkeit? *Vorschlag: zunächst nur Trigram; `unaccent` erst, wenn es im Alltag stört.*
-7. **Tag-Farben:** Freie Hex-Farbe oder eine feste Palette (z. B. 10 Farben mit geprüftem Kontrast)? *Vorschlag: feste Palette, neue Tags bekommen reihum eine Farbe.*
+## Entscheidungen (2026-09-29)
+1. **Einheitliche Suche:** Listen und Autocompletes nutzen dieselbe Volltext-/Trigram-Suche wie die Command Palette (Tippfehlertoleranz überall); `ILIKE` entfällt.
+2. **Inline-Editing ersetzt den Dialog in der Detailansicht.** Gespeichert wird über die bestehenden `Update…`-Handler mit allen aktuellen Werten; bei einem Single-User-System ist „last write wins“ vertretbar. Quick-Add, Listen und Pipeline behalten ihre Dialoge.
+3. **Tag-Zuordnungen werden auditiert**, aber nicht in der Timeline angezeigt (SPEC 2.5 bleibt unverändert).
+4. **Tag-Filter:** mehrere Tags, ODER-verknüpft, in Kontakten und Organisationen; ein Pipeline-Filter folgt erst bei Bedarf.
+5. **Tastenkürzel-Übersicht** per `?` als kleiner, statischer Dialog.
+6. **Umlaute:** zunächst nur Trigram-Ähnlichkeit; `unaccent` erst, wenn Schreibvarianten („Mueller“/„Müller“) im Alltag stören.
+7. **Tag-Farben:** feste Palette mit geprüftem Kontrast (hell und dunkel); neue Tags bekommen reihum die nächste Farbe, änderbar in den Einstellungen.
+8. **Testabdeckung** wird in der CI vorerst nicht gemessen (NFR Wartbarkeit bleibt Ziel, ohne automatische Prüfung).
 
 ## Definition of Done
 - CI grün (Build + alle Tests); keine Warnings
