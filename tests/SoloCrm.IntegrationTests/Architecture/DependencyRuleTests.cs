@@ -62,6 +62,20 @@ public sealed class DependencyRuleTests
         result.IsSuccessful.Should().BeTrue(Describe(result));
     }
 
+    /// <summary>Rule 4: Blazor components use handlers, never the DbContext.</summary>
+    [Fact]
+    public void WebComponents_Always_DoNotUseDbContext()
+    {
+        var result = Types.InAssembly(typeof(SoloCrm.Web.Components.Shared.QuickAddService).Assembly)
+            .That()
+            .ResideInNamespace("SoloCrm.Web.Components")
+            .ShouldNot()
+            .HaveDependencyOnAny("Microsoft.EntityFrameworkCore", "SoloCrm.Infrastructure.Persistence", typeof(ICrmDbContext).FullName)
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue(Describe(result));
+    }
+
     private static string Describe(NetArchTest.Rules.TestResult result) =>
         $"these types violate the dependency rule: {string.Join(", ", result.FailingTypeNames ?? [])}";
 }

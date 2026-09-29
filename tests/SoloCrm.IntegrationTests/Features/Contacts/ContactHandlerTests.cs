@@ -125,6 +125,22 @@ public sealed class ContactHandlerTests(PostgresFixture postgres) : HandlerTest(
     }
 
     [Fact]
+    public async Task GetContact_UnknownId_ReturnsNotFound()
+    {
+        (await QueryAsync<GetContact.Query, GetContact.Result>(new GetContact.Query(Guid.CreateVersion7())))
+            .Error.Should().Be(ContactErrors.NotFound);
+    }
+
+    [Fact]
+    public async Task GetContacts_InvalidFilter_ReturnsValidationError()
+    {
+        var result = await QueryAsync<GetContacts.Query, GetContacts.Result>(
+            new GetContacts.Query(Source: (LeadSource)99, SortBy: (GetContacts.SortField)99));
+
+        result.Error.Should().BeOfType<ValidationError>().Which.Errors.Keys.Should().BeEquivalentTo("Source", "SortBy");
+    }
+
+    [Fact]
     public async Task Archive_UnknownId_ReturnsNotFound()
     {
         (await SendAsync<ArchiveContact.Command, ArchiveContact.Result>(new ArchiveContact.Command(Guid.CreateVersion7())))

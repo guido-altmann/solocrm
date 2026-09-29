@@ -65,11 +65,11 @@
 - [x] Invariante: Es bleibt immer mindestens je eine Stage mit `Won` und `Lost` (fachlicher Fehler als `Result`)
 
 ## Schritt 8 – Tests
-- [ ] Unit-Tests `Pricing`, `Duration`, `OpportunityValuation` (alle vier Modelle × Laufzeiteinheiten × fehlende Angaben, Retainer-Aufrundung)
-- [ ] Unit-Tests `Opportunity.ChangeStage` (Lost ohne Grund, `ClosedAt`, Wiedereröffnen, Event)
-- [ ] Handler-Tests (Happy Path + Validierungsfehler) für alle neuen Use Cases
-- [ ] Integrationstests: AuditInterceptor (Created/Updated/Archived, Diff von Complex Types), Complex Types roundtrip, Stage-Seed, `DeleteStage` mit Umverteilung, Archiv-Filter, OutboxInterceptor (Event landet in derselben Transaktion wie die Änderung)
-- [ ] bUnit: Anfrage-Dialog (dynamisches Label, Auslastung ein-/ausgeblendet, Live-Wert), Absagegrund-Dialog
+- [x] Unit-Tests `Pricing`, `Duration`, `OpportunityValuation` (alle vier Modelle × Laufzeiteinheiten × fehlende Angaben, Retainer-Aufrundung)
+- [x] Unit-Tests `Opportunity.ChangeStage` (Lost ohne Grund, `ClosedAt`, Wiedereröffnen, Event)
+- [x] Handler-Tests (Happy Path + Validierungsfehler) für alle neuen Use Cases
+- [x] Integrationstests: AuditInterceptor (Created/Updated/Archived, Diff von Complex Types), Complex Types roundtrip, Stage-Seed, `DeleteStage` mit Umverteilung, Archiv-Filter, OutboxInterceptor (Event landet in derselben Transaktion wie die Änderung)
+- [x] bUnit: Anfrage-Dialog (dynamisches Label, Auslastung ein-/ausgeblendet, Live-Wert), Absagegrund-Dialog
 
 ## Schritt 9 – Abschluss
 - [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009)
