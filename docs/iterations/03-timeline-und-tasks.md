@@ -74,9 +74,9 @@
 - [x] bUnit: Timeline-Eingabe (Typ, Rückdatieren), Task-Checkbox mit Undo, Heute-Abschnitte
 
 ## Schritt 9 – Abschluss
-- [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009)
-- [ ] ADR-006: Umsetzung der Timeline-Aggregation und des Audit-Filters dokumentieren (Konfiguration der sichtbaren Felder)
-- [ ] README-Stand und Screenshot (Heute oder Detailansicht) aktualisieren
+- [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – *erzeugt (`AddActivitiesAndTasks`, rein additiv) und lokal verifiziert: Kopie der Dev-DB migriert, Bestandsdaten unverändert (Hash-Vergleich); `efbundle` aus dem Docker-Image migriert eine leere DB vollständig, der Container startet (`/health/ready` = 200, tzdata für `Europe/Berlin` vorhanden). Produktions-Deployment steht noch aus (Push/Deploy durch Guido).*
+- [x] ADR-006: Umsetzung der Timeline-Aggregation und des Audit-Filters dokumentieren (Konfiguration der sichtbaren Felder)
+- [x] README-Stand und Screenshot (Heute oder Detailansicht) aktualisieren
 
 ## Entscheidungen (2026-09-29)
 1. **Markdown im Activity-Body:** wird mit `Markdig` gerendert (Paket freigegeben), Ausgabe als bereinigtes HTML (kein Roh-HTML aus der Eingabe).
@@ -85,6 +85,16 @@
 4. **Tasks ohne Fälligkeitsdatum** erscheinen auf „Heute“ in einem eingeklappten Abschnitt „Ohne Termin“ (keine eigene Task-Liste).
 5. **Zeitzone:** „heute“ und „überfällig“ werden in einer konfigurierten Zeitzone berechnet (`App__TimeZone`, Default `Europe/Berlin`).
 6. **„Angelegt“ in der Timeline:** Der AuditEntry `Created` erscheint als „Angelegt“; in der aggregierten Organisations-Timeline nur für Anfragen, nicht für die Kontakte der Organisation.
+
+## Entscheidungen während der Umsetzung (2026-09-29)
+7. **Activity-Inhalt:** Der Text (Body) ist Pflicht, der Betreff optional. `OccurredAt` darf nicht in der Zukunft liegen (5 min Toleranz; Geplantes ist ein Task). Beim Bearbeiten bleiben die Bezüge fest. Ohne Datum und Uhrzeit gilt „jetzt“ (Serverzeit); ein vergangenes Datum ohne Uhrzeit wird auf 12:00 gesetzt.
+8. **Zusätzliche Bezüge bei Anfragen:** In der Anfrage-Detailansicht kann eine Activity per Checkbox zusätzlich beim Ansprechpartner und beim Endkunden (ersatzweise beim Vermittler) abgelegt werden. Das Webhook-Payload `activity.logged` enthält Art, Zeitpunkt und Bezüge, aber weder Betreff noch Text.
+9. **Löschverhalten (Vorbereitung US-20):** Activities hängen per `ON DELETE CASCADE` an allen drei Bezügen, weil sonst der Check-Constraint „mindestens ein Bezug“ verletzt werden kann. Tasks werden beim Löschen eines Kontakts mitgelöscht, bei Organisation und Anfrage wird der Bezug geleert. Tasks lassen sich zusätzlich hart löschen (auditiert).
+10. **Timeline:** Die Aggregation nutzt die *aktuelle* Zuordnung (heutige Kontakte einer Organisation). Doppelt verknüpfte Activities erscheinen einmal und ohne „via“. Preis- und Laufzeitänderungen werden aus der Audit-Historie vollständig rekonstruiert, sodass der Interceptor unverändert bleibt (Details in ADR-006). „Geändert“ ohne sichtbares Feld (z. B. neue Telefonnummer) bleibt unsichtbar.
+11. **Eingeschlafen und „Tage seit letzter Activity“:** Gezählt werden Kalendertage in der konfigurierten Zeitzone, und nur direkte Activities der Anfrage. Eine Anfrage ist eingeschlafen ab *genau* N Tagen, ohne Activity zählt die Anlage. „Zuletzt bearbeitet“ blendet Archivierte aus.
+12. **Offene Tasks in der Detailansicht** zeigen nur direkt verknüpfte Tasks; die Aggregation (z. B. Tasks der Kontakte einer Organisation) bleibt der Timeline vorbehalten.
+13. **Navigation und Quick-Add:** Ein Klick auf eine Pipeline-Karte öffnet die Detailansicht; das Stift-Symbol auf der Karte öffnet weiterhin den Bearbeiten-Dialog. In den Listen ist der Name ein Link. Auf einer Detailansicht fokussiert `N` (bzw. der Plus-Button) die Notiz-Eingabe der Timeline.
+14. **Einstellungen:** Stunden pro Tag > 0 und ≤ 24 (zwei Nachkommastellen), Retainer-Bewertungszeitraum 1–120 Monate, Schwellwert „eingeschlafen“ 1–365 Tage; die Währung wird großgeschrieben gespeichert. Ein ungültiges `App__TimeZone` verhindert den App-Start (Fail-fast, dokumentiert in `deploy/coolify.md`).
 
 ## Definition of Done
 - CI grün (Build + alle Tests); keine Warnings

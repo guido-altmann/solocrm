@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** Entwurf v0.9 · **Stand:** 2026-09-29 · **Owner:** Guido Altmann
+> **Status:** Entwurf v0.10 · **Stand:** 2026-09-29 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, konkrete Iterationsaufträge in `docs/iterations/`.
 
@@ -169,12 +169,12 @@ Beim Löschen einer Stage mit zugeordneten Anfragen muss die Ziel-Stage denselbe
 | Feld | Typ | Hinweis |
 |---|---|---|
 | Type | enum `ActivityType` | `Note`, `Call`, `Meeting`, `Email`, `ApplicationSent` |
-| OccurredAt | DateTimeOffset | Default: jetzt; rückdatierbar |
+| OccurredAt | DateTimeOffset | Default: jetzt; rückdatierbar, nicht in der Zukunft (5 min Toleranz) |
 | Subject | string(200)? | |
-| Body | text | Markdown erlaubt (gerendert mit Markdig, ohne Roh-HTML) |
+| Body | text | Pflicht; Markdown erlaubt (gerendert mit Markdig, ohne Roh-HTML; Links nur http(s)/mailto) |
 | ContactId / OrganizationId / OpportunityId | Guid? | **mindestens einer** gesetzt |
 
-Activities lassen sich bearbeiten und hart löschen (das Löschen wird als AuditEntry `Deleted` protokolliert); ein Archivieren gibt es nicht.
+Activities lassen sich bearbeiten (Art, Zeitpunkt, Betreff, Text; die Bezüge bleiben unverändert) und hart löschen (das Löschen wird als AuditEntry `Deleted` protokolliert); ein Archivieren gibt es nicht. Wird ein Bezugsobjekt hart gelöscht, werden seine Activities mitgelöscht (`ON DELETE CASCADE`, Vorbereitung für US-20).
 
 #### TaskItem
 (Der Name vermeidet die Kollision mit `System.Threading.Tasks.Task`.)
@@ -184,6 +184,8 @@ Activities lassen sich bearbeiten und hart löschen (das Löschen wird als Audit
 | DueDate | DateOnly? | |
 | CompletedAt | DateTimeOffset? | `null` = offen |
 | ContactId / OrganizationId / OpportunityId | Guid? | optional (freie Tasks erlaubt) |
+
+Titel und Fälligkeit sind bearbeitbar; Tasks lassen sich hart löschen (AuditEntry `Deleted`). Beim harten Löschen eines Kontakts werden seine Tasks mitgelöscht (US-20); bei Organisation und Anfrage wird der Bezug geleert.
 
 #### Tag
 Name (eindeutig), Color (Hex). n:m-Beziehungen zu Contact, Organization und Opportunity über drei typisierte Join-Tabellen.
@@ -208,6 +210,8 @@ Die Timeline eines Objekts ist ein chronologischer Strom, absteigend sortiert, a
 - **Organization-Timeline** enthält zusätzlich die Einträge ihrer Contacts und Opportunities (Kennzeichnung „via Max Mustermann“).
 - **Opportunity-Timeline** enthält nur Einträge mit direktem Bezug.
 - **Contact-Timeline** enthält direkte Einträge plus Einträge von Opportunities, bei denen der Kontakt `PrimaryContact` ist.
+- Maßgeblich ist die **aktuelle** Zuordnung (z. B. heutige Kontakte einer Organisation). Ein Eintrag, der direkt und über das Umfeld verknüpft ist, erscheint nur einmal (ohne „via“).
+- Die Timeline wird per Cursor geladen („Mehr laden“); Umsetzung und Konfiguration der sichtbaren Felder siehe ADR-006.
 
 **Audit-Felder, die in der Timeline erscheinen:** Stage, Pricing (Modell/Betrag), Duration, OrganizationId (Kontakt wechselt Firma), IsArchived. Alle übrigen Änderungen werden auditiert, aber in der Timeline nicht angezeigt.
 
@@ -248,11 +252,11 @@ Events werden in der Entität gesammelt (`AddDomainEvent`) und **innerhalb derse
 ### 3.3 Screens (MVP)
 | # | Screen | Route | Inhalt |
 |---|---|---|---|
-| S1 | **Heute** | `/` | Überfällige Tasks (rot), heute fällige Tasks, „eingeschlafene“ Anfragen (offen, keine Activity seit N Tagen, Default 7), zuletzt bearbeitet; eingeklappt: Tasks ohne Termin. „Heute“ gilt in der konfigurierten Zeitzone (`App__TimeZone`, Default `Europe/Berlin`) |
-| S2 | **Pipeline** | `/pipeline` | Kanban je offener Stage; Karten mit Titel, Endkunde/Vermittler, Preis im Modellformat (z. B. „95 €/h“, „2.500 €/Monat“), Tage seit letzter Activity; Drag & Drop; je Spalte Summe `EstimatedValue` und – falls Retainer enthalten – Summe MRR; Won/Lost als Drop-Zonen |
+| S1 | **Heute** | `/` | Überfällige Tasks (rot), heute fällige Tasks, „eingeschlafene“ Anfragen (offen, nicht archiviert, seit mindestens N Kalendertagen keine direkte Activity bzw. seit der Anlage, Default 7), zuletzt bearbeitet (max. 10, ohne Archivierte); eingeklappt: Tasks ohne Termin. „Heute“ und alle Tagesgrenzen gelten in der konfigurierten Zeitzone (`App__TimeZone`, Default `Europe/Berlin`) |
+| S2 | **Pipeline** | `/pipeline` | Kanban je offener Stage; Karten mit Titel, Endkunde/Vermittler, Preis im Modellformat (z. B. „95 €/h“, „2.500 €/Monat“), Tage seit letzter Activity (Definition wie S1); Klick öffnet die Detailansicht; Drag & Drop; je Spalte Summe `EstimatedValue` und – falls Retainer enthalten – Summe MRR; Won/Lost als Drop-Zonen |
 | S3 | **Kontakte** | `/contacts` | Tabelle mit Suche, Filter (Organisation, Tag, Quelle), Sortierung, Paging (serverseitig) |
 | S4 | **Organisationen** | `/organizations` | analog S3, Filter nach Typ |
-| S5 | **Detailansicht** | `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}` | Links Stammdaten (inline editierbar), Tags, verknüpfte Objekte; rechts die Timeline mit Eingabe |
+| S5 | **Detailansicht** | `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}` | Links Stammdaten (inline editierbar ab It. 4), Tags, verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe; `N` fokussiert die Eingabe |
 | S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Webhooks, Import, Konto (Passwort, 2FA) |
 
 ### 3.4 Layout
@@ -620,3 +624,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.7 | 2026-09-28 | Planung It. 2: Outbox-Schreiben nach It. 2 vorgezogen (Verarbeitung bleibt It. 5); Wiedereröffnen abgeschlossener Anfragen geregelt; Oberfläche für Preis-Defaults in It. 3 |
 | 0.9 | 2026-09-29 | Planung It. 3: Markdown per Markdig; Activities bearbeitbar/löschbar; Undo beim Erledigen per Wiederöffnen mit Event `TaskReopened` (2.6); Tasks ohne Termin auf „Heute“; Zeitzone `App__TimeZone`; „Angelegt“ in der Timeline |
 | 0.8 | 2026-09-29 | Abschluss It. 2: mindestens eine offene Stage bleibt erhalten; Ziel-Stage beim Löschen mit gleichem Status (2.3); Umsetzungsentscheidungen in `docs/iterations/02-kerndomaene.md` |
+| 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |

@@ -13,7 +13,17 @@ Schlankes, selbst gehostetes CRM für Freelancer und Einzelunternehmer: Kontakte
 - **Iteration 1 (Walking Skeleton):** Login (Single-User), CI auf GitHub Actions, Image in GHCR, Deployment auf Coolify mit HTTPS, persistenten Data-Protection-Keys und S3-Backups.
 - **Iteration 2 (Kerndomäne):** Organisationen (Endkunde, Vermittler, Partner) und Kontakte mit Firmenzuordnung, Filtern, Sortierung und Archivierung; Projektanfragen mit Preismodell (Stunden-/Tagessatz, Festpreis, Retainer), Laufzeit und live berechnetem Wert; Pipeline-Board mit Drag & Drop, Won/Lost inklusive Absagegrund; Phasen in den Einstellungen verwalten. Jede Änderung wird per EF-Interceptor auditiert, Domain Events landen transaktional in der Outbox.
 
-Weitere Funktionen (Timeline, Tasks, Heute-Ansicht, Suche, API/Webhooks) folgen gemäß [Iterationsplan](docs/SPEC.md#8-iterationsplan).
+- **Iteration 3 (Timeline & Tasks):** Detailansichten für Kontakte, Organisationen und Anfragen mit einer chronologischen Timeline aus Activities (Notiz, Anruf, Meeting, E-Mail, Bewerbung; Markdown, rückdatierbar), Tasks und lesbaren Änderungen („Phase: Beworben → Im Gespräch“, „Preis: 95 €/h → 105 €/h“). Organisationen sehen auch die Einträge ihrer Kontakte und Anfragen („via …“). Follow-up-Tasks lassen sich per Checkbox erledigen, mit „Rückgängig“ für 5 Sekunden. Die Ansicht „Heute“ zeigt überfällige und heute fällige Aufgaben, eingeschlafene Anfragen und zuletzt Bearbeitetes. Preis-Defaults und der Schwellwert für „eingeschlafen“ sind in den Einstellungen pflegbar.
+
+Weitere Funktionen (Command Palette, Inline-Editing, Tags, API/Webhooks) folgen gemäß [Iterationsplan](docs/SPEC.md#8-iterationsplan).
+
+![Heute: überfällige und fällige Aufgaben, eingeschlafene Anfragen, zuletzt bearbeitet](docs/images/today.png)
+
+<details>
+<summary>Detailansicht einer Anfrage mit Timeline (Iteration 3)</summary>
+
+![Detailansicht einer Anfrage mit Timeline, offenen Aufgaben und Eingabe für Activities](docs/images/opportunity-detail.png)
+</details>
 
 <details>
 <summary>Kontaktliste mit Quick-Add (Iteration 1)</summary>
