@@ -20,12 +20,12 @@
 ---
 
 ## Schritt 1 – Domäne: Activity und TaskItem
-- [ ] Enum `ActivityType` (`Note`, `Call`, `Meeting`, `Email`, `ApplicationSent`)
-- [ ] Entität `Activity` (SPEC 2.3): `Type`, `OccurredAt` (rückdatierbar), `Subject?` (200), `Body` (text), `ContactId`/`OrganizationId`/`OpportunityId` (mindestens einer gesetzt, als Domain-Regel und Check-Constraint); Event `ActivityLogged`
-- [ ] Entität `TaskItem` (SPEC 2.3): `Title` (200), `DueDate?`, `CompletedAt?`, optionale Bezüge; `Complete(now)` mit Event `TaskCompleted`, `Reopen()` mit Event `TaskReopened` (für Undo, Entscheidung 2)
-- [ ] Beide `IAuditable`; FKs mit `ON DELETE CASCADE` bzw. `SET NULL` gemäß DSGVO-Löschung (US-20, It. 6) vorbereiten
-- [ ] Indizes für die Timeline: je Bezug `(contact_id, occurred_at)`, `(organization_id, occurred_at)`, `(opportunity_id, occurred_at)`; für Tasks `(completed_at, due_date)`
-- [ ] Migration (additiv, siehe ADR-009)
+- [x] Enum `ActivityType` (`Note`, `Call`, `Meeting`, `Email`, `ApplicationSent`)
+- [x] Entität `Activity` (SPEC 2.3): `Type`, `OccurredAt` (rückdatierbar), `Subject?` (200), `Body` (text), `ContactId`/`OrganizationId`/`OpportunityId` (mindestens einer gesetzt, als Domain-Regel und Check-Constraint); Event `ActivityLogged`
+- [x] Entität `TaskItem` (SPEC 2.3): `Title` (200), `DueDate?`, `CompletedAt?`, optionale Bezüge; `Complete(now)` mit Event `TaskCompleted`, `Reopen()` mit Event `TaskReopened` (für Undo, Entscheidung 2)
+- [x] Beide `IAuditable`; FKs mit `ON DELETE CASCADE` bzw. `SET NULL` gemäß DSGVO-Löschung (US-20, It. 6) vorbereiten
+- [x] Indizes für die Timeline: je Bezug `(contact_id, occurred_at)`, `(organization_id, occurred_at)`, `(opportunity_id, occurred_at)`; für Tasks `(completed_at, due_date)`
+- [x] Migration (additiv, siehe ADR-009)
 
 ## Schritt 2 – Activities erfassen (US-10)
 - [ ] Use Cases `LogActivity`, `UpdateActivity`, `DeleteActivity` (hartes Löschen mit AuditEntry, Entscheidung 3)

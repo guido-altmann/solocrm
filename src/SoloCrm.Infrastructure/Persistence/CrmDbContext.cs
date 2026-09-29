@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Domain.Activities;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Settings;
+using SoloCrm.Domain.Tasks;
 using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Persistence.Outbox;
 
@@ -22,6 +24,10 @@ public class CrmDbContext(DbContextOptions options)
     public DbSet<Opportunity> Opportunities => Set<Opportunity>();
 
     public DbSet<Stage> Stages => Set<Stage>();
+
+    public DbSet<Activity> Activities => Set<Activity>();
+
+    public DbSet<TaskItem> Tasks => Set<TaskItem>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
