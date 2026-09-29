@@ -100,10 +100,10 @@ internal static partial class HostingExtensions
             return;
         }
 
-        LogApplyingMigrations(app.Logger, pending.Count, string.Join(", ", pending));
+        LogApplyingMigrations(app.Logger, pending.Count, pending);
         await db.Database.MigrateAsync();
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Development: applying {Count} pending migration(s): {Migrations}")]
-    private static partial void LogApplyingMigrations(ILogger logger, int count, string migrations);
+    private static partial void LogApplyingMigrations(ILogger logger, int count, IEnumerable<string> migrations);
 }
