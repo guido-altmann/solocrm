@@ -22,13 +22,14 @@
 ## Schritt 1 – Domäne: Activity und TaskItem
 - [ ] Enum `ActivityType` (`Note`, `Call`, `Meeting`, `Email`, `ApplicationSent`)
 - [ ] Entität `Activity` (SPEC 2.3): `Type`, `OccurredAt` (rückdatierbar), `Subject?` (200), `Body` (text), `ContactId`/`OrganizationId`/`OpportunityId` (mindestens einer gesetzt, als Domain-Regel und Check-Constraint); Event `ActivityLogged`
-- [ ] Entität `TaskItem` (SPEC 2.3): `Title` (200), `DueDate?`, `CompletedAt?`, optionale Bezüge; `Complete(now)` mit Event `TaskCompleted`, `Reopen()` (für Undo, siehe Offene Fragen)
+- [ ] Entität `TaskItem` (SPEC 2.3): `Title` (200), `DueDate?`, `CompletedAt?`, optionale Bezüge; `Complete(now)` mit Event `TaskCompleted`, `Reopen()` (für Undo, Entscheidung 2)
 - [ ] Beide `IAuditable`; FKs mit `ON DELETE CASCADE` bzw. `SET NULL` gemäß DSGVO-Löschung (US-20, It. 6) vorbereiten
 - [ ] Indizes für die Timeline: je Bezug `(contact_id, occurred_at)`, `(organization_id, occurred_at)`, `(opportunity_id, occurred_at)`; für Tasks `(completed_at, due_date)`
 - [ ] Migration (additiv, siehe ADR-009)
 
 ## Schritt 2 – Activities erfassen (US-10)
-- [ ] Use Cases `LogActivity`, `UpdateActivity`, `DeleteActivity` (siehe Offene Fragen)
+- [ ] Use Cases `LogActivity`, `UpdateActivity`, `DeleteActivity` (hartes Löschen mit AuditEntry, Entscheidung 3)
+- [ ] `Markdig` über `Directory.Packages.props` einbinden; Body als Markdown rendern (Roh-HTML deaktiviert, siehe Entscheidung 1)
 - [ ] Eingabe oben in der Timeline: „Notiz hinzufügen…“ mit Typ-Auswahl, Betreff optional, `OccurredAt` mit Default „jetzt“ und rückdatierbar (AK1)
 - [ ] Bezug automatisch aus dem Kontext (Detailansicht); bei Anfragen optional zusätzlich Kontakt/Organisation
 - [ ] Quick-Add `N` in einer Detailansicht legt eine Notiz an (SPEC 3.2)
@@ -42,6 +43,7 @@
 ## Schritt 4 – Timeline (Aggregation nach SPEC 2.5)
 - [ ] `GetTimeline(EntityType, EntityId, Before?, Limit)`: absteigend sortierter Strom aus Activities, Tasks (angelegt/erledigt) und AuditEntries; Paging per Cursor („Mehr laden“)
 - [ ] Aggregation: Organization inklusive Einträge ihrer Kontakte und Anfragen (Kennzeichnung „via Max Mustermann“); Contact inklusive Anfragen, bei denen er `PrimaryContact` ist; Opportunity nur direkt
+- [ ] `Created` erscheint als „Angelegt“; in der Organisations-Aggregation nur für Anfragen (Entscheidung 6)
 - [ ] Audit-Filter: nur `Created`, `Archived` und Änderungen an Stage, Pricing, Duration, `OrganizationId` und `IsArchived`; übrige Änderungen bleiben unsichtbar
 - [ ] Darstellung der Audit-Einträge in lesbarer Form: „Phase: Beworben → Im Gespräch“ (Stage-Namen auflösen, gelöschte Stages als „(gelöscht)“) (**US-07 AK2**), „Preis: 95 €/h → 105 €/h“, „Laufzeit: offen → 6 Monate“, „Firma: – → Contoso“, „Archiviert“/„Wiederhergestellt“
 - [ ] Integrationstest: Aggregation und Audit-Filter gegen Postgres, Laufzeit < 200 ms bei 50k Activities (NFR Kap. 6), ggf. mit `EXPLAIN`
@@ -53,7 +55,8 @@
 - [ ] Responsive: unter 960 px einspaltig (SPEC 3.4)
 
 ## Schritt 6 – Heute-Ansicht (US-12)
-- [ ] `GetToday`: Abschnitte Überfällig (rot), Heute, Eingeschlafene Anfragen, Zuletzt bearbeitet (AK1); „heute“ nach lokaler Zeitzone (siehe Offene Fragen)
+- [ ] `GetToday`: Abschnitte Überfällig (rot), Heute, Eingeschlafene Anfragen, Zuletzt bearbeitet (AK1) sowie eingeklappt „Ohne Termin“ (Entscheidung 4)
+- [ ] Zeitzone aus `App:TimeZone` (Default `Europe/Berlin`) für „heute“/„überfällig“ (Entscheidung 5)
 - [ ] Eingeschlafen = offene, nicht archivierte Anfrage ohne Activity seit `StaleOpportunityDays` Tagen (Default 7); ohne jede Activity zählt `CreatedAt`
 - [ ] Zuletzt bearbeitet: die zuletzt geänderten Kontakte, Organisationen und Anfragen (nach `UpdatedAt`, max. 10)
 - [ ] Tasks direkt auf „Heute“ erledigen und anlegen
@@ -75,13 +78,13 @@
 - [ ] ADR-006: Umsetzung der Timeline-Aggregation und des Audit-Filters dokumentieren (Konfiguration der sichtbaren Felder)
 - [ ] README-Stand und Screenshot (Heute oder Detailansicht) aktualisieren
 
-## Offene Fragen (vor Start klären)
-1. **Markdown im Activity-Body:** Die SPEC erlaubt Markdown. Zum Rendern bräuchte es ein neues Paket (Vorschlag: `Markdig`, Ausgabe als bereinigtes HTML). Alternative für It. 3: Klartext mit Zeilenumbrüchen, Markdown später. *Paket freigeben?*
-2. **Undo beim Erledigen (US-11 AK2):** Vorschlag: sofort speichern (inklusive `TaskCompleted` in der Outbox) und bei „Rückgängig“ `ReopenTask` ausführen. Alternative: erst nach Ablauf der 5 s speichern (dann geht der Klick verloren, wenn die Verbindung abbricht). Beim Vorschlag sehen Webhook-Empfänger (It. 5) ggf. ein `task.completed` ohne Gegenereignis. Soll es ein `TaskReopened`-Event geben?
-3. **Bearbeiten und Löschen von Activities:** Die SPEC regelt das nicht. Vorschlag: bearbeiten und hart löschen (mit AuditEntry `Deleted`), weil Activities Notizen sind und kein Archivieren brauchen.
-4. **Tasks ohne Fälligkeitsdatum:** „Heute“ zeigt nur Überfällig und Heute; freie Tasks ohne Datum wären nirgends sichtbar. Vorschlag: zusätzlicher, eingeklappter Abschnitt „Ohne Termin“ auf „Heute“ (statt einer eigenen Task-Liste).
-5. **Zeitzone für „heute“/„überfällig“:** Vorschlag: feste Zeitzone per Konfiguration (`App__TimeZone`, Default `Europe/Berlin`), da Single-User und Server in UTC.
-6. **Audit-Eintrag `Created` in der Timeline:** Vorschlag: als „Angelegt“ anzeigen (SPEC 2.5 nennt „Anlage“), bei Aggregation mit „via …“ nur für Anfragen, nicht für Kontakte einer Organisation (sonst viel Rauschen).
+## Entscheidungen (2026-09-29)
+1. **Markdown im Activity-Body:** wird mit `Markdig` gerendert (Paket freigegeben), Ausgabe als bereinigtes HTML (kein Roh-HTML aus der Eingabe).
+2. **Undo beim Erledigen:** `CompleteTask` speichert sofort (inklusive `TaskCompleted` in der Outbox); „Rückgängig“ führt `ReopenTask` aus. *Noch offen: ob `ReopenTask` ein eigenes Event `TaskReopened` erzeugt.*
+3. **Activities** lassen sich bearbeiten und hart löschen; das Löschen wird als AuditEntry `Deleted` protokolliert.
+4. **Tasks ohne Fälligkeitsdatum** erscheinen auf „Heute“ in einem eingeklappten Abschnitt „Ohne Termin“ (keine eigene Task-Liste).
+5. **Zeitzone:** „heute“ und „überfällig“ werden in einer konfigurierten Zeitzone berechnet (`App__TimeZone`, Default `Europe/Berlin`).
+6. **„Angelegt“ in der Timeline:** Der AuditEntry `Created` erscheint als „Angelegt“; in der aggregierten Organisations-Timeline nur für Anfragen, nicht für die Kontakte der Organisation.
 
 ## Definition of Done
 - CI grün (Build + alle Tests); keine Warnings

@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** Entwurf v0.8 · **Stand:** 2026-09-29 · **Owner:** Guido Altmann
+> **Status:** Entwurf v0.9 · **Stand:** 2026-09-29 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, konkrete Iterationsaufträge in `docs/iterations/`.
 
@@ -171,8 +171,10 @@ Beim Löschen einer Stage mit zugeordneten Anfragen muss die Ziel-Stage denselbe
 | Type | enum `ActivityType` | `Note`, `Call`, `Meeting`, `Email`, `ApplicationSent` |
 | OccurredAt | DateTimeOffset | Default: jetzt; rückdatierbar |
 | Subject | string(200)? | |
-| Body | text | Markdown erlaubt |
+| Body | text | Markdown erlaubt (gerendert mit Markdig, ohne Roh-HTML) |
 | ContactId / OrganizationId / OpportunityId | Guid? | **mindestens einer** gesetzt |
+
+Activities lassen sich bearbeiten und hart löschen (das Löschen wird als AuditEntry `Deleted` protokolliert); ein Archivieren gibt es nicht.
 
 #### TaskItem
 (Der Name vermeidet die Kollision mit `System.Threading.Tasks.Task`.)
@@ -200,7 +202,7 @@ Name (eindeutig), Color (Hex). n:m-Beziehungen zu Contact, Organization und Oppo
 Die Timeline eines Objekts ist ein chronologischer Strom, absteigend sortiert, aus:
 1. Activities, die direkt auf das Objekt verweisen,
 2. Tasks (angelegt / erledigt),
-3. relevanten AuditEntries (Anlage, Stage-Wechsel, Änderung von Schlüsselfeldern).
+3. relevanten AuditEntries (Anlage, Stage-Wechsel, Änderung von Schlüsselfeldern). Die Anlage erscheint als „Angelegt“; in der aggregierten Organisations-Timeline nur für Anfragen, nicht für die Kontakte der Organisation.
 
 **Aggregation:**
 - **Organization-Timeline** enthält zusätzlich die Einträge ihrer Contacts und Opportunities (Kennzeichnung „via Max Mustermann“).
@@ -245,7 +247,7 @@ Events werden in der Entität gesammelt (`AddDomainEvent`) und **innerhalb derse
 ### 3.3 Screens (MVP)
 | # | Screen | Route | Inhalt |
 |---|---|---|---|
-| S1 | **Heute** | `/` | Überfällige Tasks (rot), heute fällige Tasks, „eingeschlafene“ Anfragen (offen, keine Activity seit N Tagen, Default 7), zuletzt bearbeitet |
+| S1 | **Heute** | `/` | Überfällige Tasks (rot), heute fällige Tasks, „eingeschlafene“ Anfragen (offen, keine Activity seit N Tagen, Default 7), zuletzt bearbeitet; eingeklappt: Tasks ohne Termin. „Heute“ gilt in der konfigurierten Zeitzone (`App__TimeZone`, Default `Europe/Berlin`) |
 | S2 | **Pipeline** | `/pipeline` | Kanban je offener Stage; Karten mit Titel, Endkunde/Vermittler, Preis im Modellformat (z. B. „95 €/h“, „2.500 €/Monat“), Tage seit letzter Activity; Drag & Drop; je Spalte Summe `EstimatedValue` und – falls Retainer enthalten – Summe MRR; Won/Lost als Drop-Zonen |
 | S3 | **Kontakte** | `/contacts` | Tabelle mit Suche, Filter (Organisation, Tag, Quelle), Sortierung, Paging (serverseitig) |
 | S4 | **Organisationen** | `/organizations` | analog S3, Filter nach Typ |
@@ -313,7 +315,7 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 
 **US-11 · Follow-up-Task anlegen und erledigen** · It. 3
 - AK1: Anlage aus Detailansicht oder „Heute“.
-- AK2: Erledigen per Checkbox; ein Undo-Snackbar erscheint für 5 s.
+- AK2: Erledigen per Checkbox; ein Undo-Snackbar erscheint für 5 s. Das Erledigen wird sofort gespeichert, „Rückgängig“ öffnet den Task wieder.
 
 **US-12 · Heute-Ansicht** · It. 3
 - AK1: Abschnitte: Überfällig, Heute, Eingeschlafene Anfragen, Zuletzt bearbeitet.
@@ -420,6 +422,7 @@ Basis: `/api/v1` · Auth: `X-Api-Key` · Format: JSON (camelCase) · Fehler: RFC
 | Validierung | FluentValidation |
 | Logging | Serilog (Console-JSON), optional Seq |
 | CSV | CsvHelper |
+| Markdown | Markdig (Activity-Body) |
 | Tests | xUnit, AwesomeAssertions (oder Shouldly), Testcontainers.PostgreSql, bUnit, NSubstitute |
 | CI/CD | GitHub Actions (Build, Test, Image-Build → GHCR), Deployment über Coolify |
 
@@ -516,7 +519,7 @@ public static class CreateContact
 - **Reverse Proxy:** Traefik (Coolify); `UseForwardedHeaders` mit `KnownNetworks` bzw. `KnownProxies` passend konfiguriert; WebSockets für SignalR aktiv.
 - **Migrationen:** `efbundle` im Image; Ausführung vor dem App-Start durch `deploy/entrypoint.sh` (siehe ADR-009).
 - **Health Checks:** Coolify-Healthcheck auf `/health/ready`.
-- **Konfiguration (Env):** `ConnectionStrings__Crm`, `Admin__Email`, `Admin__InitialPassword`, `Serilog__MinimumLevel__Default`, `App__BaseUrl`. Anleitung: `deploy/coolify.md`.
+- **Konfiguration (Env):** `ConnectionStrings__Crm`, `Admin__Email`, `Admin__InitialPassword`, `Serilog__MinimumLevel__Default`, `App__BaseUrl`, `App__TimeZone` (Default `Europe/Berlin`). Anleitung: `deploy/coolify.md`.
 
 ---
 
@@ -614,4 +617,5 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.5 | 2026-09-28 | 7.6/Kap. 10: Image-Build via GitHub Actions → GHCR, Migrationen per Entrypoint, Repo öffentlich; Env-Variable `Serilog__MinimumLevel__Default` |
 | 0.6 | 2026-09-28 | Kap. 10: Projektname entschieden (SoloCRM), Domain bleibt privat; Abschluss Iteration 1 (ADR-009 Accepted) |
 | 0.7 | 2026-09-28 | Planung It. 2: Outbox-Schreiben nach It. 2 vorgezogen (Verarbeitung bleibt It. 5); Wiedereröffnen abgeschlossener Anfragen geregelt; Oberfläche für Preis-Defaults in It. 3 |
+| 0.9 | 2026-09-29 | Planung It. 3: Markdown per Markdig; Activities bearbeitbar/löschbar; Undo beim Erledigen per Wiederöffnen; Tasks ohne Termin auf „Heute“; Zeitzone `App__TimeZone`; „Angelegt“ in der Timeline |
 | 0.8 | 2026-09-29 | Abschluss It. 2: mindestens eine offene Stage bleibt erhalten; Ziel-Stage beim Löschen mit gleichem Status (2.3); Umsetzungsentscheidungen in `docs/iterations/02-kerndomaene.md` |
