@@ -43,6 +43,17 @@ public sealed record Duration
         _ => Value * WorkingDaysPerMonth,
     };
 
+    /// <summary>„1 Tag“, „3 Wochen“, „6 Monate“.</summary>
+    public string ToDisplayString() => (Unit, Value) switch
+    {
+        (DurationUnit.Days, 1) => "1 Tag",
+        (DurationUnit.Days, _) => $"{Value} Tage",
+        (DurationUnit.Weeks, 1) => "1 Woche",
+        (DurationUnit.Weeks, _) => $"{Value} Wochen",
+        (_, 1) => "1 Monat",
+        _ => $"{Value} Monate",
+    };
+
     /// <summary>Months as given; days and weeks via working days / 20, rounded up to whole months.</summary>
     public int ToMonths() => Unit == DurationUnit.Months
         ? Value

@@ -125,3 +125,26 @@ h1:focus {
 .pipeline-can-drop { outline: 2px dashed var(--mud-palette-primary); outline-offset: -4px; }
 
 .pipeline-card { cursor: pointer; }
+
+/* Timeline (SPEC 2.5) */
+.timeline-entry + .timeline-entry {
+    border-top: 1px solid var(--mud-palette-lines-default);
+}
+
+.timeline-body {
+    overflow-wrap: anywhere;
+}
+
+.timeline-body p {
+    margin: 0.25rem 0;
+}
+
+.timeline-body ul,
+.timeline-body ol {
+    padding-left: 1.25rem;
+    margin: 0.25rem 0;
+}
+
+.timeline-body pre {
+    white-space: pre-wrap;
+}

@@ -41,12 +41,12 @@
 - [ ] Offene Tasks eines Objekts in der Detailansicht; erledigte erscheinen in der Timeline – *`GetTasks`/`TaskList` stehen, eingebunden in Schritt 4/5*
 
 ## Schritt 4 – Timeline (Aggregation nach SPEC 2.5)
-- [ ] `GetTimeline(EntityType, EntityId, Before?, Limit)`: absteigend sortierter Strom aus Activities, Tasks (angelegt/erledigt) und AuditEntries; Paging per Cursor („Mehr laden“)
-- [ ] Aggregation: Organization inklusive Einträge ihrer Kontakte und Anfragen (Kennzeichnung „via Max Mustermann“); Contact inklusive Anfragen, bei denen er `PrimaryContact` ist; Opportunity nur direkt
-- [ ] `Created` erscheint als „Angelegt“; in der Organisations-Aggregation nur für Anfragen (Entscheidung 6)
-- [ ] Audit-Filter: nur `Created`, `Archived` und Änderungen an Stage, Pricing, Duration, `OrganizationId` und `IsArchived`; übrige Änderungen bleiben unsichtbar
-- [ ] Darstellung der Audit-Einträge in lesbarer Form: „Phase: Beworben → Im Gespräch“ (Stage-Namen auflösen, gelöschte Stages als „(gelöscht)“) (**US-07 AK2**), „Preis: 95 €/h → 105 €/h“, „Laufzeit: offen → 6 Monate“, „Firma: – → Contoso“, „Archiviert“/„Wiederhergestellt“
-- [ ] Integrationstest: Aggregation und Audit-Filter gegen Postgres, Laufzeit < 200 ms bei 50k Activities (NFR Kap. 6), ggf. mit `EXPLAIN`
+- [x] `GetTimeline(EntityType, EntityId, Before?, Limit)`: absteigend sortierter Strom aus Activities, Tasks (angelegt/erledigt) und AuditEntries; Paging per Cursor („Mehr laden“)
+- [x] Aggregation: Organization inklusive Einträge ihrer Kontakte und Anfragen (Kennzeichnung „via Max Mustermann“); Contact inklusive Anfragen, bei denen er `PrimaryContact` ist; Opportunity nur direkt
+- [x] `Created` erscheint als „Angelegt“; in der Organisations-Aggregation nur für Anfragen (Entscheidung 6)
+- [x] Audit-Filter: nur `Created`, `Archived` und Änderungen an Stage, Pricing, Duration, `OrganizationId` und `IsArchived`; übrige Änderungen bleiben unsichtbar
+- [x] Darstellung der Audit-Einträge in lesbarer Form: „Phase: Beworben → Im Gespräch“ (Stage-Namen auflösen, gelöschte Stages als „(gelöscht)“) (**US-07 AK2**), „Preis: 95 €/h → 105 €/h“, „Laufzeit: offen → 6 Monate“, „Firma: – → Contoso“, „Archiviert“/„Wiederhergestellt“
+- [x] Integrationstest: Aggregation und Audit-Filter gegen Postgres, Laufzeit < 200 ms bei 50k Activities (NFR Kap. 6), ggf. mit `EXPLAIN` – *lokal gemessen (Median): Organisation 14 ms, Kontakt 5 ms*
 
 ## Schritt 5 – Detailansichten (S5)
 - [ ] `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}`: links Stammdaten (lesend, „Bearbeiten“ öffnet den bestehenden Dialog), verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe

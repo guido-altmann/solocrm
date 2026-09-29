@@ -1,0 +1,238 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Activities
+@using SoloCrm.Application.Features.Timeline
+@using SoloCrm.Domain.Common
+@inject IQueryHandler<GetTimeline.Query, GetTimeline.Result> TimelineHandler
+@inject ICommandHandler<DeleteActivity.Command, DeleteActivity.Result> DeleteActivityHandler
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AppClock Clock
+
+@* One timeline per record with the input on top (SPEC 2.5, 3.1 no. 5). *@
+<ActivityComposer @ref="_composer" LinkedTo="LinkedTo" ExtraLinks="ExtraLinks" OnLogged="OnLoggedAsync" />
+
+<div class="timeline mt-4">
+    @if (_entries is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_entries.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Color="Color.Secondary">Noch keine Einträge.</MudText>
+    }
+    else
+    {
+        @foreach (var entry in _entries)
+        {
+            <div class="timeline-entry d-flex gap-3 py-2" @key="entry.Position" data-kind="@entry.Kind">
+                <MudAvatar Size="Size.Small" Color="@ColorOf(entry)" Variant="Variant.Outlined">
+                    <MudIcon Icon="@IconOf(entry)" Size="Size.Small" />
+                </MudAvatar>
+                <div class="flex-grow-1" style="min-width: 0;">
+                    <div class="d-flex align-center flex-wrap gap-x-2">
+                        <MudText Typo="Typo.subtitle2" Class="timeline-title">@TitleOf(entry)</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" title="@Formats.DateTime(Clock.ToLocal(entry.OccurredAt))">
+                            @Formats.DateTime(Clock.ToLocal(entry.OccurredAt))
+                        </MudText>
+                        @if (entry.Via is { } via)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="timeline-via">
+                                via <MudLink Href="@LinkOf(via)" Typo="Typo.caption">@via.Name</MudLink>
+                            </MudText>
+                        }
+                        <MudSpacer />
+                        @if (entry.Kind == TimelineEntryKind.Activity)
+                        {
+                            <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true" aria-label="Aktionen">
+                                <MudMenuItem Icon="@Icons.Material.Outlined.Edit" OnClick="() => EditAsync(entry)">Bearbeiten</MudMenuItem>
+                                <MudMenuItem Icon="@Icons.Material.Outlined.Delete" OnClick="() => DeleteAsync(entry)">Löschen</MudMenuItem>
+                            </MudMenu>
+                        }
+                    </div>
+                    @switch (entry.Kind)
+                    {
+                        case TimelineEntryKind.Activity:
+                            @if (entry.Subject is not null)
+                            {
+                                <MudText Typo="Typo.body2" Class="font-weight-medium">@entry.Subject</MudText>
+                            }
+                            <div class="timeline-body mud-typography-body2">@Markdown.ToHtml(entry.Body)</div>
+                            break;
+                        case TimelineEntryKind.TaskCreated:
+                        case TimelineEntryKind.TaskCompleted:
+                            <MudText Typo="Typo.body2">@entry.TaskTitle</MudText>
+                            break;
+                        default:
+                            @foreach (var change in entry.Changes ?? [])
+                            {
+                                <MudText Typo="Typo.body2" Class="timeline-change">@change.Label: @change.Old → @change.New</MudText>
+                            }
+                            break;
+                    }
+                </div>
+            </div>
+        }
+
+        @if (_next is not null)
+        {
+            <MudButton Variant="Variant.Text" OnClick="LoadMoreAsync" Disabled="_loading" Class="mt-2">Mehr laden</MudButton>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TimelineRecordType RecordType { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid RecordId { get; set; }
+
+    /// <summary>Links for new activities; the record of the detail view.</summary>
+    [Parameter, EditorRequired]
+    public LinkedRecords LinkedTo { get; set; } = LinkedRecords.None;
+
+    [Parameter]
+    public IReadOnlyList<ActivityLinkOption> ExtraLinks { get; set; } = [];
+
+    private ActivityComposer? _composer;
+    private List<GetTimeline.Entry>? _entries;
+    private GetTimeline.Cursor? _next;
+    private bool _loading;
+    private (TimelineRecordType, Guid) _loaded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loaded != (RecordType, RecordId))
+        {
+            _loaded = (RecordType, RecordId);
+            _entries = null;
+            await ReloadAsync();
+        }
+    }
+
+    /// <summary>Loads the newest entries again, e.g. after a task was completed on the detail view.</summary>
+    public async Task ReloadAsync()
+    {
+        var result = await LoadAsync(null);
+        if (result is not null)
+        {
+            (_entries, _next) = ([.. result.Entries], result.Next);
+        }
+
+        StateHasChanged();
+    }
+
+    /// <summary>Focuses the input (quick-add <c>N</c>).</summary>
+    public Task FocusInputAsync() => _composer?.FocusAsync() ?? Task.CompletedTask;
+
+    private async Task LoadMoreAsync()
+    {
+        var result = await LoadAsync(_next);
+        if (result is not null)
+        {
+            _entries?.AddRange(result.Entries);
+            _next = result.Next;
+        }
+    }
+
+    private async Task<GetTimeline.Result?> LoadAsync(GetTimeline.Cursor? before)
+    {
+        _loading = true;
+        try
+        {
+            var result = await TimelineHandler.Handle(new GetTimeline.Query(RecordType, RecordId, before), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+                return null;
+            }
+
+            return result.Value;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task OnLoggedAsync(Guid id)
+    {
+        Snackbar.Add("Gespeichert.", Severity.Success);
+        await ReloadAsync();
+    }
+
+    private async Task EditAsync(GetTimeline.Entry entry)
+    {
+        var parameters = new DialogParameters<ActivityDialog>
+        {
+            { d => d.ActivityId, entry.SourceId },
+            { d => d.Type, entry.ActivityType!.Value },
+            { d => d.OccurredAt, entry.OccurredAt },
+            { d => d.Subject, entry.Subject },
+            { d => d.Body, entry.Body },
+        };
+        var dialog = await DialogService.ShowAsync<ActivityDialog>("Aktivität bearbeiten", parameters, DialogDefaults.Small);
+        if (await dialog.Result is { Canceled: false })
+        {
+            await ReloadAsync();
+        }
+    }
+
+    private async Task DeleteAsync(GetTimeline.Entry entry)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Aktivität löschen",
+            "Diese Aktivität endgültig löschen?",
+            yesText: "Löschen",
+            cancelText: "Abbrechen");
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        var result = await DeleteActivityHandler.Handle(new DeleteActivity.Command(entry.SourceId), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        await ReloadAsync();
+    }
+
+    private static string TitleOf(GetTimeline.Entry entry) => entry.Kind switch
+    {
+        TimelineEntryKind.Activity => Labels.For(entry.ActivityType!.Value),
+        TimelineEntryKind.TaskCreated => "Aufgabe angelegt",
+        TimelineEntryKind.TaskCompleted => "Aufgabe erledigt",
+        TimelineEntryKind.Created => "Angelegt",
+        TimelineEntryKind.Archived => "Archiviert",
+        TimelineEntryKind.Restored => "Wiederhergestellt",
+        _ => "Geändert",
+    };
+
+    private static string IconOf(GetTimeline.Entry entry) => entry.Kind switch
+    {
+        TimelineEntryKind.Activity => Labels.IconFor(entry.ActivityType!.Value),
+        TimelineEntryKind.TaskCreated => Icons.Material.Outlined.AddTask,
+        TimelineEntryKind.TaskCompleted => Icons.Material.Outlined.TaskAlt,
+        TimelineEntryKind.Created => Icons.Material.Outlined.AddCircleOutline,
+        TimelineEntryKind.Archived => Icons.Material.Outlined.Archive,
+        TimelineEntryKind.Restored => Icons.Material.Outlined.Unarchive,
+        _ => Icons.Material.Outlined.Edit,
+    };
+
+    private static Color ColorOf(GetTimeline.Entry entry) => entry.Kind switch
+    {
+        TimelineEntryKind.Activity => Color.Primary,
+        TimelineEntryKind.TaskCompleted => Color.Success,
+        _ => Color.Default,
+    };
+
+    private static string LinkOf(GetTimeline.Via via) => via.Type switch
+    {
+        TimelineRecordType.Contact => Links.Contact(via.Id),
+        TimelineRecordType.Organization => Links.Organization(via.Id),
+        _ => Links.Opportunity(via.Id),
+    };
+}

@@ -43,4 +43,16 @@ public sealed class DurationTests
     {
         Duration.Create(value, unit).ToMonths().Should().Be(expected);
     }
+
+    [Theory]
+    [InlineData(1, DurationUnit.Days, "1 Tag")]
+    [InlineData(10, DurationUnit.Days, "10 Tage")]
+    [InlineData(1, DurationUnit.Weeks, "1 Woche")]
+    [InlineData(3, DurationUnit.Weeks, "3 Wochen")]
+    [InlineData(1, DurationUnit.Months, "1 Monat")]
+    [InlineData(6, DurationUnit.Months, "6 Monate")]
+    public void ToDisplayString_ValueAndUnit_UsesGermanSingularOrPlural(int value, DurationUnit unit, string expected)
+    {
+        Duration.Create(value, unit).ToDisplayString().Should().Be(expected);
+    }
 }
