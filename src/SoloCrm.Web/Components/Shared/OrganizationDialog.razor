@@ -1,0 +1,134 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Organizations
+@using SoloCrm.Domain.Organizations
+@inject ICommandHandler<CreateOrganization.Command, CreateOrganization.Result> CreateHandler
+@inject ICommandHandler<UpdateOrganization.Command, UpdateOrganization.Result> UpdateHandler
+@inject IQueryHandler<GetOrganization.Query, GetOrganization.Result> GetHandler
+
+<form @onsubmit="SaveAsync">
+    <MudDialog>
+        <DialogContent>
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else
+            {
+                <MudStack Spacing="2">
+                    <MudTextField @bind-Value="_name" Label="Name" Immediate="true" AutoFocus="true" Required="true"
+                                  MaxLength="@Organization.NameMaxLength"
+                                  Error="@_errors.Has(nameof(IOrganizationFields.Name))"
+                                  ErrorText="@_errors.Text(nameof(IOrganizationFields.Name))" />
+                    <MudSelect T="OrganizationType" @bind-Value="_type" Label="Typ"
+                               Error="@_errors.Has(nameof(IOrganizationFields.Type))"
+                               ErrorText="@_errors.Text(nameof(IOrganizationFields.Type))">
+                        @foreach (var type in Enum.GetValues<OrganizationType>())
+                        {
+                            <MudSelectItem T="OrganizationType" Value="type">@Labels.For(type)</MudSelectItem>
+                        }
+                    </MudSelect>
+                    @if (_showDetails)
+                    {
+                        <MudTextField @bind-Value="_website" Label="Website" Placeholder="example.com" Immediate="true"
+                                      MaxLength="@Organization.WebsiteMaxLength"
+                                      Error="@_errors.Has(nameof(IOrganizationFields.Website))"
+                                      ErrorText="@_errors.Text(nameof(IOrganizationFields.Website))" />
+                        <MudTextField @bind-Value="_city" Label="Ort" Immediate="true"
+                                      MaxLength="@Organization.CityMaxLength"
+                                      Error="@_errors.Has(nameof(IOrganizationFields.City))"
+                                      ErrorText="@_errors.Text(nameof(IOrganizationFields.City))" />
+                        <MudTextField @bind-Value="_notes" Label="Notizen" Lines="4" Immediate="true" />
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ExpandMore" Class="align-self-start"
+                                   OnClick="() => _showDetails = true">
+                            Weitere Angaben
+                        </MudButton>
+                    }
+                    @if (_errors.General is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true">@_errors.General</MudAlert>
+                    }
+                </MudStack>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel" Disabled="_saving">Abbrechen</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving || _loading">
+                Speichern
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</form>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Edits this organization; creates a new one when <c>null</c>.</summary>
+    [Parameter]
+    public Guid? OrganizationId { get; set; }
+
+    private readonly FormErrors _errors = new();
+    private string? _name;
+    private OrganizationType _type = OrganizationType.Other;
+    private string? _website;
+    private string? _city;
+    private string? _notes;
+    private bool _showDetails;
+    private bool _loading;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (OrganizationId is not { } id)
+        {
+            return;
+        }
+
+        _loading = true;
+        _showDetails = true;
+        var result = await GetHandler.Handle(new GetOrganization.Query(id), CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            (_name, _type, _website, _city, _notes) =
+                (result.Value.Name, result.Value.Type, result.Value.Website, result.Value.City, result.Value.Notes);
+        }
+        else
+        {
+            _errors.Show(result.Error);
+        }
+
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+
+        try
+        {
+            var result = OrganizationId is { } id
+                ? (await UpdateHandler.Handle(new UpdateOrganization.Command(id, _name, _type, _website, _city, _notes), CancellationToken.None))
+                    .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure)
+                : (await CreateHandler.Handle(new CreateOrganization.Command(_name, _type, _website, _city, _notes), CancellationToken.None))
+                    .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure);
+
+            if (result.IsSuccess)
+            {
+                MudDialog.Close(DialogResult.Ok(result.Value));
+                return;
+            }
+
+            _errors.Show(result.Error);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

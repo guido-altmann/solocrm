@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @implements IAsyncDisposable
 @inject QuickAddService QuickAdd
+@inject NavigationManager Navigation
 @inject IJSRuntime JS
 
 <MudThemeProvider @ref="_themeProvider" Theme="SoloCrmTheme.Instance" @bind-IsDarkMode="_isDarkMode" />
@@ -19,9 +20,9 @@
                       AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined"
                       Margin="Margin.Dense" ReadOnly="true" Disabled="true"
                       Class="d-none d-sm-flex mx-4" Style="max-width: 360px;" />
-        <MudTooltip Text="Neuer Kontakt (N)">
+        <MudTooltip Text="@($"{QuickAdd.CurrentLabel} (N)")">
             <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Inherit"
-                           aria-label="Schnell anlegen" OnClick="QuickAdd.OpenContactAsync" />
+                           aria-label="@QuickAdd.CurrentLabel" OnClick="QuickAdd.OpenForCurrentPageAsync" />
         </MudTooltip>
         <MudToggleIconButton @bind-Toggled="_isDarkMode"
                              Icon="@Icons.Material.Filled.DarkMode" Color="Color.Inherit"
@@ -55,6 +56,11 @@
     private IJSObjectReference? _keyboard;
     private DotNetObjectReference<MainLayout>? _selfReference;
 
+    // The quick-add button depends on the current page.
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender)
@@ -77,10 +83,9 @@
     [JSInvokable]
     public async Task OnShortcut(string key)
     {
-        // TODO(US-06): context-dependent quick-add (opportunity, note) once those exist.
         if (key == "n")
         {
-            await QuickAdd.OpenContactAsync();
+            await QuickAdd.OpenForCurrentPageAsync();
         }
     }
 
@@ -88,6 +93,8 @@
 
     public async ValueTask DisposeAsync()
     {
+        Navigation.LocationChanged -= OnLocationChanged;
+
         if (_keyboard is not null)
         {
             try

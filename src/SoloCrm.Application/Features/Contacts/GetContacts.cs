@@ -9,11 +9,9 @@ namespace SoloCrm.Application.Features.Contacts;
 /// </summary>
 public static class GetContacts
 {
-    public const int DefaultPageSize = 50;
-    public const int MaxPageSize = 200;
+    public const int DefaultPageSize = Paging.DefaultPageSize;
 
-    /// <param name="PageIndex">Zero-based page index.</param>
-    public sealed record Query(string? Search = null, int PageIndex = 0, int PageSize = DefaultPageSize);
+    public sealed record Query(string? Search = null, int PageIndex = 0, int PageSize = DefaultPageSize) : IPagedQuery;
 
     public sealed record Item(
         Guid Id,
@@ -30,21 +28,13 @@ public static class GetContacts
     {
         public Validator()
         {
-            RuleFor(q => q.PageIndex)
-                .GreaterThanOrEqualTo(0)
-                .WithMessage("Die Seitenzahl darf nicht negativ sein.");
-
-            RuleFor(q => q.PageSize)
-                .InclusiveBetween(1, MaxPageSize)
-                .WithMessage($"Die Seitengröße muss zwischen 1 und {MaxPageSize} liegen.");
+            Include(new PagingValidator<Query>());
         }
     }
 
     public sealed class Handler(ICrmDbContextFactory dbFactory, IValidator<Query> validator)
         : IQueryHandler<Query, Result>
     {
-        private const string LikeEscape = "\\";
-
         public async Task<Result<Result>> Handle(Query query, CancellationToken cancellationToken)
         {
             var validation = await validator.ValidateAsync(query, cancellationToken);
@@ -59,12 +49,12 @@ public static class GetContacts
 
             if (!string.IsNullOrWhiteSpace(query.Search))
             {
-                var pattern = $"%{EscapeLikePattern(query.Search.Trim())}%";
+                var pattern = LikePattern.Contains(query.Search);
                 contacts = contacts.Where(c =>
-                    EF.Functions.ILike(c.FirstName ?? "", pattern, LikeEscape)
-                    || EF.Functions.ILike(c.LastName ?? "", pattern, LikeEscape)
-                    || EF.Functions.ILike((c.FirstName ?? "") + " " + (c.LastName ?? ""), pattern, LikeEscape)
-                    || EF.Functions.ILike(c.Email ?? "", pattern, LikeEscape));
+                    EF.Functions.ILike(c.FirstName ?? "", pattern, LikePattern.Escape)
+                    || EF.Functions.ILike(c.LastName ?? "", pattern, LikePattern.Escape)
+                    || EF.Functions.ILike((c.FirstName ?? "") + " " + (c.LastName ?? ""), pattern, LikePattern.Escape)
+                    || EF.Functions.ILike(c.Email ?? "", pattern, LikePattern.Escape));
             }
 
             var totalCount = await contacts.CountAsync(cancellationToken);
@@ -73,17 +63,11 @@ public static class GetContacts
                 .OrderBy(c => c.LastName ?? c.FirstName)
                 .ThenBy(c => c.FirstName)
                 .ThenBy(c => c.Id)
-                .Skip(query.PageIndex * query.PageSize)
-                .Take(query.PageSize)
+                .Page(query)
                 .Select(c => new Item(c.Id, c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle, c.CreatedAt))
                 .ToListAsync(cancellationToken);
 
             return new Result(items, totalCount);
         }
-
-        private static string EscapeLikePattern(string value) => value
-            .Replace(LikeEscape, LikeEscape + LikeEscape, StringComparison.Ordinal)
-            .Replace("%", LikeEscape + "%", StringComparison.Ordinal)
-            .Replace("_", LikeEscape + "_", StringComparison.Ordinal);
     }
 }

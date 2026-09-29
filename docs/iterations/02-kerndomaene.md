@@ -25,10 +25,10 @@
 - [x] `OutboxMessage` (SPEC 2.4) + `OutboxInterceptor` (ADR-010): Domain Events aller Entitäten transaktional in die Outbox schreiben, danach `ClearDomainEvents()`; die Verarbeitung und die Webhooks folgen in It. 5
 
 ## Schritt 2 – Organization (US-03, US-04, US-05)
-- [ ] Entität `Organization` (SPEC 2.3) inkl. `OrganizationType` (als string gespeichert), Website-Validierung und Normalisierung (Vorbereitung auf Enrichment, SPEC 9.5); Event `OrganizationCreated`
-- [ ] Use Cases `CreateOrganization`, `UpdateOrganization`, `GetOrganizations` (Paging Default 50, Suche, Filter Typ, Sortierung, „Archivierte anzeigen“), `ArchiveOrganization`/`RestoreOrganization`
-- [ ] `SearchOrganizations` für Autocomplete (optional mit bevorzugtem Typ, siehe US-06 AK2)
-- [ ] Seite `/organizations` (analog `/contacts`) mit Typ-Filter, Quick-Add (`N` auf dieser Seite legt eine Organisation an) und Bearbeiten-Dialog
+- [x] Entität `Organization` (SPEC 2.3) inkl. `OrganizationType` (als string gespeichert), Website-Validierung und Normalisierung (Vorbereitung auf Enrichment, SPEC 9.5); Event `OrganizationCreated`
+- [x] Use Cases `CreateOrganization`, `UpdateOrganization`, `GetOrganizations` (Paging Default 50, Suche, Filter Typ, Sortierung, „Archivierte anzeigen“), `ArchiveOrganization`/`RestoreOrganization`
+- [x] `SearchOrganizations` für Autocomplete (optional mit bevorzugtem Typ, siehe US-06 AK2)
+- [x] Seite `/organizations` (analog `/contacts`) mit Typ-Filter, Quick-Add (`N` auf dieser Seite legt eine Organisation an) und Bearbeiten-Dialog
 
 ## Schritt 3 – Contact erweitern (US-02, US-04, US-05)
 - [ ] `Contact` um `OrganizationId` (FK, `ON DELETE SET NULL`) und `Source` (`LeadSource`) erweitern
@@ -83,6 +83,9 @@
 
 ## Entscheidungen während der Umsetzung (2026-09-29)
 4. **Wiederherstellen im Audit:** `Restore()` wird als `Updated` mit dem Diff `IsArchived: true → false` protokolliert (die Spec kennt keine Aktion `Restored`). `Created` enthält nur gesetzte Werte, `Deleted` die alten Werte.
+5. **Website-Normalisierung:** Ohne Schema wird `https://` ergänzt; Schema und Host werden kleingeschrieben, Standard-Port, Fragment und abschließender Slash entfallen. Zulässig sind nur http(s)-URLs mit Domainnamen (keine IP-Adressen, keine Zugangsdaten in der URL).
+6. **„Archivierte anzeigen“** blendet archivierte Einträge zusätzlich ein (mit Chip „Archiviert“), statt nur sie zu zeigen.
+7. **Quick-Add kontextabhängig:** `N` und der Plus-Button der App-Leiste legen auf `/organizations` eine Organisation an, sonst einen Kontakt (ab Schritt 5 auf `/pipeline` eine Anfrage).
 
 ## Definition of Done
 - CI grün (Build + alle Tests); `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet

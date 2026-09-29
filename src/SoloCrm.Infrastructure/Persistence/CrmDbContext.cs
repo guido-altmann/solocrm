@@ -4,6 +4,7 @@ using SoloCrm.Application.Abstractions;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
+using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Settings;
 using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Persistence.Outbox;
@@ -14,6 +15,8 @@ public class CrmDbContext(DbContextOptions options)
     : IdentityDbContext<ApplicationUser>(options), ICrmDbContext
 {
     public DbSet<Contact> Contacts => Set<Contact>();
+
+    public DbSet<Organization> Organizations => Set<Organization>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 

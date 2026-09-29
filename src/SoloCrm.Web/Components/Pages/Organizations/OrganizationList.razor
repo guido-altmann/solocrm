@@ -1,0 +1,179 @@
+@page "/organizations"
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Organizations
+@using SoloCrm.Domain.Organizations
+@implements IDisposable
+@inject IQueryHandler<GetOrganizations.Query, GetOrganizations.Result> GetOrganizationsHandler
+@inject ICommandHandler<ArchiveOrganization.Command, ArchiveOrganization.Result> ArchiveHandler
+@inject ICommandHandler<RestoreOrganization.Command, RestoreOrganization.Result> RestoreHandler
+@inject QuickAddService QuickAdd
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Organisationen · SoloCRM</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Organisationen</MudText>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddBusiness"
+               OnClick="QuickAdd.OpenOrganizationAsync">
+        Neue Organisation
+    </MudButton>
+</MudStack>
+
+<MudDataGrid @ref="_grid" T="GetOrganizations.Item" ServerData="LoadAsync" SortMode="SortMode.Single"
+             RowsPerPage="Paging.DefaultPageSize" Hover="true" Dense="true" Elevation="1">
+    <ToolBarContent>
+        <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="4" Class="flex-grow-1">
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearchChanged" Placeholder="Name, Ort oder Website suchen…"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" DebounceInterval="300" Clearable="true" Class="mt-0" Style="max-width: 360px;" />
+            <MudSelect T="OrganizationType?" Value="_type" ValueChanged="OnTypeChanged" Label="Typ" Dense="true"
+                       Clearable="true" Style="max-width: 200px;">
+                @foreach (var type in Enum.GetValues<OrganizationType>())
+                {
+                    <MudSelectItem T="OrganizationType?" Value="type">@Labels.For(type)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSwitch T="bool" Value="_includeArchived" ValueChanged="OnIncludeArchivedChanged" Color="Color.Primary"
+                       Label="Archivierte anzeigen" />
+        </MudStack>
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="o => o.Name" Title="Name">
+            <CellTemplate>
+                @context.Item.Name
+                @if (context.Item.IsArchived)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-2">Archiviert</MudChip>
+                }
+            </CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="o => o.Type" Title="Typ">
+            <CellTemplate>@Labels.For(context.Item.Type)</CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="o => o.Website" Title="Website" Sortable="false">
+            <CellTemplate>
+                @if (context.Item.Website is { } website)
+                {
+                    <MudLink Href="@website" Target="_blank" rel="noopener noreferrer">@website</MudLink>
+                }
+            </CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="o => o.City" Title="Ort" />
+        <TemplateColumn T="GetOrganizations.Item" Sortable="false" CellClass="d-flex justify-end">
+            <CellTemplate>
+                <MudTooltip Text="Bearbeiten">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Bearbeiten"
+                                   OnClick="() => EditAsync(context.Item)" />
+                </MudTooltip>
+                @if (context.Item.IsArchived)
+                {
+                    <MudTooltip Text="Wiederherstellen">
+                        <MudIconButton Icon="@Icons.Material.Filled.Unarchive" Size="Size.Small" aria-label="Wiederherstellen"
+                                       OnClick="() => RestoreAsync(context.Item)" />
+                    </MudTooltip>
+                }
+                else
+                {
+                    <MudTooltip Text="Archivieren">
+                        <MudIconButton Icon="@Icons.Material.Filled.Archive" Size="Size.Small" aria-label="Archivieren"
+                                       OnClick="() => ArchiveAsync(context.Item)" />
+                    </MudTooltip>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent>
+        <MudText>@(IsFiltered ? "Keine Organisationen gefunden." : "Noch keine Organisationen vorhanden.")</MudText>
+    </NoRecordsContent>
+    <PagerContent>
+        <MudDataGridPager T="GetOrganizations.Item" PageSizeOptions="[25, 50, 100]" RowsPerPageString="Zeilen pro Seite:" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private static readonly DialogOptions EditOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+
+    private MudDataGrid<GetOrganizations.Item>? _grid;
+    private string? _search;
+    private OrganizationType? _type;
+    private bool _includeArchived;
+
+    private bool IsFiltered => !string.IsNullOrWhiteSpace(_search) || _type is not null;
+
+    protected override void OnInitialized() => QuickAdd.OrganizationCreated += OnOrganizationCreated;
+
+    private async Task<GridData<GetOrganizations.Item>> LoadAsync(
+        GridState<GetOrganizations.Item> state,
+        CancellationToken cancellationToken)
+    {
+        var sort = state.SortDefinitions.FirstOrDefault();
+        var sortBy = Enum.TryParse<GetOrganizations.SortField>(sort?.SortBy, out var field) ? field : GetOrganizations.SortField.Name;
+
+        var result = await GetOrganizationsHandler.Handle(
+            new GetOrganizations.Query(_search, _type, _includeArchived, sortBy, sort?.Descending ?? false, state.Page, state.PageSize),
+            cancellationToken);
+
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return new GridData<GetOrganizations.Item> { Items = [], TotalItems = 0 };
+        }
+
+        return new GridData<GetOrganizations.Item> { Items = result.Value.Items, TotalItems = result.Value.TotalCount };
+    }
+
+    private async Task OnSearchChanged(string? search)
+    {
+        _search = search;
+        await ReloadAsync();
+    }
+
+    private async Task OnTypeChanged(OrganizationType? type)
+    {
+        _type = type;
+        await ReloadAsync();
+    }
+
+    private async Task OnIncludeArchivedChanged(bool includeArchived)
+    {
+        _includeArchived = includeArchived;
+        await ReloadAsync();
+    }
+
+    private async Task EditAsync(GetOrganizations.Item item)
+    {
+        var parameters = new DialogParameters<OrganizationDialog> { { d => d.OrganizationId, item.Id } };
+        var dialog = await DialogService.ShowAsync<OrganizationDialog>("Organisation bearbeiten", parameters, EditOptions);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Organisation gespeichert.", Severity.Success);
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ArchiveAsync(GetOrganizations.Item item)
+    {
+        var result = await ArchiveHandler.Handle(new ArchiveOrganization.Command(item.Id), CancellationToken.None);
+        await ShowOutcomeAsync(result.IsSuccess, $"„{item.Name}“ archiviert.", result.IsFailure ? result.Error : null);
+    }
+
+    private async Task RestoreAsync(GetOrganizations.Item item)
+    {
+        var result = await RestoreHandler.Handle(new RestoreOrganization.Command(item.Id), CancellationToken.None);
+        await ShowOutcomeAsync(result.IsSuccess, $"„{item.Name}“ wiederhergestellt.", result.IsFailure ? result.Error : null);
+    }
+
+    private async Task ShowOutcomeAsync(bool success, string message, Error? error)
+    {
+        Snackbar.Add(success ? message : error!.Message, success ? Severity.Success : Severity.Error);
+        await ReloadAsync();
+    }
+
+    private Task OnOrganizationCreated(Guid organizationId) => InvokeAsync(ReloadAsync);
+
+    private Task ReloadAsync() => _grid?.ReloadServerData() ?? Task.CompletedTask;
+
+    public void Dispose() => QuickAdd.OrganizationCreated -= OnOrganizationCreated;
+}

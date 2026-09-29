@@ -9,19 +9,19 @@
             <MudStack Spacing="2">
                 <MudTextField @bind-Value="_firstName" Label="Vorname" Immediate="true" AutoFocus="true"
                               MaxLength="@Contact.FirstNameMaxLength"
-                              Error="@HasError(nameof(CreateContact.Command.FirstName))"
-                              ErrorText="@ErrorText(nameof(CreateContact.Command.FirstName))" />
+                              Error="@_errors.Has(nameof(CreateContact.Command.FirstName))"
+                              ErrorText="@_errors.Text(nameof(CreateContact.Command.FirstName))" />
                 <MudTextField @bind-Value="_lastName" Label="Nachname" Immediate="true"
                               MaxLength="@Contact.LastNameMaxLength"
-                              Error="@HasError(nameof(CreateContact.Command.LastName))"
-                              ErrorText="@ErrorText(nameof(CreateContact.Command.LastName))" />
+                              Error="@_errors.Has(nameof(CreateContact.Command.LastName))"
+                              ErrorText="@_errors.Text(nameof(CreateContact.Command.LastName))" />
                 <MudTextField @bind-Value="_email" Label="E-Mail" InputType="InputType.Email" Immediate="true"
                               MaxLength="@Contact.EmailMaxLength"
-                              Error="@HasError(nameof(CreateContact.Command.Email))"
-                              ErrorText="@ErrorText(nameof(CreateContact.Command.Email))" />
-                @if (_generalError is not null)
+                              Error="@_errors.Has(nameof(CreateContact.Command.Email))"
+                              ErrorText="@_errors.Text(nameof(CreateContact.Command.Email))" />
+                @if (_errors.General is not null)
                 {
-                    <MudAlert Severity="Severity.Error" Dense="true">@_generalError</MudAlert>
+                    <MudAlert Severity="Severity.Error" Dense="true">@_errors.General</MudAlert>
                 }
             </MudStack>
         </DialogContent>
@@ -38,18 +38,16 @@
     [CascadingParameter]
     private IMudDialogInstance MudDialog { get; set; } = default!;
 
+    private readonly FormErrors _errors = new();
     private string? _firstName;
     private string? _lastName;
     private string? _email;
     private bool _saving;
-    private IReadOnlyDictionary<string, string[]> _fieldErrors = new Dictionary<string, string[]>();
-    private string? _generalError;
 
     private async Task SaveAsync()
     {
         _saving = true;
-        _fieldErrors = new Dictionary<string, string[]>();
-        _generalError = null;
+        _errors.Clear();
 
         try
         {
@@ -63,21 +61,8 @@
                 return;
             }
 
-            switch (result.Error)
-            {
-                case ValidationError validation:
-                    _fieldErrors = validation.Errors;
-                    break;
-                case var error when error == CreateContact.Errors.DuplicateEmail:
-                    _fieldErrors = new Dictionary<string, string[]>
-                    {
-                        [nameof(CreateContact.Command.Email)] = [error.Message],
-                    };
-                    break;
-                default:
-                    _generalError = result.Error.Message;
-                    break;
-            }
+            _errors.Show(result.Error, error =>
+                error == CreateContact.Errors.DuplicateEmail ? nameof(CreateContact.Command.Email) : null);
         }
         finally
         {
@@ -86,9 +71,4 @@
     }
 
     private void Cancel() => MudDialog.Cancel();
-
-    private bool HasError(string field) => _fieldErrors.ContainsKey(field);
-
-    private string? ErrorText(string field) =>
-        _fieldErrors.TryGetValue(field, out var messages) ? string.Join(" ", messages) : null;
 }
