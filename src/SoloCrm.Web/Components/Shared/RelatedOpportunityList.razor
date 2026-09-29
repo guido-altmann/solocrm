@@ -1,0 +1,51 @@
+@using SoloCrm.Application.Features.Opportunities
+@using SoloCrm.Domain.Opportunities
+
+@* Requests linked to a contact or an organization (SPEC 3.3 S5). *@
+@if (Items.Count == 0)
+{
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">Keine Anfragen.</MudText>
+}
+else
+{
+    <MudList T="string" Dense="true" Class="pa-0">
+        @foreach (var item in Items)
+        {
+            <MudListItem T="string" @key="item.Id" Class="px-0">
+                <div class="d-flex align-center gap-2 flex-wrap">
+                    <MudLink Href="@Links.Opportunity(item.Id)" Typo="Typo.body2">@item.Title</MudLink>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@StatusColor(item.Status)">@item.StageName</MudChip>
+                    @if (ShowRole && item.Role != GetRelatedOpportunities.Role.PrimaryContact)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            @(item.Role == GetRelatedOpportunities.Role.Client ? "als Endkunde" : "als Vermittler")
+                        </MudText>
+                    }
+                    @if (item.PricingDisplay is not null)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@item.PricingDisplay</MudText>
+                    }
+                    @if (item.IsArchived)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">Archiviert</MudChip>
+                    }
+                </div>
+            </MudListItem>
+        }
+    </MudList>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<GetRelatedOpportunities.Item> Items { get; set; } = [];
+
+    [Parameter]
+    public bool ShowRole { get; set; }
+
+    private static Color StatusColor(StageStatus status) => status switch
+    {
+        StageStatus.Won => Color.Success,
+        StageStatus.Lost => Color.Error,
+        _ => Color.Default,
+    };
+}

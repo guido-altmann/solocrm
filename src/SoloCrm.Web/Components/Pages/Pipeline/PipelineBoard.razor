@@ -6,6 +6,7 @@
 @inject IQueryHandler<GetPipelineBoard.Query, GetPipelineBoard.Result> BoardHandler
 @inject ICommandHandler<MoveOpportunity.Command, MoveOpportunity.Result> MoveHandler
 @inject QuickAddService QuickAdd
+@inject NavigationManager Navigation
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
@@ -84,9 +85,16 @@ else
             </div>
         </ChildContent>
         <ItemRenderer>
-            <MudCard Elevation="1" Class="pipeline-card" @onclick="() => EditAsync(context.Id)">
+            <MudCard Elevation="1" Class="pipeline-card" @onclick="() => Navigation.NavigateTo(Links.Opportunity(context.Id))">
                 <MudCardContent Class="pa-3">
-                    <MudText Typo="Typo.body1"><b>@context.Title</b></MudText>
+                    <div class="d-flex align-start">
+                        <MudText Typo="Typo.body1" Class="flex-grow-1"><b>@context.Title</b></MudText>
+                        @* Keeps the edit dialog reachable; the card itself opens the detail view. *@
+                        <span @onclick:stopPropagation="true">
+                            <MudIconButton Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Class="ma-n1"
+                                           aria-label="Bearbeiten" OnClick="() => EditAsync(context.Id)" />
+                        </span>
+                    </div>
                     @if (context.ClientName is not null || context.AgencyName is not null)
                     {
                         <MudText Typo="Typo.body2">

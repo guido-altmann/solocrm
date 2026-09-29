@@ -1,0 +1,159 @@
+@page "/organizations/{Id:guid}"
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Opportunities
+@using SoloCrm.Application.Features.Organizations
+@using SoloCrm.Application.Features.Timeline
+@using SoloCrm.Domain.Common
+@implements IDisposable
+@inject IQueryHandler<GetOrganization.Query, GetOrganization.Result> GetOrganizationHandler
+@inject IQueryHandler<GetOrganizationContacts.Query, GetOrganizationContacts.Result> GetContactsHandler
+@inject IQueryHandler<GetRelatedOpportunities.Query, GetRelatedOpportunities.Result> GetOpportunitiesHandler
+@inject QuickAddService QuickAdd
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_organization?.Name ?? "Organisation") · SoloCRM</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="px-0 pt-0" />
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning">Die Organisation wurde nicht gefunden.</MudAlert>
+}
+else if (_organization is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="4">
+            <MudStack Spacing="4">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <div class="d-flex align-start">
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.h5">@_organization.Name</MudText>
+                            <MudText Typo="Typo.body2" Class="mud-text-secondary">@Labels.For(_organization.Type)</MudText>
+                            @if (_organization.IsArchived)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-0">Archiviert</MudChip>
+                            }
+                        </div>
+                        <MudTooltip Text="Bearbeiten">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="Bearbeiten" OnClick="EditAsync" />
+                        </MudTooltip>
+                    </div>
+                    <MudStack Spacing="2" Class="mt-3">
+                        <DetailField Label="Website" Visible="_organization.Website is not null">
+                            <MudLink Href="@_organization.Website" Target="_blank" rel="noopener noreferrer">@_organization.Website</MudLink>
+                        </DetailField>
+                        <DetailField Label="Ort" Visible="_organization.City is not null">@_organization.City</DetailField>
+                        <DetailField Label="Notizen" Visible="_organization.Notes is not null">
+                            <span style="white-space: pre-line;">@_organization.Notes</span>
+                        </DetailField>
+                    </MudStack>
+                </MudPaper>
+
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-1">Kontakte</MudText>
+                    @if (_contacts.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">Keine Kontakte.</MudText>
+                    }
+                    else
+                    {
+                        <MudList T="string" Dense="true" Class="pa-0">
+                            @foreach (var contact in _contacts)
+                            {
+                                <MudListItem T="string" @key="contact.Id" Class="px-0">
+                                    <div class="d-flex align-center gap-2 flex-wrap">
+                                        <MudLink Href="@Links.Contact(contact.Id)" Typo="Typo.body2">@contact.Name</MudLink>
+                                        @if (contact.JobTitle is not null)
+                                        {
+                                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@contact.JobTitle</MudText>
+                                        }
+                                        @if (contact.IsArchived)
+                                        {
+                                            <MudChip T="string" Size="Size.Small" Variant="Variant.Text">Archiviert</MudChip>
+                                        }
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                </MudPaper>
+
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-1">Anfragen</MudText>
+                    <RelatedOpportunityList Items="_opportunities" ShowRole="true" />
+                </MudPaper>
+
+                <OpenTasksCard LinkedTo="_linkedTo" OnChanged="ReloadTimelineAsync" />
+            </MudStack>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Outlined="true" Class="pa-4">
+                <Timeline @ref="_timeline" RecordType="TimelineRecordType.Organization" RecordId="Id" LinkedTo="_linkedTo" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private GetOrganization.Result? _organization;
+    private IReadOnlyList<GetOrganizationContacts.Item> _contacts = [];
+    private IReadOnlyList<GetRelatedOpportunities.Item> _opportunities = [];
+    private LinkedRecords _linkedTo = LinkedRecords.None;
+    private List<BreadcrumbItem> _breadcrumbs = [];
+    private Timeline? _timeline;
+    private IDisposable? _noteInput;
+    private bool _notFound;
+
+    protected override void OnInitialized() =>
+        _noteInput = QuickAdd.RegisterNoteInput(() => _timeline?.FocusInputAsync() ?? Task.CompletedTask);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _linkedTo = new LinkedRecords(OrganizationId: Id);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var organization = await GetOrganizationHandler.Handle(new GetOrganization.Query(Id), CancellationToken.None);
+        _notFound = organization.IsFailure;
+        if (organization.IsFailure)
+        {
+            return;
+        }
+
+        _organization = organization.Value;
+        _breadcrumbs = [new("Organisationen", "/organizations"), new(_organization.Name, null, disabled: true)];
+
+        var contacts = await GetContactsHandler.Handle(new GetOrganizationContacts.Query(Id), CancellationToken.None);
+        _contacts = contacts.IsSuccess ? contacts.Value.Items : [];
+
+        var opportunities = await GetOpportunitiesHandler.Handle(new GetRelatedOpportunities.Query(OrganizationId: Id), CancellationToken.None);
+        _opportunities = opportunities.IsSuccess ? opportunities.Value.Items : [];
+    }
+
+    private async Task EditAsync()
+    {
+        var parameters = new DialogParameters<OrganizationDialog> { { d => d.OrganizationId, Id } };
+        var dialog = await DialogService.ShowAsync<OrganizationDialog>("Organisation bearbeiten", parameters, DialogDefaults.Small);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Organisation gespeichert.", Severity.Success);
+            await LoadAsync();
+            await ReloadTimelineAsync();
+        }
+    }
+
+    private Task ReloadTimelineAsync() => _timeline?.ReloadAsync() ?? Task.CompletedTask;
+
+    public void Dispose() => _noteInput?.Dispose();
+}

@@ -1,0 +1,20 @@
+@* A labeled read-only value in the master data of a detail view (SPEC 3.3 S5). *@
+@if (Visible)
+{
+    <div class="detail-field">
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">@Label</MudText>
+        <MudText Typo="Typo.body2" Class="detail-field-value">@ChildContent</MudText>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Empty fields are hidden to keep the view compact.</summary>
+    [Parameter]
+    public bool Visible { get; set; } = true;
+}

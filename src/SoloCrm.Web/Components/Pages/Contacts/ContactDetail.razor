@@ -1,0 +1,138 @@
+@page "/contacts/{Id:guid}"
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Contacts
+@using SoloCrm.Application.Features.Opportunities
+@using SoloCrm.Application.Features.Timeline
+@using SoloCrm.Domain.Common
+@implements IDisposable
+@inject IQueryHandler<GetContact.Query, GetContact.Result> GetContactHandler
+@inject IQueryHandler<GetRelatedOpportunities.Query, GetRelatedOpportunities.Result> GetOpportunitiesHandler
+@inject QuickAddService QuickAdd
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_contact is null ? "Kontakt" : Name) · SoloCRM</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="px-0 pt-0" />
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning">Der Kontakt wurde nicht gefunden.</MudAlert>
+}
+else if (_contact is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="4">
+            <MudStack Spacing="4">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <div class="d-flex align-start">
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.h5">@Name</MudText>
+                            @if (_contact.JobTitle is not null)
+                            {
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">@_contact.JobTitle</MudText>
+                            }
+                            @if (_contact.IsArchived)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-0">Archiviert</MudChip>
+                            }
+                        </div>
+                        <MudTooltip Text="Bearbeiten">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="Bearbeiten" OnClick="EditAsync" />
+                        </MudTooltip>
+                    </div>
+                    <MudStack Spacing="2" Class="mt-3">
+                        <DetailField Label="Organisation" Visible="_contact.OrganizationId is not null">
+                            <MudLink Href="@Links.Organization(_contact.OrganizationId!.Value)">@_contact.OrganizationName</MudLink>
+                        </DetailField>
+                        <DetailField Label="E-Mail" Visible="_contact.Email is not null">
+                            <MudLink Href="@($"mailto:{_contact.Email}")">@_contact.Email</MudLink>
+                        </DetailField>
+                        <DetailField Label="Telefon" Visible="_contact.Phone is not null">
+                            <MudLink Href="@($"tel:{_contact.Phone}")">@_contact.Phone</MudLink>
+                        </DetailField>
+                        <DetailField Label="LinkedIn" Visible="_contact.LinkedInUrl is not null">
+                            <MudLink Href="@_contact.LinkedInUrl" Target="_blank" rel="noopener noreferrer">Profil öffnen</MudLink>
+                        </DetailField>
+                        <DetailField Label="Quelle" Visible="_contact.Source is not null">
+                            @(_contact.Source is { } source ? Labels.For(source) : null)
+                        </DetailField>
+                    </MudStack>
+                </MudPaper>
+
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-1">Anfragen</MudText>
+                    <RelatedOpportunityList Items="_opportunities" />
+                </MudPaper>
+
+                <OpenTasksCard LinkedTo="_linkedTo" OnChanged="ReloadTimelineAsync" />
+            </MudStack>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Outlined="true" Class="pa-4">
+                <Timeline @ref="_timeline" RecordType="TimelineRecordType.Contact" RecordId="Id" LinkedTo="_linkedTo" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private GetContact.Result? _contact;
+    private IReadOnlyList<GetRelatedOpportunities.Item> _opportunities = [];
+    private LinkedRecords _linkedTo = LinkedRecords.None;
+    private List<BreadcrumbItem> _breadcrumbs = [];
+    private Timeline? _timeline;
+    private IDisposable? _noteInput;
+    private bool _notFound;
+
+    private string Name => Names.Person(_contact?.FirstName, _contact?.LastName);
+
+    protected override void OnInitialized() =>
+        _noteInput = QuickAdd.RegisterNoteInput(() => _timeline?.FocusInputAsync() ?? Task.CompletedTask);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _linkedTo = new LinkedRecords(ContactId: Id);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var contact = await GetContactHandler.Handle(new GetContact.Query(Id), CancellationToken.None);
+        _notFound = contact.IsFailure;
+        if (contact.IsFailure)
+        {
+            return;
+        }
+
+        _contact = contact.Value;
+        _breadcrumbs = [new("Kontakte", "/contacts"), new(Name, null, disabled: true)];
+
+        var opportunities = await GetOpportunitiesHandler.Handle(new GetRelatedOpportunities.Query(PrimaryContactId: Id), CancellationToken.None);
+        _opportunities = opportunities.IsSuccess ? opportunities.Value.Items : [];
+    }
+
+    private async Task EditAsync()
+    {
+        var parameters = new DialogParameters<ContactDialog> { { d => d.ContactId, Id } };
+        var dialog = await DialogService.ShowAsync<ContactDialog>("Kontakt bearbeiten", parameters, DialogDefaults.Small);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Kontakt gespeichert.", Severity.Success);
+            await LoadAsync();
+            await ReloadTimelineAsync();
+        }
+    }
+
+    private Task ReloadTimelineAsync() => _timeline?.ReloadAsync() ?? Task.CompletedTask;
+
+    public void Dispose() => _noteInput?.Dispose();
+}

@@ -1,0 +1,164 @@
+@page "/opportunities/{Id:guid}"
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Opportunities
+@using SoloCrm.Application.Features.Timeline
+@using SoloCrm.Domain.Common
+@using SoloCrm.Domain.Opportunities
+@implements IDisposable
+@inject IQueryHandler<GetOpportunity.Query, GetOpportunity.Result> GetOpportunityHandler
+@inject QuickAddService QuickAdd
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>@(_opportunity?.Title ?? "Anfrage") · SoloCRM</PageTitle>
+
+<MudBreadcrumbs Items="_breadcrumbs" Class="px-0 pt-0" />
+
+@if (_notFound)
+{
+    <MudAlert Severity="Severity.Warning">Die Anfrage wurde nicht gefunden.</MudAlert>
+}
+else if (_opportunity is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    var o = _opportunity;
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="4">
+            <MudStack Spacing="4">
+                <MudPaper Outlined="true" Class="pa-4">
+                    <div class="d-flex align-start">
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.h5">@o.Title</MudText>
+                            <div class="d-flex flex-wrap gap-1 mt-1">
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Color="@StatusColor(o.StageStatus)" Class="ml-0">
+                                    @o.StageName
+                                </MudChip>
+                                @if (o.IsArchived)
+                                {
+                                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">Archiviert</MudChip>
+                                }
+                            </div>
+                        </div>
+                        <MudTooltip Text="Bearbeiten">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="Bearbeiten" OnClick="EditAsync" />
+                        </MudTooltip>
+                    </div>
+                    <MudStack Spacing="2" Class="mt-3">
+                        <DetailField Label="Absagegrund" Visible="o.LostReason is not null">
+                            @(o.LostReason is { } reason ? Labels.For(reason) : null)
+                        </DetailField>
+                        <DetailField Label="Endkunde" Visible="o.ClientOrganizationId is not null">
+                            <MudLink Href="@Links.Organization(o.ClientOrganizationId!.Value)">@o.ClientOrganizationName</MudLink>
+                        </DetailField>
+                        <DetailField Label="Vermittler" Visible="o.AgencyOrganizationId is not null">
+                            <MudLink Href="@Links.Organization(o.AgencyOrganizationId!.Value)">@o.AgencyOrganizationName</MudLink>
+                        </DetailField>
+                        <DetailField Label="Ansprechpartner" Visible="o.PrimaryContactId is not null">
+                            <MudLink Href="@Links.Contact(o.PrimaryContactId!.Value)">@o.PrimaryContactName</MudLink>
+                        </DetailField>
+                        <DetailField Label="Preis" Visible="o.Pricing is not null">@o.Pricing?.ToDisplayString()</DetailField>
+                        <DetailField Label="Start" Visible="o.StartDate is not null">
+                            @(o.StartDate is { } start ? Formats.Date(start) : null)
+                        </DetailField>
+                        <DetailField Label="Laufzeit">@(o.Duration?.ToDisplayString() ?? "offen")</DetailField>
+                        <DetailField Label="Auslastung" Visible="o.Utilization is not null">@o.Utilization %</DetailField>
+                        <DetailField Label="Remote" Visible="o.RemotePercentage is not null">@o.RemotePercentage %</DetailField>
+                        <DetailField Label="Geschätzter Wert" Visible="o.EstimatedValue is not null">
+                            @(o.EstimatedValue is { } value ? Currency.Format(decimal.Round(value, 0), o.Pricing!.Currency) : null)
+                        </DetailField>
+                        <DetailField Label="MRR" Visible="o.MonthlyRecurringValue is not null">
+                            @(o.MonthlyRecurringValue is { } mrr ? Currency.Format(mrr, o.Pricing!.Currency) : null)
+                        </DetailField>
+                        <DetailField Label="Quelle" Visible="o.Source is not null">
+                            @(o.Source is { } source ? Labels.For(source) : null)
+                        </DetailField>
+                    </MudStack>
+                </MudPaper>
+
+                <OpenTasksCard LinkedTo="_linkedTo" OnChanged="ReloadTimelineAsync" />
+            </MudStack>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Outlined="true" Class="pa-4">
+                <Timeline @ref="_timeline" RecordType="TimelineRecordType.Opportunity" RecordId="Id" LinkedTo="_linkedTo"
+                          ExtraLinks="_extraLinks" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private GetOpportunity.Result? _opportunity;
+    private LinkedRecords _linkedTo = LinkedRecords.None;
+    private IReadOnlyList<ActivityLinkOption> _extraLinks = [];
+    private List<BreadcrumbItem> _breadcrumbs = [];
+    private Timeline? _timeline;
+    private IDisposable? _noteInput;
+    private bool _notFound;
+
+    protected override void OnInitialized() =>
+        _noteInput = QuickAdd.RegisterNoteInput(() => _timeline?.FocusInputAsync() ?? Task.CompletedTask);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _linkedTo = new LinkedRecords(OpportunityId: Id);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await GetOpportunityHandler.Handle(new GetOpportunity.Query(Id), CancellationToken.None);
+        _notFound = result.IsFailure;
+        if (result.IsFailure)
+        {
+            return;
+        }
+
+        var o = _opportunity = result.Value;
+        _breadcrumbs = [new("Pipeline", "/pipeline"), new(o.Title, null, disabled: true)];
+
+        // Optionally also log an activity at the primary contact and the client (or agency), iteration 3 step 2.
+        var extraLinks = new List<ActivityLinkOption>();
+        if (o.PrimaryContactId is { } contactId)
+        {
+            extraLinks.Add(new ActivityLinkOption($"Auch bei {o.PrimaryContactName}", ContactId: contactId));
+        }
+
+        if ((o.ClientOrganizationId ?? o.AgencyOrganizationId) is { } organizationId)
+        {
+            extraLinks.Add(new ActivityLinkOption($"Auch bei {o.ClientOrganizationName ?? o.AgencyOrganizationName}", OrganizationId: organizationId));
+        }
+
+        _extraLinks = extraLinks;
+    }
+
+    private async Task EditAsync()
+    {
+        var parameters = new DialogParameters<OpportunityDialog> { { d => d.OpportunityId, Id } };
+        var dialog = await DialogService.ShowAsync<OpportunityDialog>("Anfrage bearbeiten", parameters, DialogDefaults.Medium);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Anfrage gespeichert.", Severity.Success);
+            await LoadAsync();
+            await ReloadTimelineAsync();
+        }
+    }
+
+    private Task ReloadTimelineAsync() => _timeline?.ReloadAsync() ?? Task.CompletedTask;
+
+    private static Color StatusColor(StageStatus status) => status switch
+    {
+        StageStatus.Won => Color.Success,
+        StageStatus.Lost => Color.Error,
+        _ => Color.Default,
+    };
+
+    public void Dispose() => _noteInput?.Dispose();
+}

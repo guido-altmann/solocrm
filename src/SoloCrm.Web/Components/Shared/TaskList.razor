@@ -12,7 +12,7 @@
 {
     @if (EmptyText is not null)
     {
-        <MudText Typo="Typo.body2" Color="Color.Secondary" Class="py-1">@EmptyText</MudText>
+        <MudText Typo="Typo.body2" Class="py-1 mud-text-secondary">@EmptyText</MudText>
     }
 }
 else
@@ -30,7 +30,7 @@ else
                         <div class="d-flex flex-wrap gap-2">
                             @if (task.DueDate is { } due)
                             {
-                                <MudText Typo="Typo.caption" Color="@(overdue ? Color.Error : Color.Secondary)" Class="task-due">
+                                <MudText Typo="Typo.caption" Color="@(overdue ? Color.Error : Color.Default)" Class="@(overdue ? "task-due" : "task-due mud-text-secondary")">
                                     <MudIcon Icon="@Icons.Material.Outlined.Event" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: -2px;" />
                                     @Formats.DueDate(due, Clock.Today)
                                 </MudText>

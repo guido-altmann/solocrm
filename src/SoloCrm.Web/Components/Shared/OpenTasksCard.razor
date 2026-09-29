@@ -1,0 +1,79 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Tasks
+@using SoloCrm.Domain.Common
+@inject IQueryHandler<GetTasks.Query, GetTasks.Result> GetTasksHandler
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* Open tasks of a detail view; new tasks are linked to its record (US-11 AK1). *@
+<MudPaper Outlined="true" Class="pa-4">
+    <div class="d-flex align-center mb-1">
+        <MudText Typo="Typo.h6">Offene Aufgaben</MudText>
+        <MudSpacer />
+        <MudTooltip Text="Aufgabe anlegen">
+            <MudIconButton Icon="@Icons.Material.Filled.AddTask" Size="Size.Small" aria-label="Aufgabe anlegen" OnClick="CreateAsync" />
+        </MudTooltip>
+    </div>
+    @if (_tasks is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        <TaskList Tasks="_tasks" EmptyText="Keine offenen Aufgaben." OnChanged="OnTasksChangedAsync" />
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired]
+    public LinkedRecords LinkedTo { get; set; } = LinkedRecords.None;
+
+    /// <summary>Raised after a task was created, completed, reopened, edited or deleted (the timeline shows tasks).</summary>
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+
+    private IReadOnlyList<TaskSummary>? _tasks;
+    private LinkedRecords? _loaded;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loaded != LinkedTo)
+        {
+            _loaded = LinkedTo;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await GetTasksHandler.Handle(
+            new GetTasks.Query(LinkedTo.ContactId, LinkedTo.OrganizationId, LinkedTo.OpportunityId),
+            CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            _tasks = [];
+            return;
+        }
+
+        _tasks = result.Value.Items;
+    }
+
+    private async Task CreateAsync()
+    {
+        var parameters = new DialogParameters<TaskDialog> { { d => d.LinkedTo, LinkedTo } };
+        var dialog = await DialogService.ShowAsync<TaskDialog>("Neue Aufgabe", parameters, DialogDefaults.Small);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Aufgabe angelegt.", Severity.Success);
+            await OnTasksChangedAsync();
+        }
+    }
+
+    private async Task OnTasksChangedAsync()
+    {
+        await LoadAsync();
+        StateHasChanged();
+        await OnChanged.InvokeAsync();
+    }
+}

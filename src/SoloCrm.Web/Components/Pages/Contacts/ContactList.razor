@@ -44,7 +44,7 @@
     <Columns>
         <PropertyColumn Property="c => c.LastName" Title="Name">
             <CellTemplate>
-                @FormatName(context.Item)
+                <MudLink Href="@Links.Contact(context.Item.Id)" Typo="Typo.body2">@FormatName(context.Item)</MudLink>
                 @if (context.Item.IsArchived)
                 {
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-2">Archiviert</MudChip>

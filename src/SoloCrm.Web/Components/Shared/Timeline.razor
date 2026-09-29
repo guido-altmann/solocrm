@@ -18,7 +18,7 @@
     }
     else if (_entries.Count == 0)
     {
-        <MudText Typo="Typo.body2" Color="Color.Secondary">Noch keine Einträge.</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">Noch keine Einträge.</MudText>
     }
     else
     {
@@ -31,12 +31,12 @@
                 <div class="flex-grow-1" style="min-width: 0;">
                     <div class="d-flex align-center flex-wrap gap-x-2">
                         <MudText Typo="Typo.subtitle2" Class="timeline-title">@TitleOf(entry)</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary" title="@Formats.DateTime(Clock.ToLocal(entry.OccurredAt))">
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary" title="@Formats.DateTime(Clock.ToLocal(entry.OccurredAt))">
                             @Formats.DateTime(Clock.ToLocal(entry.OccurredAt))
                         </MudText>
                         @if (entry.Via is { } via)
                         {
-                            <MudText Typo="Typo.caption" Color="Color.Secondary" Class="timeline-via">
+                            <MudText Typo="Typo.caption" Class="timeline-via mud-text-secondary">
                                 via <MudLink Href="@LinkOf(via)" Typo="Typo.caption">@via.Name</MudLink>
                             </MudText>
                         }

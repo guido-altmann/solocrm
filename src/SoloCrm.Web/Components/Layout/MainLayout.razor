@@ -57,9 +57,15 @@
     private DotNetObjectReference<MainLayout>? _selfReference;
 
     // The quick-add button depends on the current page.
-    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        QuickAdd.TargetChanged += OnQuickAddTargetChanged;
+    }
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e) => InvokeAsync(StateHasChanged);
+
+    private void OnQuickAddTargetChanged() => InvokeAsync(StateHasChanged);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -94,6 +100,7 @@
     public async ValueTask DisposeAsync()
     {
         Navigation.LocationChanged -= OnLocationChanged;
+        QuickAdd.TargetChanged -= OnQuickAddTargetChanged;
 
         if (_keyboard is not null)
         {

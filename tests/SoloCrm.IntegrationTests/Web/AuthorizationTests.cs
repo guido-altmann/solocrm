@@ -22,12 +22,16 @@ public sealed partial class AuthorizationTests(PostgresFixture postgres) : IClas
 
     public ValueTask DisposeAsync() => _factory.DisposeAsync();
 
-    [Fact]
-    public async Task Get_ProtectedPageAnonymous_RedirectsToLogin()
+    [Theory]
+    [InlineData("/")]
+    [InlineData("/contacts/0199a000-0000-7000-8000-000000000001")]
+    [InlineData("/organizations/0199a000-0000-7000-8000-000000000001")]
+    [InlineData("/opportunities/0199a000-0000-7000-8000-000000000001")]
+    public async Task Get_ProtectedPageAnonymous_RedirectsToLogin(string path)
     {
         var client = CreateClient();
 
-        var response = await client.GetAsync("/", TestContext.Current.CancellationToken);
+        var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Redirect);
         response.Headers.Location!.AbsolutePath.Should().Be("/Account/Login");

@@ -8,16 +8,18 @@ public enum QuickAddTarget
     Contact,
     Organization,
     Opportunity,
+    Note,
 }
 
 /// <summary>
 /// Single entry point for quick-add (app bar button, page buttons, shortcut <c>N</c>). The shortcut and the
 /// app bar button create what fits the current page (SPEC 3.2). Scoped per circuit; pages subscribe to the
-/// <c>…Created</c> events to refresh their data.
+/// <c>…Created</c> events to refresh their data. On a detail view, quick-add focuses the note input of its timeline.
 /// </summary>
 public sealed class QuickAddService(IDialogService dialogService, ISnackbar snackbar, NavigationManager navigation)
 {
     private bool _isOpen;
+    private NoteInput? _noteInput;
 
     public event Func<Guid, Task>? ContactCreated;
 
@@ -25,11 +27,19 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
 
     public event Func<Guid, Task>? OpportunityCreated;
 
+    /// <summary>Raised when <see cref="CurrentTarget"/> may have changed without navigation.</summary>
+    public event Action? TargetChanged;
+
     public QuickAddTarget CurrentTarget
     {
         get
         {
             var path = navigation.ToBaseRelativePath(navigation.Uri);
+            if (_noteInput is not null && IsDetailPath(path))
+            {
+                return QuickAddTarget.Note;
+            }
+
             return path.StartsWith("organizations", StringComparison.OrdinalIgnoreCase) ? QuickAddTarget.Organization
                 : path.StartsWith("pipeline", StringComparison.OrdinalIgnoreCase) ? QuickAddTarget.Opportunity
                 : QuickAddTarget.Contact;
@@ -40,6 +50,7 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
     {
         QuickAddTarget.Organization => "Neue Organisation",
         QuickAddTarget.Opportunity => "Neue Anfrage",
+        QuickAddTarget.Note => "Neue Notiz",
         _ => "Neuer Kontakt",
     };
 
@@ -47,8 +58,27 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
     {
         QuickAddTarget.Organization => OpenOrganizationAsync(),
         QuickAddTarget.Opportunity => OpenOpportunityAsync(),
+        QuickAddTarget.Note => _noteInput!.Focus(),
         _ => OpenContactAsync(),
     };
+
+    /// <summary>
+    /// Registers the note input of a detail view for quick-add; dispose the result when the view goes away.
+    /// A later registration (e.g. the next detail view) replaces an earlier one.
+    /// </summary>
+    public IDisposable RegisterNoteInput(Func<Task> focus)
+    {
+        var input = new NoteInput(this, focus);
+        _noteInput = input;
+        TargetChanged?.Invoke();
+        return input;
+    }
+
+    private static bool IsDetailPath(string path)
+    {
+        var segments = path.Split('?', '#')[0].Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments is ["contacts" or "organizations" or "opportunities", var id] && Guid.TryParse(id, out _);
+    }
 
     public async Task OpenContactAsync()
     {
@@ -110,6 +140,20 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
         foreach (var handler in handlers.GetInvocationList().Cast<Func<Guid, Task>>())
         {
             await handler(id);
+        }
+    }
+
+    private sealed class NoteInput(QuickAddService owner, Func<Task> focus) : IDisposable
+    {
+        public Func<Task> Focus { get; } = focus;
+
+        public void Dispose()
+        {
+            if (owner._noteInput == this)
+            {
+                owner._noteInput = null;
+                owner.TargetChanged?.Invoke();
+            }
         }
     }
 }

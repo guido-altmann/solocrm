@@ -32,13 +32,13 @@
 - [x] `Markdig` über `Directory.Packages.props` einbinden; Body als Markdown rendern (Roh-HTML deaktiviert, siehe Entscheidung 1)
 - [x] Eingabe oben in der Timeline: „Notiz hinzufügen…“ mit Typ-Auswahl, Betreff optional, `OccurredAt` mit Default „jetzt“ und rückdatierbar (AK1)
 - [x] Bezug automatisch aus dem Kontext (Detailansicht); bei Anfragen optional zusätzlich Kontakt/Organisation
-- [ ] Quick-Add `N` in einer Detailansicht legt eine Notiz an (SPEC 3.2) – *folgt mit den Detailansichten (Schritt 5)*
+- [x] Quick-Add `N` in einer Detailansicht legt eine Notiz an (SPEC 3.2) – *fokussiert die Eingabe der Timeline*
 
 ## Schritt 3 – Tasks (US-11)
 - [x] Use Cases `CreateTask`, `UpdateTask`, `CompleteTask`, `ReopenTask`, `DeleteTask`
-- [ ] Anlage aus der Detailansicht (Bezug vorbelegt) und aus „Heute“ (frei oder mit Bezug) (AK1) – *Dialog steht, eingebunden in Schritt 5/6*
+- [ ] Anlage aus der Detailansicht (Bezug vorbelegt) und aus „Heute“ (frei oder mit Bezug) (AK1) – *Detailansicht erledigt, „Heute“ folgt in Schritt 6*
 - [x] Erledigen per Checkbox, danach Snackbar mit „Rückgängig“ für 5 s (AK2)
-- [ ] Offene Tasks eines Objekts in der Detailansicht; erledigte erscheinen in der Timeline – *`GetTasks`/`TaskList` stehen, eingebunden in Schritt 4/5*
+- [x] Offene Tasks eines Objekts in der Detailansicht; erledigte erscheinen in der Timeline
 
 ## Schritt 4 – Timeline (Aggregation nach SPEC 2.5)
 - [x] `GetTimeline(EntityType, EntityId, Before?, Limit)`: absteigend sortierter Strom aus Activities, Tasks (angelegt/erledigt) und AuditEntries; Paging per Cursor („Mehr laden“)
@@ -49,10 +49,10 @@
 - [x] Integrationstest: Aggregation und Audit-Filter gegen Postgres, Laufzeit < 200 ms bei 50k Activities (NFR Kap. 6), ggf. mit `EXPLAIN` – *lokal gemessen (Median): Organisation 14 ms, Kontakt 5 ms*
 
 ## Schritt 5 – Detailansichten (S5)
-- [ ] `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}`: links Stammdaten (lesend, „Bearbeiten“ öffnet den bestehenden Dialog), verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe
-- [ ] Verknüpfte Objekte: Organisation → Kontakte und Anfragen (als Endkunde bzw. Vermittler); Kontakt → Organisation und Anfragen; Anfrage → Endkunde, Vermittler, Ansprechpartner, Stage, Wert/MRR
-- [ ] Navigation: Zeilen der Listen und Pipeline-Karten führen zur Detailansicht (die Bearbeiten-Dialoge bleiben erreichbar)
-- [ ] Responsive: unter 960 px einspaltig (SPEC 3.4)
+- [x] `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}`: links Stammdaten (lesend, „Bearbeiten“ öffnet den bestehenden Dialog), verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe
+- [x] Verknüpfte Objekte: Organisation → Kontakte und Anfragen (als Endkunde bzw. Vermittler); Kontakt → Organisation und Anfragen; Anfrage → Endkunde, Vermittler, Ansprechpartner, Stage, Wert/MRR
+- [x] Navigation: Zeilen der Listen und Pipeline-Karten führen zur Detailansicht (die Bearbeiten-Dialoge bleiben erreichbar)
+- [x] Responsive: unter 960 px einspaltig (SPEC 3.4)
 
 ## Schritt 6 – Heute-Ansicht (US-12)
 - [ ] `GetToday`: Abschnitte Überfällig (rot), Heute, Eingeschlafene Anfragen, Zuletzt bearbeitet (AK1) sowie eingeklappt „Ohne Termin“ (Entscheidung 4)
