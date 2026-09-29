@@ -22,7 +22,7 @@
 ## Schritt 1 – Domäne: Activity und TaskItem
 - [ ] Enum `ActivityType` (`Note`, `Call`, `Meeting`, `Email`, `ApplicationSent`)
 - [ ] Entität `Activity` (SPEC 2.3): `Type`, `OccurredAt` (rückdatierbar), `Subject?` (200), `Body` (text), `ContactId`/`OrganizationId`/`OpportunityId` (mindestens einer gesetzt, als Domain-Regel und Check-Constraint); Event `ActivityLogged`
-- [ ] Entität `TaskItem` (SPEC 2.3): `Title` (200), `DueDate?`, `CompletedAt?`, optionale Bezüge; `Complete(now)` mit Event `TaskCompleted`, `Reopen()` (für Undo, Entscheidung 2)
+- [ ] Entität `TaskItem` (SPEC 2.3): `Title` (200), `DueDate?`, `CompletedAt?`, optionale Bezüge; `Complete(now)` mit Event `TaskCompleted`, `Reopen()` mit Event `TaskReopened` (für Undo, Entscheidung 2)
 - [ ] Beide `IAuditable`; FKs mit `ON DELETE CASCADE` bzw. `SET NULL` gemäß DSGVO-Löschung (US-20, It. 6) vorbereiten
 - [ ] Indizes für die Timeline: je Bezug `(contact_id, occurred_at)`, `(organization_id, occurred_at)`, `(opportunity_id, occurred_at)`; für Tasks `(completed_at, due_date)`
 - [ ] Migration (additiv, siehe ADR-009)
@@ -70,7 +70,7 @@
 ## Schritt 8 – Tests
 - [ ] Unit-Tests `Activity` (mindestens ein Bezug, Event), `TaskItem` (Complete/Reopen, Event, Überfällig-Logik)
 - [ ] Handler-Tests (Happy Path + Validierungsfehler) für alle neuen Use Cases
-- [ ] Integrationstests: Timeline-Aggregation je Objekttyp, Audit-Filter und Formatierung, Cursor-Paging, eingeschlafene Anfragen (Grenzfälle: keine Activity, genau N Tage, archiviert, geschlossen), Outbox-Events `activity.logged`/`task.completed`
+- [ ] Integrationstests: Timeline-Aggregation je Objekttyp, Audit-Filter und Formatierung, Cursor-Paging, eingeschlafene Anfragen (Grenzfälle: keine Activity, genau N Tage, archiviert, geschlossen), Outbox-Events `activity.logged`/`task.completed`/`task.reopened`
 - [ ] bUnit: Timeline-Eingabe (Typ, Rückdatieren), Task-Checkbox mit Undo, Heute-Abschnitte
 
 ## Schritt 9 – Abschluss
@@ -80,7 +80,7 @@
 
 ## Entscheidungen (2026-09-29)
 1. **Markdown im Activity-Body:** wird mit `Markdig` gerendert (Paket freigegeben), Ausgabe als bereinigtes HTML (kein Roh-HTML aus der Eingabe).
-2. **Undo beim Erledigen:** `CompleteTask` speichert sofort (inklusive `TaskCompleted` in der Outbox); „Rückgängig“ führt `ReopenTask` aus. *Noch offen: ob `ReopenTask` ein eigenes Event `TaskReopened` erzeugt.*
+2. **Undo beim Erledigen:** `CompleteTask` speichert sofort (inklusive `TaskCompleted` in der Outbox); „Rückgängig“ führt `ReopenTask` aus. `ReopenTask` erzeugt das Event `TaskReopened`, damit Webhook-Empfänger (It. 5) das Rückgängigmachen sehen.
 3. **Activities** lassen sich bearbeiten und hart löschen; das Löschen wird als AuditEntry `Deleted` protokolliert.
 4. **Tasks ohne Fälligkeitsdatum** erscheinen auf „Heute“ in einem eingeklappten Abschnitt „Ohne Termin“ (keine eigene Task-Liste).
 5. **Zeitzone:** „heute“ und „überfällig“ werden in einer konfigurierten Zeitzone berechnet (`App__TimeZone`, Default `Europe/Berlin`).

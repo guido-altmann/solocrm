@@ -219,6 +219,7 @@ Die Timeline eines Objekts ist ein chronologischer Strom, absteigend sortiert, a
 | `OpportunityCreated` | Anlage Opportunity | Outbox |
 | `OpportunityStageChanged` | Stage-Wechsel | Outbox; setzt `ClosedAt` bei Won/Lost |
 | `TaskCompleted` | Task erledigt | Outbox |
+| `TaskReopened` | Erledigter Task wieder geöffnet (z. B. Undo) | Outbox |
 | `ActivityLogged` | Activity erfasst | Outbox |
 
 Events werden in der Entität gesammelt (`AddDomainEvent`) und **innerhalb derselben Transaktion** in die Outbox geschrieben (ADR-006, ADR-010).
@@ -617,5 +618,5 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.5 | 2026-09-28 | 7.6/Kap. 10: Image-Build via GitHub Actions → GHCR, Migrationen per Entrypoint, Repo öffentlich; Env-Variable `Serilog__MinimumLevel__Default` |
 | 0.6 | 2026-09-28 | Kap. 10: Projektname entschieden (SoloCRM), Domain bleibt privat; Abschluss Iteration 1 (ADR-009 Accepted) |
 | 0.7 | 2026-09-28 | Planung It. 2: Outbox-Schreiben nach It. 2 vorgezogen (Verarbeitung bleibt It. 5); Wiedereröffnen abgeschlossener Anfragen geregelt; Oberfläche für Preis-Defaults in It. 3 |
-| 0.9 | 2026-09-29 | Planung It. 3: Markdown per Markdig; Activities bearbeitbar/löschbar; Undo beim Erledigen per Wiederöffnen; Tasks ohne Termin auf „Heute“; Zeitzone `App__TimeZone`; „Angelegt“ in der Timeline |
+| 0.9 | 2026-09-29 | Planung It. 3: Markdown per Markdig; Activities bearbeitbar/löschbar; Undo beim Erledigen per Wiederöffnen mit Event `TaskReopened` (2.6); Tasks ohne Termin auf „Heute“; Zeitzone `App__TimeZone`; „Angelegt“ in der Timeline |
 | 0.8 | 2026-09-29 | Abschluss It. 2: mindestens eine offene Stage bleibt erhalten; Ziel-Stage beim Löschen mit gleichem Status (2.3); Umsetzungsentscheidungen in `docs/iterations/02-kerndomaene.md` |
