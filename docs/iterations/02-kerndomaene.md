@@ -72,7 +72,7 @@
 - [x] bUnit: Anfrage-Dialog (dynamisches Label, Auslastung ein-/ausgeblendet, Live-Wert), Absagegrund-Dialog
 
 ## Schritt 9 – Abschluss
-- [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – *erzeugt und lokal verifiziert (Dev-DB mit Bestandskontakten migriert, Daten unverändert; `efbundle` aus dem Docker-Image migriert eine leere DB vollständig). Offen: Push und Deployment in Produktion (Guido).*
+- [x] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – *erzeugt und lokal verifiziert (Dev-DB mit Bestandskontakten migriert, Daten unverändert; `efbundle` aus dem Docker-Image migriert eine leere DB vollständig). Produktions-Deployment durch Guido am 2026-09-29 erfolgt.*
 - [x] ADR-011: Erfahrungen mit nullable Complex Types dokumentieren
 - [x] README-Stand und Screenshot (Pipeline) aktualisieren
 
