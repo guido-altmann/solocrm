@@ -46,11 +46,11 @@
 - [x] Früh verifizieren: Nullable Complex Types mit EF Core 10 + Npgsql (Migration, Speichern, Laden, `null`). Bei Problemen: Fallback laut ADR-011 und ADR aktualisieren
 
 ## Schritt 5 – Anfragen erfassen (US-06)
-- [ ] Use Cases `CreateOpportunity`, `UpdateOpportunity`, `GetOpportunity`, `ArchiveOpportunity`/`RestoreOpportunity`
-- [ ] Dialog „Neue Anfrage“ (Quick-Add `N` auf der Pipeline): Pflicht ist nur der Titel, Stage-Default ist die erste offene Stage
-- [ ] Endkunde und Vermittler als getrennte Autocompletes: passender Typ zuerst, alle anderen weiterhin wählbar (AK2)
-- [ ] Preismodell-Auswahl mit dynamischem Label bzw. Einheit; Auslastung nur bei Stunden- und Tagessatz (AK3); Laufzeit als Zahl + Einheit oder leer (AK4)
-- [ ] Live-Anzeige von `EstimatedValue` und bei Retainern zusätzlich MRR (AK5), berechnet über denselben Domain-Service
+- [x] Use Cases `CreateOpportunity`, `UpdateOpportunity`, `GetOpportunity`, `ArchiveOpportunity`/`RestoreOpportunity`
+- [x] Dialog „Neue Anfrage“ (Quick-Add `N` auf der Pipeline): Pflicht ist nur der Titel, Stage-Default ist die erste offene Stage
+- [x] Endkunde und Vermittler als getrennte Autocompletes: passender Typ zuerst, alle anderen weiterhin wählbar (AK2)
+- [x] Preismodell-Auswahl mit dynamischem Label bzw. Einheit; Auslastung nur bei Stunden- und Tagessatz (AK3); Laufzeit als Zahl + Einheit oder leer (AK4)
+- [x] Live-Anzeige von `EstimatedValue` und bei Retainern zusätzlich MRR (AK5), berechnet über denselben Domain-Service
 
 ## Schritt 6 – Pipeline (US-07, US-08)
 - [ ] `GetPipelineBoard`: offene Stages mit Karten (Titel, Endkunde/Vermittler, Preis im Modellformat), je Spalte Summe `EstimatedValue` und ggf. Summe MRR
@@ -89,6 +89,7 @@
 8. **Ein Kontakt-Dialog für Anlegen und Bearbeiten:** Der Quick-Add-Dialog zeigt Name, E-Mail und Organisation; weitere Felder sind hinter „Weitere Angaben“ eingeklappt. `CreateContact` akzeptiert ebenfalls Organisation („Neu anlegen“ inklusive) und Quelle. Die Listensuche umfasst zusätzlich den Firmennamen.
 9. **Neue Anfragen starten in einer offenen Stage.** Der Status einer Anfrage wird aus `ClosedAt`/`LostReason` abgeleitet. Beim Wechsel zwischen zwei Lost-Stages bleiben `ClosedAt` und der Absagegrund erhalten, bei Won → Lost ist ein neuer Grund Pflicht. Die Auslastung wird bei Festpreis und Retainer geleert.
 10. **Nullable Complex Types verifiziert** (EF Core 10.0.12 + Npgsql 10.0.3): Migration, Speichern, Laden und `null` funktionieren. Zwei Stolpersteine: (a) Properties ohne Setter werden nicht gemappt (Lösung: `private init`), (b) bei einem `null`-Complex-Type meldet der ChangeTracker für die inneren Properties CLR-Defaults (`0`, `Hourly`), und `ComplexPropertyEntry` hat kein `OriginalValue`. Der `AuditInterceptor` ermittelt die ursprüngliche Null-Belegung deshalb über `OriginalValues.ToObject()` und vergleicht Werte statt `IsModified`.
+11. **Anfrage-Dialog:** Anlegen und Bearbeiten in einem Dialog (Bearbeiten inkl. Stage-Wahl, Absagegrund und Archivieren). Ohne Preismodell bzw. Währung gelten `DefaultPricingModel`/`DefaultCurrency` aus den Einstellungen. Endkunde und Vermittler werden nur aus bestehenden Organisationen gewählt („Neu anlegen“ gibt es in It. 2 nur beim Kontakt, US-02).
 
 ## Definition of Done
 - CI grün (Build + alle Tests); `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet

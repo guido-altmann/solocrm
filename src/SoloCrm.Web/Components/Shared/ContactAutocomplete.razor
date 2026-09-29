@@ -1,0 +1,47 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Contacts
+@inject IQueryHandler<GetContacts.Query, GetContacts.Result> GetContactsHandler
+
+<MudAutocomplete T="ContactOption" Value="Value" ValueChanged="ValueChanged" Label="@Label"
+                 SearchFunc="SearchAsync" ToStringFunc="@(c => c?.Name)" Clearable="true" ResetValueOnEmptyText="true"
+                 DebounceInterval="200" MaxItems="null" Dense="true" Error="Error" ErrorText="@ErrorText">
+    <ItemTemplate>
+        <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+            <span>@context.Name</span>
+            @if (context.OrganizationName is not null)
+            {
+                <MudText Typo="Typo.caption">@context.OrganizationName</MudText>
+            }
+        </MudStack>
+    </ItemTemplate>
+</MudAutocomplete>
+
+@code {
+    private const int MaxSuggestions = 10;
+
+    [Parameter]
+    public ContactOption? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<ContactOption?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "Ansprechpartner";
+
+    [Parameter]
+    public bool Error { get; set; }
+
+    [Parameter]
+    public string? ErrorText { get; set; }
+
+    private async Task<IEnumerable<ContactOption>> SearchAsync(string? text, CancellationToken cancellationToken)
+    {
+        var result = await GetContactsHandler.Handle(new GetContacts.Query(text, PageSize: MaxSuggestions), cancellationToken);
+        return result.IsFailure
+            ? []
+            : result.Value.Items.Select(c => new ContactOption(
+                c.Id,
+                string.Join(" ", new[] { c.FirstName, c.LastName }.Where(n => n is not null)),
+                c.OrganizationName));
+    }
+}

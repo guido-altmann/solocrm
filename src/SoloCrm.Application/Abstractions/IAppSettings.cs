@@ -27,3 +27,14 @@ public static class AppSettingKeys
 
     public static AppSettingKey<PricingModel> DefaultPricingModel { get; } = new(nameof(DefaultPricingModel), PricingModel.Hourly);
 }
+
+public static class AppSettingsExtensions
+{
+    public static async Task<ValuationSettings> GetValuationSettingsAsync(this IAppSettings settings, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        return new ValuationSettings(
+            await settings.GetAsync(AppSettingKeys.HoursPerDay, cancellationToken),
+            await settings.GetAsync(AppSettingKeys.RetainerValuationMonths, cancellationToken));
+    }
+}

@@ -7,6 +7,7 @@ public enum QuickAddTarget
 {
     Contact,
     Organization,
+    Opportunity,
 }
 
 /// <summary>
@@ -23,19 +24,28 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
         CloseOnEscapeKey = true,
     };
 
+    private static readonly DialogOptions WideOptions = new()
+    {
+        MaxWidth = MaxWidth.Medium,
+        FullWidth = true,
+        CloseOnEscapeKey = true,
+    };
+
     private bool _isOpen;
 
     public event Func<Guid, Task>? ContactCreated;
 
     public event Func<Guid, Task>? OrganizationCreated;
 
+    public event Func<Guid, Task>? OpportunityCreated;
+
     public QuickAddTarget CurrentTarget
     {
         get
         {
             var path = navigation.ToBaseRelativePath(navigation.Uri);
-            return path.StartsWith("organizations", StringComparison.OrdinalIgnoreCase)
-                ? QuickAddTarget.Organization
+            return path.StartsWith("organizations", StringComparison.OrdinalIgnoreCase) ? QuickAddTarget.Organization
+                : path.StartsWith("pipeline", StringComparison.OrdinalIgnoreCase) ? QuickAddTarget.Opportunity
                 : QuickAddTarget.Contact;
         }
     }
@@ -43,12 +53,14 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
     public string CurrentLabel => CurrentTarget switch
     {
         QuickAddTarget.Organization => "Neue Organisation",
+        QuickAddTarget.Opportunity => "Neue Anfrage",
         _ => "Neuer Kontakt",
     };
 
     public Task OpenForCurrentPageAsync() => CurrentTarget switch
     {
         QuickAddTarget.Organization => OpenOrganizationAsync(),
+        QuickAddTarget.Opportunity => OpenOpportunityAsync(),
         _ => OpenContactAsync(),
     };
 
@@ -70,8 +82,17 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
         }
     }
 
+    public async Task OpenOpportunityAsync()
+    {
+        if (await ShowAsync<OpportunityDialog>("Neue Anfrage", WideOptions) is { } id)
+        {
+            snackbar.Add("Anfrage angelegt.", Severity.Success);
+            await NotifyAsync(OpportunityCreated, id);
+        }
+    }
+
     /// <returns>The id of the created object, or <c>null</c> if the dialog was canceled.</returns>
-    private async Task<Guid?> ShowAsync<TDialog>(string title)
+    private async Task<Guid?> ShowAsync<TDialog>(string title, DialogOptions? options = null)
         where TDialog : IComponent
     {
         // The shortcut may fire again while a dialog is already open.
@@ -83,7 +104,7 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
         _isOpen = true;
         try
         {
-            var dialog = await dialogService.ShowAsync<TDialog>(title, Options);
+            var dialog = await dialogService.ShowAsync<TDialog>(title, options ?? Options);
             var result = await dialog.Result;
             return result is { Canceled: false, Data: Guid id } ? id : null;
         }

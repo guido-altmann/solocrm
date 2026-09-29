@@ -1,0 +1,363 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Opportunities
+@using SoloCrm.Domain.Common
+@using SoloCrm.Domain.Opportunities
+@using SoloCrm.Domain.Organizations
+@inject ICommandHandler<CreateOpportunity.Command, CreateOpportunity.Result> CreateHandler
+@inject ICommandHandler<UpdateOpportunity.Command, UpdateOpportunity.Result> UpdateHandler
+@inject ICommandHandler<ArchiveOpportunity.Command, ArchiveOpportunity.Result> ArchiveHandler
+@inject ICommandHandler<RestoreOpportunity.Command, RestoreOpportunity.Result> RestoreHandler
+@inject IQueryHandler<GetOpportunity.Query, GetOpportunity.Result> GetHandler
+@inject IQueryHandler<GetOpportunityDefaults.Query, GetOpportunityDefaults.Result> DefaultsHandler
+@inject ISnackbar Snackbar
+
+<form @onsubmit="SaveAsync">
+    <MudDialog>
+        <DialogContent>
+            @if (_defaults is null)
+            {
+                <MudProgressLinear Indeterminate="true" />
+                @if (_errors.General is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_errors.General</MudAlert>
+                }
+            }
+            else
+            {
+                <MudGrid Spacing="2">
+                    <MudItem xs="12">
+                        <MudTextField @bind-Value="_title" Label="Titel" Placeholder="z. B. .NET-Architekt Migration Azure"
+                                      Immediate="true" AutoFocus="true" Required="true" MaxLength="@Opportunity.TitleMaxLength"
+                                      Error="@_errors.Has(nameof(IOpportunityFields.Title))"
+                                      ErrorText="@_errors.Text(nameof(IOpportunityFields.Title))" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="Guid?" @bind-Value="_stageId" Label="Phase"
+                                   Error="@_errors.Has(StageField)" ErrorText="@_errors.Text(StageField)">
+                            @foreach (var stage in SelectableStages)
+                            {
+                                <MudSelectItem T="Guid?" Value="stage.Id">@stage.Name</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        @if (SelectedStageStatus == StageStatus.Lost)
+                        {
+                            <MudSelect T="LostReason?" @bind-Value="_lostReason" Label="Absagegrund" Required="true"
+                                       Error="@_errors.Has(LostReasonField)" ErrorText="@_errors.Text(LostReasonField)">
+                                @foreach (var reason in Enum.GetValues<LostReason>())
+                                {
+                                    <MudSelectItem T="LostReason?" Value="reason">@Labels.For(reason)</MudSelectItem>
+                                }
+                            </MudSelect>
+                        }
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <OrganizationAutocomplete @bind-Value="_client" Label="Endkunde" PreferredType="OrganizationType.Client"
+                                                  Error="@_errors.Has(nameof(IOpportunityFields.ClientOrganizationId))"
+                                                  ErrorText="@_errors.Text(nameof(IOpportunityFields.ClientOrganizationId))" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <OrganizationAutocomplete @bind-Value="_agency" Label="Vermittler" PreferredType="OrganizationType.Agency"
+                                                  Error="@_errors.Has(nameof(IOpportunityFields.AgencyOrganizationId))"
+                                                  ErrorText="@_errors.Text(nameof(IOpportunityFields.AgencyOrganizationId))" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <ContactAutocomplete @bind-Value="_contact"
+                                             Error="@_errors.Has(nameof(IOpportunityFields.PrimaryContactId))"
+                                             ErrorText="@_errors.Text(nameof(IOpportunityFields.PrimaryContactId))" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudSelect T="LeadSource?" @bind-Value="_source" Label="Quelle" Clearable="true">
+                            @foreach (var source in Enum.GetValues<LeadSource>())
+                            {
+                                <MudSelectItem T="LeadSource?" Value="source">@Labels.For(source)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12" sm="4">
+                        <MudSelect T="PricingModel" @bind-Value="_pricingModel" Label="Preismodell" data-test="pricing-model">
+                            @foreach (var model in Enum.GetValues<PricingModel>())
+                            {
+                                <MudSelectItem T="PricingModel" Value="model">@Labels.For(model)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="8" sm="5">
+                        <MudNumericField T="decimal?" @bind-Value="_amount" Label="@Labels.AmountLabel(_pricingModel)"
+                                         Immediate="true" HideSpinButtons="true" Min="0" data-test="amount"
+                                         Adornment="Adornment.End" AdornmentText="@Labels.AmountUnit(_pricingModel, _currency)"
+                                         Error="@_errors.Has(nameof(IOpportunityFields.Amount))"
+                                         ErrorText="@_errors.Text(nameof(IOpportunityFields.Amount))" />
+                    </MudItem>
+                    <MudItem xs="4" sm="3">
+                        <MudTextField T="string" Value="_currency" ValueChanged="OnCurrencyChanged" Label="Währung" MaxLength="3"
+                                      Immediate="true"
+                                      Error="@_errors.Has(nameof(IOpportunityFields.Currency))"
+                                      ErrorText="@_errors.Text(nameof(IOpportunityFields.Currency))" />
+                    </MudItem>
+
+                    <MudItem xs="6" sm="3">
+                        <MudNumericField T="int?" @bind-Value="_durationValue" Label="Laufzeit" HelperText="leer = offen"
+                                         Immediate="true" Min="1" Max="@Duration.MaxValue" data-test="duration-value"
+                                         Error="@_errors.Has(nameof(IOpportunityFields.DurationValue))"
+                                         ErrorText="@_errors.Text(nameof(IOpportunityFields.DurationValue))" />
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudSelect T="DurationUnit" @bind-Value="_durationUnit" Label="Einheit">
+                            @foreach (var unit in Enum.GetValues<DurationUnit>())
+                            {
+                                <MudSelectItem T="DurationUnit" Value="unit">@Labels.For(unit)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        @if (UsesUtilization)
+                        {
+                            <MudNumericField T="int?" @bind-Value="_utilization" Label="Auslastung" HelperText="leer = 100 %"
+                                             Immediate="true" Min="0" Max="100" data-test="utilization"
+                                             Adornment="Adornment.End" AdornmentText="%"
+                                             Error="@_errors.Has(nameof(IOpportunityFields.Utilization))"
+                                             ErrorText="@_errors.Text(nameof(IOpportunityFields.Utilization))" />
+                        }
+                    </MudItem>
+                    <MudItem xs="6" sm="3">
+                        <MudNumericField T="int?" @bind-Value="_remotePercentage" Label="Remote" Immediate="true" Min="0" Max="100"
+                                         Adornment="Adornment.End" AdornmentText="%"
+                                         Error="@_errors.Has(nameof(IOpportunityFields.RemotePercentage))"
+                                         ErrorText="@_errors.Text(nameof(IOpportunityFields.RemotePercentage))" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
+                        <MudDatePicker @bind-Date="_startDate" Label="Start" Clearable="true" DateFormat="dd.MM.yyyy" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6" Class="d-flex flex-column justify-center">
+                        <MudText Typo="Typo.subtitle2" data-test="estimated-value">
+                            Geschätzter Wert: @(EstimatedValue is { } value ? Currency.Format(decimal.Round(value, 2), _currency) : "–")
+                        </MudText>
+                        @if (MonthlyRecurringValue is { } mrr)
+                        {
+                            <MudText Typo="Typo.body2" data-test="mrr">MRR: @Currency.Format(mrr, _currency)/Monat</MudText>
+                        }
+                        else if (EstimatedValue is null && ValuationHint is { } hint)
+                        {
+                            <MudText Typo="Typo.caption" Color="Color.Secondary">@hint</MudText>
+                        }
+                    </MudItem>
+                    @if (_errors.General is not null)
+                    {
+                        <MudItem xs="12">
+                            <MudAlert Severity="Severity.Error" Dense="true">@_errors.General</MudAlert>
+                        </MudItem>
+                    }
+                </MudGrid>
+            }
+        </DialogContent>
+        <DialogActions>
+            @if (_existing is not null)
+            {
+                <MudButton OnClick="ToggleArchiveAsync" Disabled="_saving" Color="Color.Default" Class="mr-auto"
+                           StartIcon="@(_existing.IsArchived ? Icons.Material.Filled.Unarchive : Icons.Material.Filled.Archive)">
+                    @(_existing.IsArchived ? "Wiederherstellen" : "Archivieren")
+                </MudButton>
+            }
+            <MudButton OnClick="Cancel" Disabled="_saving">Abbrechen</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving || _defaults is null">
+                Speichern
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</form>
+
+@code {
+    private const string StageField = "StageId";
+    private const string LostReasonField = "LostReason";
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Edits this request; creates a new one when <c>null</c>.</summary>
+    [Parameter]
+    public Guid? OpportunityId { get; set; }
+
+    private readonly FormErrors _errors = new();
+    private GetOpportunityDefaults.Result? _defaults;
+    private GetOpportunity.Result? _existing;
+    private string? _title;
+    private Guid? _stageId;
+    private LostReason? _lostReason;
+    private OrganizationOption? _client;
+    private OrganizationOption? _agency;
+    private ContactOption? _contact;
+    private LeadSource? _source;
+    private PricingModel _pricingModel;
+    private decimal? _amount;
+    private string _currency = Currency.Euro;
+    private int? _durationValue;
+    private DurationUnit _durationUnit = DurationUnit.Months;
+    private int? _utilization;
+    private int? _remotePercentage;
+    private DateTime? _startDate;
+    private bool _saving;
+
+    /// <summary>New requests start in an open stage; existing ones can move anywhere.</summary>
+    private IEnumerable<GetOpportunityDefaults.StageItem> SelectableStages =>
+        _defaults!.Stages.Where(s => _existing is not null || s.Status == StageStatus.Open);
+
+    private StageStatus? SelectedStageStatus => _defaults?.Stages.FirstOrDefault(s => s.Id == _stageId)?.Status;
+
+    private bool UsesUtilization => Opportunity.UsesUtilization(_pricingModel);
+
+    private Pricing? CurrentPricing =>
+        _amount is { } amount && amount > 0 && amount <= Pricing.MaxAmount && decimal.Round(amount, 2) == amount && Currency.IsValid(_currency)
+            ? Pricing.Create(_pricingModel, amount, _currency)
+            : null;
+
+    private Duration? CurrentDuration =>
+        _durationValue is >= 1 and <= Duration.MaxValue ? Duration.Create(_durationValue.Value, _durationUnit) : null;
+
+    /// <summary>Calculated live with the same domain service as everywhere else (US-06 AK5).</summary>
+    private decimal? EstimatedValue =>
+        _defaults is null || (UsesUtilization && _utilization is < 0 or > 100)
+            ? null
+            : OpportunityValuation.EstimatedValue(CurrentPricing, CurrentDuration, UsesUtilization ? _utilization : null, _defaults.Valuation);
+
+    private decimal? MonthlyRecurringValue => OpportunityValuation.MonthlyRecurringValue(CurrentPricing);
+
+    private string? ValuationHint => CurrentPricing is null
+        ? "Für den geschätzten Wert fehlt der Betrag."
+        : "Für den geschätzten Wert fehlt die Laufzeit.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var defaults = await DefaultsHandler.Handle(new GetOpportunityDefaults.Query(), CancellationToken.None);
+        if (defaults.IsFailure)
+        {
+            _errors.Show(defaults.Error);
+            return;
+        }
+
+        _pricingModel = defaults.Value.DefaultPricingModel;
+        _currency = defaults.Value.DefaultCurrency;
+        _stageId = defaults.Value.Stages.FirstOrDefault(s => s.Status == StageStatus.Open)?.Id;
+
+        if (OpportunityId is { } id)
+        {
+            var result = await GetHandler.Handle(new GetOpportunity.Query(id), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                _errors.Show(result.Error);
+                return;
+            }
+
+            Load(result.Value);
+        }
+
+        _defaults = defaults.Value;
+    }
+
+    private void Load(GetOpportunity.Result o)
+    {
+        _existing = o;
+        _title = o.Title;
+        _stageId = o.StageId;
+        _lostReason = o.LostReason;
+        _client = OrganizationOption.Existing(o.ClientOrganizationId, o.ClientOrganizationName, o.ClientOrganizationType);
+        _agency = OrganizationOption.Existing(o.AgencyOrganizationId, o.AgencyOrganizationName, o.AgencyOrganizationType);
+        _contact = o.PrimaryContactId is { } contactId ? new ContactOption(contactId, o.PrimaryContactName ?? "", null) : null;
+        _source = o.Source;
+        if (o.Pricing is { } pricing)
+        {
+            (_pricingModel, _amount, _currency) = (pricing.Model, pricing.Amount, pricing.Currency);
+        }
+
+        if (o.Duration is { } duration)
+        {
+            (_durationValue, _durationUnit) = (duration.Value, duration.Unit);
+        }
+
+        _utilization = o.Utilization;
+        _remotePercentage = o.RemotePercentage;
+        _startDate = o.StartDate?.ToDateTime(TimeOnly.MinValue);
+    }
+
+    private void OnCurrencyChanged(string? currency) => _currency = currency?.Trim().ToUpperInvariant() ?? "";
+
+    private async Task SaveAsync()
+    {
+        if (_defaults is null)
+        {
+            return;
+        }
+
+        _saving = true;
+        _errors.Clear();
+
+        try
+        {
+            var startDate = _startDate is { } date ? DateOnly.FromDateTime(date) : (DateOnly?)null;
+            var durationUnit = _durationValue is null ? (DurationUnit?)null : _durationUnit;
+            var utilization = UsesUtilization ? _utilization : null;
+            var currency = string.IsNullOrWhiteSpace(_currency) ? null : _currency;
+
+            var result = _existing is { } existing
+                ? (await UpdateHandler.Handle(
+                        new UpdateOpportunity.Command(existing.Id, _title, _stageId ?? Guid.Empty,
+                            SelectedStageStatus == StageStatus.Lost ? _lostReason : null,
+                            _client?.Id, _agency?.Id, _contact?.Id, _pricingModel, _amount, currency, startDate,
+                            _durationValue, durationUnit, utilization, _remotePercentage, _source),
+                        CancellationToken.None))
+                    .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure)
+                : (await CreateHandler.Handle(
+                        new CreateOpportunity.Command(_title, _stageId, _client?.Id, _agency?.Id, _contact?.Id,
+                            _pricingModel, _amount, currency, startDate, _durationValue, durationUnit, utilization,
+                            _remotePercentage, _source),
+                        CancellationToken.None))
+                    .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure);
+
+            if (result.IsSuccess)
+            {
+                if (_existing is not null)
+                {
+                    Snackbar.Add("Anfrage gespeichert.", Severity.Success);
+                }
+
+                MudDialog.Close(DialogResult.Ok(result.Value));
+                return;
+            }
+
+            _errors.Show(result.Error, OpportunityErrors.FieldOf);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ToggleArchiveAsync()
+    {
+        var existing = _existing!;
+        _saving = true;
+        try
+        {
+            var result = existing.IsArchived
+                ? (await RestoreHandler.Handle(new RestoreOpportunity.Command(existing.Id), CancellationToken.None)).Match(_ => (Error?)null, e => e)
+                : (await ArchiveHandler.Handle(new ArchiveOpportunity.Command(existing.Id), CancellationToken.None)).Match(_ => (Error?)null, e => e);
+
+            if (result is not null)
+            {
+                _errors.Show(result);
+                return;
+            }
+
+            Snackbar.Add(existing.IsArchived ? "Anfrage wiederhergestellt." : "Anfrage archiviert.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(existing.Id));
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}
