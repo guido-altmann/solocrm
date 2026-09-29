@@ -1,0 +1,75 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Settings
+@inject IQueryHandler<GetSettings.Query, GetSettings.Result> GetSettingsHandler
+@inject ICommandHandler<UpdateTodaySettings.Command, UpdateTodaySettings.Result> UpdateHandler
+@inject ISnackbar Snackbar
+
+@* Threshold for „eingeschlafene“ requests (US-12 AK2). *@
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="today">
+    <MudText Typo="Typo.h6">Heute</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Offene Anfragen ohne Aktivität seit dieser Anzahl Tagen erscheinen auf „Heute“ als eingeschlafen.
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        <form @onsubmit="SaveAsync">
+            <MudStack Row="true" AlignItems="AlignItems.Start" Spacing="2">
+                <MudNumericField T="int" @bind-Value="_staleDays" Label="Eingeschlafen nach (Tagen)" Min="1"
+                                 Max="UpdateTodaySettings.MaxStaleOpportunityDays" Immediate="true" Style="max-width: 260px;"
+                                 Error="@_errors.Has(nameof(UpdateTodaySettings.Command.StaleOpportunityDays))"
+                                 ErrorText="@_errors.Text(nameof(UpdateTodaySettings.Command.StaleOpportunityDays))" />
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving" Class="mt-4">
+                    Speichern
+                </MudButton>
+            </MudStack>
+        </form>
+    }
+</MudPaper>
+
+@code {
+    private readonly FormErrors _errors = new();
+    private int _staleDays;
+    private bool _loading = true;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await GetSettingsHandler.Handle(new GetSettings.Query(), CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            _staleDays = result.Value.StaleOpportunityDays;
+        }
+        else
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+        }
+
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            var result = await UpdateHandler.Handle(new UpdateTodaySettings.Command(_staleDays), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                _errors.Show(result.Error);
+                return;
+            }
+
+            Snackbar.Add("Schwellwert gespeichert.", Severity.Success);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

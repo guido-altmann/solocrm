@@ -1,0 +1,108 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Settings
+@using SoloCrm.Domain.Opportunities
+@inject IQueryHandler<GetSettings.Query, GetSettings.Result> GetSettingsHandler
+@inject ICommandHandler<UpdatePricingSettings.Command, UpdatePricingSettings.Result> UpdateHandler
+@inject ISnackbar Snackbar
+
+@* Pricing defaults and valuation parameters (SPEC 2.3 „Einstellungen“, S6). *@
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="pricing">
+    <MudText Typo="Typo.h6">Preise &amp; Bewertung</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Vorgaben für neue Anfragen und die Berechnung des geschätzten Werts.
+    </MudText>
+
+    @if (_loading)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        <form @onsubmit="SaveAsync">
+            <MudGrid Spacing="2">
+                <MudItem xs="12" sm="6">
+                    <MudSelect T="PricingModel" @bind-Value="_model" Label="Standard-Preismodell"
+                               Error="@_errors.Has(nameof(UpdatePricingSettings.Command.DefaultPricingModel))"
+                               ErrorText="@_errors.Text(nameof(UpdatePricingSettings.Command.DefaultPricingModel))">
+                        @foreach (var model in Enum.GetValues<PricingModel>())
+                        {
+                            <MudSelectItem T="PricingModel" Value="model">@Labels.For(model)</MudSelectItem>
+                        }
+                    </MudSelect>
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudTextField T="string" @bind-Value="_currency" Label="Standard-Währung" MaxLength="3" Immediate="true"
+                                  HelperText="ISO 4217, z. B. EUR"
+                                  Error="@_errors.Has(nameof(UpdatePricingSettings.Command.DefaultCurrency))"
+                                  ErrorText="@_errors.Text(nameof(UpdatePricingSettings.Command.DefaultCurrency))" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="decimal" @bind-Value="_hoursPerDay" Label="Stunden pro Tag" Min="0" Max="UpdatePricingSettings.MaxHoursPerDay"
+                                     Step="0.5m" Immediate="true" HelperText="für Stundensätze"
+                                     Error="@_errors.Has(nameof(UpdatePricingSettings.Command.HoursPerDay))"
+                                     ErrorText="@_errors.Text(nameof(UpdatePricingSettings.Command.HoursPerDay))" />
+                </MudItem>
+                <MudItem xs="12" sm="6">
+                    <MudNumericField T="int" @bind-Value="_retainerMonths" Label="Bewertungszeitraum Retainer" Min="1"
+                                     Max="UpdatePricingSettings.MaxRetainerValuationMonths" Immediate="true"
+                                     HelperText="Monate, wenn keine Laufzeit angegeben ist"
+                                     Error="@_errors.Has(nameof(UpdatePricingSettings.Command.RetainerValuationMonths))"
+                                     ErrorText="@_errors.Text(nameof(UpdatePricingSettings.Command.RetainerValuationMonths))" />
+                </MudItem>
+            </MudGrid>
+            <div class="d-flex justify-end mt-3">
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Disabled="_saving">Speichern</MudButton>
+            </div>
+        </form>
+    }
+</MudPaper>
+
+@code {
+    private readonly FormErrors _errors = new();
+    private PricingModel _model;
+    private string? _currency;
+    private decimal _hoursPerDay;
+    private int _retainerMonths;
+    private bool _loading = true;
+    private bool _saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await GetSettingsHandler.Handle(new GetSettings.Query(), CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            (_model, _currency, _hoursPerDay, _retainerMonths) =
+                (result.Value.DefaultPricingModel, result.Value.DefaultCurrency, result.Value.HoursPerDay, result.Value.RetainerValuationMonths);
+        }
+        else
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+        }
+
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            var result = await UpdateHandler.Handle(
+                new UpdatePricingSettings.Command(_model, _currency, _hoursPerDay, _retainerMonths),
+                CancellationToken.None);
+            if (result.IsFailure)
+            {
+                _errors.Show(result.Error);
+                return;
+            }
+
+            _currency = _currency?.Trim().ToUpperInvariant();
+            Snackbar.Add("Preis-Einstellungen gespeichert.", Severity.Success);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

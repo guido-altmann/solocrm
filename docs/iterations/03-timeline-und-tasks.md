@@ -63,9 +63,9 @@
 - [x] Pipeline-Karten zeigen „Tage seit letzter Activity“ (aus It. 2 übernommen)
 
 ## Schritt 7 – Einstellungen (S6)
-- [ ] `AppSettingKeys.StaleOpportunityDays` (Default 7)
-- [ ] Abschnitt „Preise & Bewertung“ in `/settings`: `DefaultPricingModel`, `DefaultCurrency`, `HoursPerDay`, `RetainerValuationMonths` mit Validierung (`UpdatePricingSettings`)
-- [ ] Abschnitt „Heute“: Schwellwert „eingeschlafen“ in Tagen (`UpdateTodaySettings`) (US-12 AK2)
+- [x] `AppSettingKeys.StaleOpportunityDays` (Default 7)
+- [x] Abschnitt „Preise & Bewertung“ in `/settings`: `DefaultPricingModel`, `DefaultCurrency`, `HoursPerDay`, `RetainerValuationMonths` mit Validierung (`UpdatePricingSettings`)
+- [x] Abschnitt „Heute“: Schwellwert „eingeschlafen“ in Tagen (`UpdateTodaySettings`) (US-12 AK2)
 
 ## Schritt 8 – Tests
 - [ ] Unit-Tests `Activity` (mindestens ein Bezug, Event), `TaskItem` (Complete/Reopen, Event, Überfällig-Logik)
