@@ -74,7 +74,7 @@
 - [x] bUnit: Timeline-Eingabe (Typ, Rückdatieren), Task-Checkbox mit Undo, Heute-Abschnitte
 
 ## Schritt 9 – Abschluss
-- [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – *erzeugt (`AddActivitiesAndTasks`, rein additiv) und lokal verifiziert: Kopie der Dev-DB migriert, Bestandsdaten unverändert (Hash-Vergleich); `efbundle` aus dem Docker-Image migriert eine leere DB vollständig, der Container startet (`/health/ready` = 200, tzdata für `Europe/Berlin` vorhanden). Produktions-Deployment steht noch aus (Push/Deploy durch Guido).*
+- [x] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – *erzeugt (`AddActivitiesAndTasks`, rein additiv) und lokal verifiziert: Kopie der Dev-DB migriert, Bestandsdaten unverändert (Hash-Vergleich); `efbundle` aus dem Docker-Image migriert eine leere DB vollständig, der Container startet (`/health/ready` = 200, tzdata für `Europe/Berlin` vorhanden). Produktions-Deployment durch Guido am 2026-09-29 erfolgt.*
 - [x] ADR-006: Umsetzung der Timeline-Aggregation und des Audit-Filters dokumentieren (Konfiguration der sichtbaren Felder)
 - [x] README-Stand und Screenshot (Heute oder Detailansicht) aktualisieren
 
