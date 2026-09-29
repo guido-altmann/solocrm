@@ -156,18 +156,16 @@
     private async Task ArchiveAsync(GetOrganizations.Item item)
     {
         var result = await ArchiveHandler.Handle(new ArchiveOrganization.Command(item.Id), CancellationToken.None);
-        await ShowOutcomeAsync(result.IsSuccess, $"„{item.Name}“ archiviert.", result.IsFailure ? result.Error : null);
+        Snackbar.Add(result.IsSuccess ? $"„{item.Name}“ archiviert." : result.Error.Message,
+            result.IsSuccess ? Severity.Success : Severity.Error);
+        await ReloadAsync();
     }
 
     private async Task RestoreAsync(GetOrganizations.Item item)
     {
         var result = await RestoreHandler.Handle(new RestoreOrganization.Command(item.Id), CancellationToken.None);
-        await ShowOutcomeAsync(result.IsSuccess, $"„{item.Name}“ wiederhergestellt.", result.IsFailure ? result.Error : null);
-    }
-
-    private async Task ShowOutcomeAsync(bool success, string message, Error? error)
-    {
-        Snackbar.Add(success ? message : error!.Message, success ? Severity.Success : Severity.Error);
+        Snackbar.Add(result.IsSuccess ? $"„{item.Name}“ wiederhergestellt." : result.Error.Message,
+            result.IsSuccess ? Severity.Success : Severity.Error);
         await ReloadAsync();
     }
 

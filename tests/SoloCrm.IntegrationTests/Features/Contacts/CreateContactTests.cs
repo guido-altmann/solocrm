@@ -107,7 +107,7 @@ public sealed class CreateContactTests(PostgresFixture postgres) : IClassFixture
 
         var result = await Handler.Handle(new CreateContact.Command("Other", null, "ADA@example.TEST"), ct);
 
-        result.Error.Should().Be(CreateContact.Errors.DuplicateEmail);
+        result.Error.Should().Be(ContactErrors.DuplicateEmail);
         await using var db = CrmWebApplicationFactory.CreateDbContext(_connectionString);
         (await db.Contacts.CountAsync(ct)).Should().Be(1);
     }

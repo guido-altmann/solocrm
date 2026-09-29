@@ -1,28 +1,28 @@
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Domain.Common;
-using SoloCrm.Domain.Contacts;
 
 namespace SoloCrm.Application.Features.Contacts;
 
 /// <summary>
-/// Creates a contact; only a first or last name is required (US-01). Optionally assigns an existing
-/// or a newly created organization (US-02).
+/// Replaces the master data of a contact incl. its organization (US-02).
 /// </summary>
-public static class CreateContact
+public static class UpdateContact
 {
     public sealed record Command(
+        Guid Id,
         string? FirstName,
         string? LastName,
-        string? Email = null,
-        string? Phone = null,
-        string? JobTitle = null,
-        string? LinkedInUrl = null,
-        Guid? OrganizationId = null,
-        string? NewOrganizationName = null,
-        LeadSource? Source = null) : IContactFields;
+        string? Email,
+        string? Phone,
+        string? JobTitle,
+        string? LinkedInUrl,
+        Guid? OrganizationId,
+        string? NewOrganizationName,
+        LeadSource? Source) : IContactFields;
 
-    public sealed record Result(Guid Id);
+    public sealed record Result(Guid Id, Guid? OrganizationId);
 
     public sealed class Validator : AbstractValidator<Command>
     {
@@ -44,8 +44,13 @@ public static class CreateContact
             }
 
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+            var contact = await db.Contacts.SingleOrDefaultAsync(c => c.Id == command.Id, cancellationToken);
+            if (contact is null)
+            {
+                return ContactErrors.NotFound;
+            }
 
-            if (await ContactRules.IsEmailTakenAsync(db, command.Email, null, cancellationToken))
+            if (await ContactRules.IsEmailTakenAsync(db, command.Email, contact.Id, cancellationToken))
             {
                 return ContactErrors.DuplicateEmail;
             }
@@ -56,7 +61,7 @@ public static class CreateContact
                 return organization.Error;
             }
 
-            var contact = Contact.Create(
+            contact.Update(
                 command.FirstName,
                 command.LastName,
                 command.Email,
@@ -66,10 +71,9 @@ public static class CreateContact
                 organization.Value,
                 command.Source);
 
-            db.Contacts.Add(contact);
             await db.SaveChangesAsync(cancellationToken);
 
-            return new Result(contact.Id);
+            return new Result(contact.Id, contact.OrganizationId);
         }
     }
 }

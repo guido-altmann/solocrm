@@ -54,7 +54,7 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
 
     public async Task OpenContactAsync()
     {
-        if (await ShowAsync<QuickAddContactDialog>("Neuer Kontakt") is { } id)
+        if (await ShowAsync<ContactDialog>("Neuer Kontakt") is { } id)
         {
             snackbar.Add("Kontakt angelegt.", Severity.Success);
             await NotifyAsync(ContactCreated, id);

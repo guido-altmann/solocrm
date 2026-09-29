@@ -1,3 +1,4 @@
+using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Web.Components.Shared;
@@ -12,6 +13,16 @@ public static class Labels
         OrganizationType.Client => "Endkunde",
         OrganizationType.Agency => "Vermittler",
         OrganizationType.Partner => "Partner",
+        _ => "Sonstige",
+    };
+
+    public static string For(LeadSource source) => source switch
+    {
+        LeadSource.LinkedIn => "LinkedIn",
+        LeadSource.ProjectPortal => "Projektportal",
+        LeadSource.Referral => "Empfehlung",
+        LeadSource.Website => "Website",
+        LeadSource.Event => "Event",
         _ => "Sonstige",
     };
 }

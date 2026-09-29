@@ -1,0 +1,167 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Contacts
+@using SoloCrm.Domain.Common
+@using SoloCrm.Domain.Contacts
+@inject ICommandHandler<CreateContact.Command, CreateContact.Result> CreateContactHandler
+@inject ICommandHandler<UpdateContact.Command, UpdateContact.Result> UpdateContactHandler
+@inject IQueryHandler<GetContact.Query, GetContact.Result> GetContactHandler
+
+<form @onsubmit="SaveAsync">
+    <MudDialog>
+        <DialogContent>
+            @if (_loading)
+            {
+                <MudProgressLinear Indeterminate="true" />
+            }
+            else
+            {
+                <MudStack Spacing="2">
+                    <MudTextField @bind-Value="_firstName" Label="Vorname" Immediate="true" AutoFocus="true"
+                                  MaxLength="@Contact.FirstNameMaxLength"
+                                  Error="@_errors.Has(nameof(IContactFields.FirstName))"
+                                  ErrorText="@_errors.Text(nameof(IContactFields.FirstName))" />
+                    <MudTextField @bind-Value="_lastName" Label="Nachname" Immediate="true"
+                                  MaxLength="@Contact.LastNameMaxLength"
+                                  Error="@_errors.Has(nameof(IContactFields.LastName))"
+                                  ErrorText="@_errors.Text(nameof(IContactFields.LastName))" />
+                    <MudTextField @bind-Value="_email" Label="E-Mail" InputType="InputType.Email" Immediate="true"
+                                  MaxLength="@Contact.EmailMaxLength"
+                                  Error="@_errors.Has(nameof(IContactFields.Email))"
+                                  ErrorText="@_errors.Text(nameof(IContactFields.Email))" />
+                    <OrganizationAutocomplete @bind-Value="_organization" AllowCreate="true"
+                                              Error="@HasOrganizationError"
+                                              ErrorText="@OrganizationErrorText" />
+                    @if (_showDetails)
+                    {
+                        <MudTextField @bind-Value="_phone" Label="Telefon" InputType="InputType.Telephone" Immediate="true"
+                                      MaxLength="@Contact.PhoneMaxLength"
+                                      Error="@_errors.Has(nameof(IContactFields.Phone))"
+                                      ErrorText="@_errors.Text(nameof(IContactFields.Phone))" />
+                        <MudTextField @bind-Value="_jobTitle" Label="Rolle" Placeholder="z. B. Recruiterin, CTO" Immediate="true"
+                                      MaxLength="@Contact.JobTitleMaxLength"
+                                      Error="@_errors.Has(nameof(IContactFields.JobTitle))"
+                                      ErrorText="@_errors.Text(nameof(IContactFields.JobTitle))" />
+                        <MudTextField @bind-Value="_linkedInUrl" Label="LinkedIn-URL" InputType="InputType.Url" Immediate="true"
+                                      MaxLength="@Contact.LinkedInUrlMaxLength"
+                                      Error="@_errors.Has(nameof(IContactFields.LinkedInUrl))"
+                                      ErrorText="@_errors.Text(nameof(IContactFields.LinkedInUrl))" />
+                        <MudSelect T="LeadSource?" @bind-Value="_source" Label="Quelle" Clearable="true"
+                                   Error="@_errors.Has(nameof(IContactFields.Source))"
+                                   ErrorText="@_errors.Text(nameof(IContactFields.Source))">
+                            @foreach (var source in Enum.GetValues<LeadSource>())
+                            {
+                                <MudSelectItem T="LeadSource?" Value="source">@Labels.For(source)</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    else
+                    {
+                        <MudButton Variant="Variant.Text" StartIcon="@Icons.Material.Filled.ExpandMore" Class="align-self-start"
+                                   OnClick="() => _showDetails = true">
+                            Weitere Angaben
+                        </MudButton>
+                    }
+                    @if (_errors.General is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true">@_errors.General</MudAlert>
+                    }
+                </MudStack>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel" Disabled="_saving">Abbrechen</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving || _loading">
+                Speichern
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</form>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Edits this contact; creates a new one (quick-add, US-01) when <c>null</c>.</summary>
+    [Parameter]
+    public Guid? ContactId { get; set; }
+
+    private readonly FormErrors _errors = new();
+    private string? _firstName;
+    private string? _lastName;
+    private string? _email;
+    private string? _phone;
+    private string? _jobTitle;
+    private string? _linkedInUrl;
+    private OrganizationOption? _organization;
+    private LeadSource? _source;
+    private bool _showDetails;
+    private bool _loading;
+    private bool _saving;
+
+    private bool HasOrganizationError =>
+        _errors.Has(nameof(IContactFields.OrganizationId)) || _errors.Has(nameof(IContactFields.NewOrganizationName));
+
+    private string? OrganizationErrorText =>
+        _errors.Text(nameof(IContactFields.OrganizationId)) ?? _errors.Text(nameof(IContactFields.NewOrganizationName));
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (ContactId is not { } id)
+        {
+            return;
+        }
+
+        _loading = true;
+        _showDetails = true;
+        var result = await GetContactHandler.Handle(new GetContact.Query(id), CancellationToken.None);
+        if (result.IsSuccess)
+        {
+            var c = result.Value;
+            (_firstName, _lastName, _email, _phone, _jobTitle, _linkedInUrl, _source) =
+                (c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle, c.LinkedInUrl, c.Source);
+            _organization = OrganizationOption.Existing(c.OrganizationId, c.OrganizationName, c.OrganizationType);
+        }
+        else
+        {
+            _errors.Show(result.Error);
+        }
+
+        _loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+
+        try
+        {
+            var (organizationId, newOrganizationName) = OrganizationOption.ToCommand(_organization);
+            var result = ContactId is { } id
+                ? (await UpdateContactHandler.Handle(
+                        new UpdateContact.Command(id, _firstName, _lastName, _email, _phone, _jobTitle, _linkedInUrl,
+                            organizationId, newOrganizationName, _source),
+                        CancellationToken.None))
+                    .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure)
+                : (await CreateContactHandler.Handle(
+                        new CreateContact.Command(_firstName, _lastName, _email, _phone, _jobTitle, _linkedInUrl,
+                            organizationId, newOrganizationName, _source),
+                        CancellationToken.None))
+                    .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure);
+
+            if (result.IsSuccess)
+            {
+                MudDialog.Close(DialogResult.Ok(result.Value));
+                return;
+            }
+
+            _errors.Show(result.Error, ContactErrors.FieldOf);
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

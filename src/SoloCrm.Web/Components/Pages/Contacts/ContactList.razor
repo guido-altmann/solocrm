@@ -1,9 +1,13 @@
 @page "/contacts"
 @using SoloCrm.Application.Abstractions
 @using SoloCrm.Application.Features.Contacts
+@using SoloCrm.Domain.Common
 @implements IDisposable
 @inject IQueryHandler<GetContacts.Query, GetContacts.Result> GetContactsHandler
+@inject ICommandHandler<ArchiveContact.Command, ArchiveContact.Result> ArchiveHandler
+@inject ICommandHandler<RestoreContact.Command, RestoreContact.Result> RestoreHandler
 @inject QuickAddService QuickAdd
+@inject IDialogService DialogService
 @inject ISnackbar Snackbar
 
 <PageTitle>Kontakte · SoloCRM</PageTitle>
@@ -17,23 +21,68 @@
     </MudButton>
 </MudStack>
 
-<MudDataGrid @ref="_grid" T="GetContacts.Item" ServerData="LoadAsync" SortMode="SortMode.None"
+<MudDataGrid @ref="_grid" T="GetContacts.Item" ServerData="LoadAsync" SortMode="SortMode.Single"
              RowsPerPage="GetContacts.DefaultPageSize" Hover="true" Dense="true" Elevation="1">
     <ToolBarContent>
-        <MudTextField T="string" Value="_search" ValueChanged="OnSearchChanged" Placeholder="Name oder E-Mail suchen…"
-                      Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
-                      Immediate="true" DebounceInterval="300" Clearable="true" Class="mt-0" Style="max-width: 400px;" />
+        <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="4" Class="flex-grow-1">
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearchChanged" Placeholder="Name, E-Mail oder Firma suchen…"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" DebounceInterval="300" Clearable="true" Class="mt-0" Style="max-width: 360px;" />
+            <OrganizationAutocomplete Value="_organization" ValueChanged="OnOrganizationChanged" Margin="Margin.Dense"
+                                      Style="max-width: 260px;" />
+            <MudSelect T="LeadSource?" Value="_source" ValueChanged="OnSourceChanged" Label="Quelle" Dense="true"
+                       Clearable="true" Style="max-width: 180px;">
+                @foreach (var source in Enum.GetValues<LeadSource>())
+                {
+                    <MudSelectItem T="LeadSource?" Value="source">@Labels.For(source)</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSwitch T="bool" Value="_includeArchived" ValueChanged="OnIncludeArchivedChanged" Color="Color.Primary"
+                       Label="Archivierte anzeigen" />
+        </MudStack>
     </ToolBarContent>
     <Columns>
-        <TemplateColumn T="GetContacts.Item" Title="Name">
-            <CellTemplate>@FormatName(context.Item)</CellTemplate>
-        </TemplateColumn>
+        <PropertyColumn Property="c => c.LastName" Title="Name">
+            <CellTemplate>
+                @FormatName(context.Item)
+                @if (context.Item.IsArchived)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-2">Archiviert</MudChip>
+                }
+            </CellTemplate>
+        </PropertyColumn>
+        <PropertyColumn Property="c => c.OrganizationName" Title="Organisation" />
         <PropertyColumn Property="c => c.Email" Title="E-Mail" />
-        <PropertyColumn Property="c => c.Phone" Title="Telefon" />
-        <PropertyColumn Property="c => c.JobTitle" Title="Rolle" />
+        <PropertyColumn Property="c => c.Phone" Title="Telefon" Sortable="false" />
+        <PropertyColumn Property="c => c.JobTitle" Title="Rolle" Sortable="false" />
+        <PropertyColumn Property="c => c.Source" Title="Quelle" Sortable="false">
+            <CellTemplate>@(context.Item.Source is { } source ? Labels.For(source) : null)</CellTemplate>
+        </PropertyColumn>
+        <TemplateColumn T="GetContacts.Item" Sortable="false" CellClass="d-flex justify-end">
+            <CellTemplate>
+                <MudTooltip Text="Bearbeiten">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="Bearbeiten"
+                                   OnClick="() => EditAsync(context.Item)" />
+                </MudTooltip>
+                @if (context.Item.IsArchived)
+                {
+                    <MudTooltip Text="Wiederherstellen">
+                        <MudIconButton Icon="@Icons.Material.Filled.Unarchive" Size="Size.Small" aria-label="Wiederherstellen"
+                                       OnClick="() => RestoreAsync(context.Item)" />
+                    </MudTooltip>
+                }
+                else
+                {
+                    <MudTooltip Text="Archivieren">
+                        <MudIconButton Icon="@Icons.Material.Filled.Archive" Size="Size.Small" aria-label="Archivieren"
+                                       OnClick="() => ArchiveAsync(context.Item)" />
+                    </MudTooltip>
+                }
+            </CellTemplate>
+        </TemplateColumn>
     </Columns>
     <NoRecordsContent>
-        <MudText>@(string.IsNullOrWhiteSpace(_search) ? "Noch keine Kontakte vorhanden." : "Keine Kontakte gefunden.")</MudText>
+        <MudText>@(IsFiltered ? "Keine Kontakte gefunden." : "Noch keine Kontakte vorhanden.")</MudText>
     </NoRecordsContent>
     <PagerContent>
         <MudDataGridPager T="GetContacts.Item" PageSizeOptions="[25, 50, 100]" RowsPerPageString="Zeilen pro Seite:" />
@@ -41,16 +90,32 @@
 </MudDataGrid>
 
 @code {
+    private static readonly DialogOptions EditOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
+
     private MudDataGrid<GetContacts.Item>? _grid;
     private string? _search;
+    private OrganizationOption? _organization;
+    private LeadSource? _source;
+    private bool _includeArchived;
+
+    private bool IsFiltered => !string.IsNullOrWhiteSpace(_search) || _organization is not null || _source is not null;
 
     protected override void OnInitialized() => QuickAdd.ContactCreated += OnContactCreated;
 
     private async Task<GridData<GetContacts.Item>> LoadAsync(GridState<GetContacts.Item> state, CancellationToken cancellationToken)
     {
-        var result = await GetContactsHandler.Handle(
-            new GetContacts.Query(_search, state.Page, state.PageSize),
-            cancellationToken);
+        var sort = state.SortDefinitions.FirstOrDefault();
+        var query = new GetContacts.Query(
+            _search,
+            _organization?.Id,
+            _source,
+            _includeArchived,
+            ToSortField(sort?.SortBy),
+            sort?.Descending ?? false,
+            state.Page,
+            state.PageSize);
+
+        var result = await GetContactsHandler.Handle(query, cancellationToken);
 
         if (result.IsFailure)
         {
@@ -61,9 +126,61 @@
         return new GridData<GetContacts.Item> { Items = result.Value.Items, TotalItems = result.Value.TotalCount };
     }
 
+    private static GetContacts.SortField ToSortField(string? column) => column switch
+    {
+        nameof(GetContacts.Item.OrganizationName) => GetContacts.SortField.Organization,
+        nameof(GetContacts.Item.Email) => GetContacts.SortField.Email,
+        _ => GetContacts.SortField.Name,
+    };
+
     private async Task OnSearchChanged(string? search)
     {
         _search = search;
+        await ReloadAsync();
+    }
+
+    private async Task OnOrganizationChanged(OrganizationOption? organization)
+    {
+        _organization = organization;
+        await ReloadAsync();
+    }
+
+    private async Task OnSourceChanged(LeadSource? source)
+    {
+        _source = source;
+        await ReloadAsync();
+    }
+
+    private async Task OnIncludeArchivedChanged(bool includeArchived)
+    {
+        _includeArchived = includeArchived;
+        await ReloadAsync();
+    }
+
+    private async Task EditAsync(GetContacts.Item item)
+    {
+        var parameters = new DialogParameters<ContactDialog> { { d => d.ContactId, item.Id } };
+        var dialog = await DialogService.ShowAsync<ContactDialog>("Kontakt bearbeiten", parameters, EditOptions);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Kontakt gespeichert.", Severity.Success);
+            await ReloadAsync();
+        }
+    }
+
+    private async Task ArchiveAsync(GetContacts.Item item)
+    {
+        var result = await ArchiveHandler.Handle(new ArchiveContact.Command(item.Id), CancellationToken.None);
+        Snackbar.Add(result.IsSuccess ? $"„{FormatName(item)}“ archiviert." : result.Error.Message,
+            result.IsSuccess ? Severity.Success : Severity.Error);
+        await ReloadAsync();
+    }
+
+    private async Task RestoreAsync(GetContacts.Item item)
+    {
+        var result = await RestoreHandler.Handle(new RestoreContact.Command(item.Id), CancellationToken.None);
+        Snackbar.Add(result.IsSuccess ? $"„{FormatName(item)}“ wiederhergestellt." : result.Error.Message,
+            result.IsSuccess ? Severity.Success : Severity.Error);
         await ReloadAsync();
     }
 

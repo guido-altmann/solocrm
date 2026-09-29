@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SoloCrm.Domain.Contacts;
+using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Infrastructure.Persistence.Configurations;
 
@@ -26,5 +27,11 @@ internal sealed class ContactConfiguration : IEntityTypeConfiguration<Contact>
         builder.Property(c => c.Phone).HasMaxLength(Contact.PhoneMaxLength);
         builder.Property(c => c.JobTitle).HasMaxLength(Contact.JobTitleMaxLength);
         builder.Property(c => c.LinkedInUrl).HasMaxLength(Contact.LinkedInUrlMaxLength);
+        builder.Property(c => c.Source).HasConversion<string>().HasMaxLength(20);
+
+        builder.HasOne(c => c.Organization)
+            .WithMany()
+            .HasForeignKey(c => c.OrganizationId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

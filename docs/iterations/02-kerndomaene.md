@@ -31,10 +31,10 @@
 - [x] Seite `/organizations` (analog `/contacts`) mit Typ-Filter, Quick-Add (`N` auf dieser Seite legt eine Organisation an) und Bearbeiten-Dialog
 
 ## Schritt 3 – Contact erweitern (US-02, US-04, US-05)
-- [ ] `Contact` um `OrganizationId` (FK, `ON DELETE SET NULL`) und `Source` (`LeadSource`) erweitern
-- [ ] `UpdateContact` mit Bearbeiten-Dialog; Organisations-Autocomplete mit „Neu anlegen: <Eingabe>“ (legt die Organisation inline mit Typ `Other` an, in derselben Transaktion)
-- [ ] `GetContacts`: Filter Organisation und Quelle, Sortierung, „Archivierte anzeigen“; Spalte Organisation in der Liste
-- [ ] `ArchiveContact`/`RestoreContact`; archivierte Kontakte erscheinen nicht in Liste und Suche (US-05 AK1)
+- [x] `Contact` um `OrganizationId` (FK, `ON DELETE SET NULL`) und `Source` (`LeadSource`) erweitern
+- [x] `UpdateContact` mit Bearbeiten-Dialog; Organisations-Autocomplete mit „Neu anlegen: <Eingabe>“ (legt die Organisation inline mit Typ `Other` an, in derselben Transaktion)
+- [x] `GetContacts`: Filter Organisation und Quelle, Sortierung, „Archivierte anzeigen“; Spalte Organisation in der Liste
+- [x] `ArchiveContact`/`RestoreContact`; archivierte Kontakte erscheinen nicht in Liste und Suche (US-05 AK1)
 
 ## Schritt 4 – Opportunity-Domäne (ADR-011)
 - [ ] Value Objects `Pricing` und `Duration` (unveränderliche Records, Validierung per Factory: `Amount > 0`, `Value > 0`, ISO-4217-Code) + `Pricing.ToDisplayString()` („95 €/h“, „2.500 €/Monat“)
@@ -86,6 +86,7 @@
 5. **Website-Normalisierung:** Ohne Schema wird `https://` ergänzt; Schema und Host werden kleingeschrieben, Standard-Port, Fragment und abschließender Slash entfallen. Zulässig sind nur http(s)-URLs mit Domainnamen (keine IP-Adressen, keine Zugangsdaten in der URL).
 6. **„Archivierte anzeigen“** blendet archivierte Einträge zusätzlich ein (mit Chip „Archiviert“), statt nur sie zu zeigen.
 7. **Quick-Add kontextabhängig:** `N` und der Plus-Button der App-Leiste legen auf `/organizations` eine Organisation an, sonst einen Kontakt (ab Schritt 5 auf `/pipeline` eine Anfrage).
+8. **Ein Kontakt-Dialog für Anlegen und Bearbeiten:** Der Quick-Add-Dialog zeigt Name, E-Mail und Organisation; weitere Felder sind hinter „Weitere Angaben“ eingeklappt. `CreateContact` akzeptiert ebenfalls Organisation („Neu anlegen“ inklusive) und Quelle. Die Listensuche umfasst zusätzlich den Firmennamen.
 
 ## Definition of Done
 - CI grün (Build + alle Tests); `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet

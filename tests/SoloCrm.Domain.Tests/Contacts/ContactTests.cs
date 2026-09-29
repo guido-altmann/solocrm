@@ -1,3 +1,4 @@
+using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
 
 namespace SoloCrm.Domain.Tests.Contacts;
@@ -46,5 +47,44 @@ public sealed class ContactTests
 
         contact.DomainEvents.Should().ContainSingle()
             .Which.Should().Be(new ContactCreated(contact.Id));
+    }
+
+    [Fact]
+    public void Update_NewValues_ReplacesFieldsWithoutEvent()
+    {
+        var contact = Contact.Create("Ada", "Lovelace", "ada@example.test");
+        contact.ClearDomainEvents();
+        var organizationId = Guid.CreateVersion7();
+
+        contact.Update(" Ada ", "King", null, "123", "CTO", null, organizationId, LeadSource.Referral);
+
+        contact.FirstName.Should().Be("Ada");
+        contact.LastName.Should().Be("King");
+        contact.Email.Should().BeNull();
+        contact.Phone.Should().Be("123");
+        contact.OrganizationId.Should().Be(organizationId);
+        contact.Source.Should().Be(LeadSource.Referral);
+        contact.DomainEvents.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Update_NoName_Throws()
+    {
+        var contact = Contact.Create("Ada", null);
+
+        var act = () => contact.Update(" ", null, null, null, null, null, null, null);
+
+        act.Should().Throw<ArgumentException>();
+        contact.FirstName.Should().Be("Ada");
+    }
+
+    [Fact]
+    public void Update_UnknownSource_Throws()
+    {
+        var contact = Contact.Create("Ada", null);
+
+        var act = () => contact.Update("Ada", null, null, null, null, null, null, (LeadSource)99);
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
     }
 }

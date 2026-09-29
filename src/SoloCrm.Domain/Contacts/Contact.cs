@@ -1,4 +1,5 @@
 using SoloCrm.Domain.Common;
+using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Domain.Contacts;
 
@@ -19,12 +20,6 @@ public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
     {
     }
 
-    private Contact(string? firstName, string? lastName)
-    {
-        FirstName = firstName;
-        LastName = lastName;
-    }
-
     public string? FirstName { get; private set; }
 
     public string? LastName { get; private set; }
@@ -38,6 +33,13 @@ public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
 
     public string? LinkedInUrl { get; private set; }
 
+    /// <summary>Optional employer; set to <c>null</c> by the database when the organization is deleted.</summary>
+    public Guid? OrganizationId { get; private set; }
+
+    public Organization? Organization { get; private set; }
+
+    public LeadSource? Source { get; private set; }
+
     public IReadOnlyDictionary<string, string> ExtraFields { get; private set; } = new Dictionary<string, string>();
 
     /// <summary>
@@ -49,23 +51,49 @@ public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
         string? email = null,
         string? phone = null,
         string? jobTitle = null,
-        string? linkedInUrl = null)
+        string? linkedInUrl = null,
+        Guid? organizationId = null,
+        LeadSource? source = null)
     {
-        var contact = new Contact(Normalize(firstName), Normalize(lastName))
-        {
-            Email = Normalize(email),
-            Phone = Normalize(phone),
-            JobTitle = Normalize(jobTitle),
-            LinkedInUrl = Normalize(linkedInUrl),
-        };
+        var contact = new Contact();
+        contact.Update(firstName, lastName, email, phone, jobTitle, linkedInUrl, organizationId, source);
+        contact.AddDomainEvent(new ContactCreated(contact.Id));
+        return contact;
+    }
 
-        if (contact.FirstName is null && contact.LastName is null)
+    /// <summary>
+    /// Replaces the master data; the same rules as for <see cref="Create"/> apply.
+    /// </summary>
+    public void Update(
+        string? firstName,
+        string? lastName,
+        string? email,
+        string? phone,
+        string? jobTitle,
+        string? linkedInUrl,
+        Guid? organizationId,
+        LeadSource? source)
+    {
+        var normalizedFirstName = Normalize(firstName);
+        var normalizedLastName = Normalize(lastName);
+        if (normalizedFirstName is null && normalizedLastName is null)
         {
             throw new ArgumentException("A contact requires a first or a last name.", nameof(lastName));
         }
 
-        contact.AddDomainEvent(new ContactCreated(contact.Id));
-        return contact;
+        if (source is { } value && !Enum.IsDefined(value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(source), source, "Unknown lead source.");
+        }
+
+        FirstName = normalizedFirstName;
+        LastName = normalizedLastName;
+        Email = Normalize(email);
+        Phone = Normalize(phone);
+        JobTitle = Normalize(jobTitle);
+        LinkedInUrl = Normalize(linkedInUrl);
+        OrganizationId = organizationId;
+        Source = source;
     }
 
     private static string? Normalize(string? value) =>

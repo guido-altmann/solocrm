@@ -1,0 +1,85 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Organizations
+@using SoloCrm.Domain.Organizations
+@inject IQueryHandler<SearchOrganizations.Query, SearchOrganizations.Result> SearchHandler
+
+<MudAutocomplete T="OrganizationOption" Value="Value" ValueChanged="ValueChanged" Label="@Label"
+                 SearchFunc="SearchAsync" ToStringFunc="@(o => o?.Name)" Clearable="true" ResetValueOnEmptyText="true"
+                 DebounceInterval="200" MaxItems="null" Dense="true" Margin="Margin"
+                 Error="Error" ErrorText="@ErrorText" Class="@Class" Style="@Style">
+    <ItemTemplate>
+        @if (context.IsNew)
+        {
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                <MudIcon Icon="@Icons.Material.Filled.AddBusiness" Size="Size.Small" />
+                <span>Neu anlegen: „@context.Name“</span>
+            </MudStack>
+        }
+        else
+        {
+            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+                <span>@context.Name</span>
+                @if (context.Type is { } type)
+                {
+                    <MudText Typo="Typo.caption" Color="@(type == PreferredType ? Color.Primary : Color.Default)">@Labels.For(type)</MudText>
+                }
+            </MudStack>
+        }
+    </ItemTemplate>
+</MudAutocomplete>
+
+@code {
+    [Parameter]
+    public OrganizationOption? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<OrganizationOption?> ValueChanged { get; set; }
+
+    [Parameter]
+    public string Label { get; set; } = "Organisation";
+
+    /// <summary>Organizations of this type are suggested first; all others stay selectable.</summary>
+    [Parameter]
+    public OrganizationType? PreferredType { get; set; }
+
+    /// <summary>Offers „Neu anlegen: &lt;Eingabe&gt;“ when no organization has exactly this name (US-02 AK2).</summary>
+    [Parameter]
+    public bool AllowCreate { get; set; }
+
+    [Parameter]
+    public bool Error { get; set; }
+
+    [Parameter]
+    public string? ErrorText { get; set; }
+
+    [Parameter]
+    public Margin Margin { get; set; } = Margin.Normal;
+
+    [Parameter]
+    public string? Class { get; set; }
+
+    [Parameter]
+    public string? Style { get; set; }
+
+    private async Task<IEnumerable<OrganizationOption>> SearchAsync(string? text, CancellationToken cancellationToken)
+    {
+        var result = await SearchHandler.Handle(new SearchOrganizations.Query(text, PreferredType), cancellationToken);
+        if (result.IsFailure)
+        {
+            return [];
+        }
+
+        var options = result.Value.Items.Select(i => new OrganizationOption(i.Id, i.Name, i.Type)).ToList();
+
+        var name = text?.Trim();
+        if (AllowCreate
+            && !string.IsNullOrEmpty(name)
+            && name.Length <= Organization.NameMaxLength
+            && !options.Any(o => string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            options.Add(new OrganizationOption(null, name, null));
+        }
+
+        return options;
+    }
+}
