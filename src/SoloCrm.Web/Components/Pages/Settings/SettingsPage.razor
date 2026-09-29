@@ -1,0 +1,201 @@
+@page "/settings"
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Stages
+@using SoloCrm.Domain.Opportunities
+@inject IQueryHandler<GetStages.Query, GetStages.Result> GetStagesHandler
+@inject ICommandHandler<CreateStage.Command, CreateStage.Result> CreateStageHandler
+@inject ICommandHandler<RenameStage.Command, RenameStage.Result> RenameStageHandler
+@inject ICommandHandler<ReorderStages.Command, ReorderStages.Result> ReorderStagesHandler
+@inject ICommandHandler<DeleteStage.Command, DeleteStage.Result> DeleteStageHandler
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<PageTitle>Einstellungen · SoloCRM</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Einstellungen</MudText>
+
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;">
+    <MudText Typo="Typo.h6">Phasen</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Reihenfolge und Namen der Pipeline. Es bleibt immer mindestens je eine offene, eine gewonnene und eine verlorene Phase.
+    </MudText>
+
+    @if (_stages is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        <MudStack Spacing="1">
+            @for (var i = 0; i < _stages.Count; i++)
+            {
+                var index = i;
+                var stage = _stages[i];
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="stage-row">
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" aria-label="Nach oben"
+                                   Disabled="@(index == 0 || _busy)" OnClick="() => MoveAsync(index, -1)" />
+                    <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small" aria-label="Nach unten"
+                                   Disabled="@(index == _stages.Count - 1 || _busy)" OnClick="() => MoveAsync(index, 1)" />
+                    <MudTextField T="string" Value="@_names[stage.Id]" ValueChanged="@(v => _names[stage.Id] = v)" Immediate="true"
+                                  Margin="Margin.Dense" MaxLength="@Stage.NameMaxLength" Class="flex-grow-1 mt-0"
+                                  aria-label="Name der Phase"
+                                  OnBlur="() => RenameAsync(stage)" OnKeyUp="@(e => e.Key == "Enter" ? RenameAsync(stage) : Task.CompletedTask)" />
+                    <MudChip T="string" Size="Size.Small" Color="@StatusColor(stage.Status)" Variant="Variant.Outlined">
+                        @Labels.For(stage.Status)
+                    </MudChip>
+                    <MudText Typo="Typo.caption" Style="min-width: 80px;" Class="mud-text-secondary">
+                        @(stage.OpportunityCount == 1 ? "1 Anfrage" : $"{stage.OpportunityCount} Anfragen")
+                    </MudText>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="Löschen" Disabled="_busy"
+                                   OnClick="() => DeleteAsync(stage)" />
+                </MudStack>
+            }
+        </MudStack>
+
+        <form @onsubmit="CreateAsync">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-4">
+                <MudTextField @bind-Value="_newName" Label="Neue Phase" Margin="Margin.Dense" MaxLength="@Stage.NameMaxLength"
+                              Immediate="true" Class="flex-grow-1" Error="@(_newNameError is not null)" ErrorText="@_newNameError" />
+                <MudSelect T="StageStatus" @bind-Value="_newStatus" Label="Status" Margin="Margin.Dense" Style="max-width: 160px;">
+                    @foreach (var status in Enum.GetValues<StageStatus>())
+                    {
+                        <MudSelectItem T="StageStatus" Value="status">@Labels.For(status)</MudSelectItem>
+                    }
+                </MudSelect>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add" Disabled="_busy">
+                    Hinzufügen
+                </MudButton>
+            </MudStack>
+        </form>
+    }
+</MudPaper>
+
+@code {
+    private List<GetStages.Item>? _stages;
+    private readonly Dictionary<Guid, string?> _names = [];
+    private string? _newName;
+    private StageStatus _newStatus = StageStatus.Open;
+    private string? _newNameError;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await GetStagesHandler.Handle(new GetStages.Query(), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        _stages = result.Value.Items.ToList();
+        _names.Clear();
+        foreach (var stage in _stages)
+        {
+            _names[stage.Id] = stage.Name;
+        }
+    }
+
+    private async Task MoveAsync(int index, int offset)
+    {
+        var ids = _stages!.Select(s => s.Id).ToList();
+        (ids[index], ids[index + offset]) = (ids[index + offset], ids[index]);
+        await RunAsync(() => ReorderStagesHandler.Handle(new ReorderStages.Command(ids), CancellationToken.None), null);
+    }
+
+    private async Task RenameAsync(GetStages.Item stage)
+    {
+        var name = _names[stage.Id];
+        if (name?.Trim() == stage.Name)
+        {
+            return;
+        }
+
+        await RunAsync(() => RenameStageHandler.Handle(new RenameStage.Command(stage.Id, name), CancellationToken.None), "Phase umbenannt.");
+    }
+
+    private async Task CreateAsync()
+    {
+        _newNameError = null;
+        var result = await CreateStageHandler.Handle(new CreateStage.Command(_newName, _newStatus), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            _newNameError = result.Error is ValidationError validation
+                ? string.Join(" ", validation.Errors.Values.SelectMany(m => m))
+                : result.Error.Message;
+            return;
+        }
+
+        _newName = null;
+        Snackbar.Add("Phase hinzugefügt.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task DeleteAsync(GetStages.Item stage)
+    {
+        Guid? targetId = null;
+        if (stage.OpportunityCount > 0)
+        {
+            var targets = _stages!.Where(s => s.Status == stage.Status && s.Id != stage.Id).Select(s => (s.Id, s.Name)).ToList();
+            var parameters = new DialogParameters<DeleteStageDialog>
+            {
+                { d => d.StageName, stage.Name },
+                { d => d.OpportunityCount, stage.OpportunityCount },
+                { d => d.Targets, targets },
+            };
+            var dialog = await DialogService.ShowAsync<DeleteStageDialog>("Phase löschen", parameters,
+                new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true });
+            if (await dialog.Result is not { Canceled: false, Data: Guid target })
+            {
+                return;
+            }
+
+            targetId = target;
+        }
+        else
+        {
+            var confirmed = await DialogService.ShowMessageBoxAsync(
+                "Phase löschen", $"Die Phase „{stage.Name}“ wirklich löschen?", yesText: "Löschen", cancelText: "Abbrechen");
+            if (confirmed != true)
+            {
+                return;
+            }
+        }
+
+        await RunAsync(() => DeleteStageHandler.Handle(new DeleteStage.Command(stage.Id, targetId), CancellationToken.None), "Phase gelöscht.");
+    }
+
+    private async Task RunAsync<T>(Func<Task<Result<T>>> action, string? successMessage)
+    {
+        _busy = true;
+        try
+        {
+            var result = await action();
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error is ValidationError validation
+                    ? string.Join(" ", validation.Errors.Values.SelectMany(m => m))
+                    : result.Error.Message, Severity.Error);
+            }
+            else if (successMessage is not null)
+            {
+                Snackbar.Add(successMessage, Severity.Success);
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static Color StatusColor(StageStatus status) => status switch
+    {
+        StageStatus.Won => Color.Success,
+        StageStatus.Lost => Color.Error,
+        _ => Color.Default,
+    };
+}

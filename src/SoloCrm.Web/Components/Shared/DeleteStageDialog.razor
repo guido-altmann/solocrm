@@ -1,0 +1,50 @@
+<MudDialog>
+    <DialogContent>
+        <MudText Class="mb-2">
+            Der Phase „@StageName“ @(OpportunityCount == 1 ? "ist 1 Anfrage" : $"sind {OpportunityCount} Anfragen") zugeordnet.
+            Wohin sollen sie verschoben werden?
+        </MudText>
+        <MudSelect T="Guid?" @bind-Value="_targetId" Label="Ziel-Phase" Required="true"
+                   Error="_showError" ErrorText="Bitte eine Ziel-Phase wählen.">
+            @foreach (var (id, name) in Targets)
+            {
+                <MudSelectItem T="Guid?" Value="id">@name</MudSelectItem>
+            }
+        </MudSelect>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Abbrechen</MudButton>
+        <MudButton OnClick="Confirm" Color="Color.Error" Variant="Variant.Filled">Verschieben und löschen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public string StageName { get; set; } = "";
+
+    [Parameter]
+    public int OpportunityCount { get; set; }
+
+    /// <summary>Stages with the same status as the deleted one.</summary>
+    [Parameter]
+    public IReadOnlyList<(Guid Id, string Name)> Targets { get; set; } = [];
+
+    private Guid? _targetId;
+    private bool _showError;
+
+    private void Confirm()
+    {
+        if (_targetId is not { } targetId)
+        {
+            _showError = true;
+            return;
+        }
+
+        MudDialog.Close(DialogResult.Ok(targetId));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

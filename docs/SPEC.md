@@ -162,7 +162,8 @@ Zusätzlich wird für Retainer der **monatlich wiederkehrende Umsatz (MRR)** sep
 | Status | enum `StageStatus` | `Open`, `Won`, `Lost` |
 
 **Seed-Daten:** Neu (Open) → Beworben (Open) → Im Gespräch (Open) → Angebot (Open) → Gewonnen (Won) → Verloren (Lost).
-Es muss immer mindestens je eine Stage mit `Won` und mit `Lost` existieren.
+Es muss immer mindestens je eine Stage mit `Won` und mit `Lost` existieren, außerdem mindestens eine offene Stage (sonst lassen sich keine Anfragen anlegen).
+Beim Löschen einer Stage mit zugeordneten Anfragen muss die Ziel-Stage denselben Status haben; die Anfragen werden einzeln über den Stage-Wechsel umgehängt (Audit und Event je Anfrage).
 
 #### Activity
 | Feld | Typ | Hinweis |

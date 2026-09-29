@@ -60,9 +60,9 @@
 - [x] Gewonnene/verlorene Anfragen verlassen das aktive Board (AK2); Filter „Abgeschlossene“ zeigt Won und Lost (AK3)
 
 ## Schritt 7 – Stages verwalten (US-09)
-- [ ] Seite `/settings` mit Abschnitt Stages: anlegen, umbenennen, umsortieren (Drag & Drop oder Pfeile)
-- [ ] `DeleteStage` mit Ziel-Stage für die Umverteilung, falls Anfragen zugeordnet sind (AK2)
-- [ ] Invariante: Es bleibt immer mindestens je eine Stage mit `Won` und `Lost` (fachlicher Fehler als `Result`)
+- [x] Seite `/settings` mit Abschnitt Stages: anlegen, umbenennen, umsortieren (Drag & Drop oder Pfeile)
+- [x] `DeleteStage` mit Ziel-Stage für die Umverteilung, falls Anfragen zugeordnet sind (AK2)
+- [x] Invariante: Es bleibt immer mindestens je eine Stage mit `Won` und `Lost` (fachlicher Fehler als `Result`)
 
 ## Schritt 8 – Tests
 - [ ] Unit-Tests `Pricing`, `Duration`, `OpportunityValuation` (alle vier Modelle × Laufzeiteinheiten × fehlende Angaben, Retainer-Aufrundung)
@@ -91,6 +91,7 @@
 10. **Nullable Complex Types verifiziert** (EF Core 10.0.12 + Npgsql 10.0.3): Migration, Speichern, Laden und `null` funktionieren. Zwei Stolpersteine: (a) Properties ohne Setter werden nicht gemappt (Lösung: `private init`), (b) bei einem `null`-Complex-Type meldet der ChangeTracker für die inneren Properties CLR-Defaults (`0`, `Hourly`), und `ComplexPropertyEntry` hat kein `OriginalValue`. Der `AuditInterceptor` ermittelt die ursprüngliche Null-Belegung deshalb über `OriginalValues.ToObject()` und vergleicht Werte statt `IsModified`.
 11. **Anfrage-Dialog:** Anlegen und Bearbeiten in einem Dialog (Bearbeiten inkl. Stage-Wahl, Absagegrund und Archivieren). Ohne Preismodell bzw. Währung gelten `DefaultPricingModel`/`DefaultCurrency` aus den Einstellungen. Endkunde und Vermittler werden nur aus bestehenden Organisationen gewählt („Neu anlegen“ gibt es in It. 2 nur beim Kontakt, US-02).
 12. **Pipeline-Layout:** Die Won/Lost-Drop-Zonen liegen als Leiste über den offenen Spalten, damit sie beim Ziehen ohne horizontales Scrollen erreichbar sind. Mit „Abgeschlossene anzeigen“ zeigen sie ihre Karten. Summen werden je Währung ausgewiesen (keine Umrechnung, SPEC 8 Backlog). Ein Klick auf eine Karte öffnet den Bearbeiten-Dialog.
+13. **Stages verwalten:** Umsortieren per Pfeiltasten, Umbenennen inline (Enter/Blur speichert). Neben je einer Won- und Lost-Stage bleibt auch immer mindestens eine offene Stage. Die Ziel-Stage beim Löschen muss denselben Status haben, damit keine Absagegründe fehlen (SPEC 2.3 ergänzt).
 
 ## Definition of Done
 - CI grün (Build + alle Tests); `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet
