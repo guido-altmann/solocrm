@@ -119,6 +119,13 @@ else
                     {
                         <MudText Typo="Typo.caption" Color="Color.Error">@Labels.For(reason)</MudText>
                     }
+                    else if (context.ClosedAt is null)
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary pipeline-card-activity" title="Letzte Aktivität (oder Anlage)">
+                            <MudIcon Icon="@Icons.Material.Outlined.History" Size="Size.Small" Style="font-size: 0.9rem; vertical-align: -2px;" />
+                            @(context.DaysSinceActivity <= 0 ? "Aktivität heute" : $"Keine Aktivität {Formats.SinceDays(context.DaysSinceActivity)}")
+                        </MudText>
+                    }
                 </MudCardContent>
             </MudCard>
         </ItemRenderer>

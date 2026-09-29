@@ -1,7 +1,160 @@
 @page "/"
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Tasks
+@using SoloCrm.Application.Features.Timeline
+@using SoloCrm.Application.Features.Today
+@inject IQueryHandler<GetToday.Query, GetToday.Result> TodayHandler
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AppClock Clock
 
 <PageTitle>Heute · SoloCRM</PageTitle>
 
-<MudText Typo="Typo.h4" GutterBottom="true">Heute</MudText>
-@* TODO(US-12): overdue/today tasks, stale opportunities, recently edited *@
-<MudText Typo="Typo.body1">Willkommen bei SoloCRM.</MudText>
+@* „Heute“ (US-12, SPEC 3.3 S1): everything due today at a glance (goal Z1). *@
+<MudStack Row="true" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-4">
+    <div>
+        <MudText Typo="Typo.h4">Heute</MudText>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@Formats.LongDate(_today?.Today ?? Clock.Today)</MudText>
+    </div>
+    <MudSpacer />
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddTask" OnClick="CreateTaskAsync">
+        Neue Aufgabe
+    </MudButton>
+</MudStack>
+
+@if (_today is null)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else
+{
+    <MudGrid Spacing="4">
+        <MudItem xs="12" md="6">
+            <MudStack Spacing="4">
+                <MudPaper Outlined="true" Class="pa-4 today-section" data-section="overdue">
+                    <MudText Typo="Typo.h6" Color="@(_today.Overdue.Count > 0 ? Color.Error : Color.Default)">
+                        Überfällig @Count(_today.Overdue.Count)
+                    </MudText>
+                    <TaskList Tasks="_today.Overdue" ShowLinks="true" EmptyText="Nichts überfällig." OnChanged="LoadAsync" />
+                </MudPaper>
+
+                <MudPaper Outlined="true" Class="pa-4 today-section" data-section="due-today">
+                    <MudText Typo="Typo.h6">Heute fällig @Count(_today.DueToday.Count)</MudText>
+                    <TaskList Tasks="_today.DueToday" ShowLinks="true" EmptyText="Für heute ist nichts fällig." OnChanged="LoadAsync" />
+                </MudPaper>
+
+                <MudExpansionPanels Outlined="true" Elevation="0" Class="today-section" data-section="without-due-date">
+                    <MudExpansionPanel Text="@($"Ohne Termin {Count(_today.WithoutDueDate.Count)}")">
+                        <TaskList Tasks="_today.WithoutDueDate" ShowLinks="true" EmptyText="Keine Aufgaben ohne Termin." OnChanged="LoadAsync" />
+                    </MudExpansionPanel>
+                </MudExpansionPanels>
+            </MudStack>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudStack Spacing="4">
+                <MudPaper Outlined="true" Class="pa-4 today-section" data-section="stale">
+                    <MudText Typo="Typo.h6">Eingeschlafene Anfragen @Count(_today.StaleOpportunities.Count)</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        Offen und seit mindestens @_today.StaleOpportunityDays Tagen ohne Aktivität
+                    </MudText>
+                    @if (_today.StaleOpportunities.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary py-1">Alle Anfragen sind in Bewegung.</MudText>
+                    }
+                    else
+                    {
+                        <MudList T="string" Dense="true" Class="pa-0">
+                            @foreach (var stale in _today.StaleOpportunities)
+                            {
+                                <MudListItem T="string" @key="stale.Id" Class="px-0">
+                                    <div class="d-flex align-center gap-2 flex-wrap">
+                                        <MudLink Href="@Links.Opportunity(stale.Id)" Typo="Typo.body2">@stale.Title</MudLink>
+                                        @if (stale.ClientName is not null)
+                                        {
+                                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@stale.ClientName</MudText>
+                                        }
+                                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@stale.StageName</MudChip>
+                                        <MudSpacer />
+                                        <MudText Typo="Typo.caption" Color="Color.Warning">@Formats.SinceDays(stale.DaysSinceActivity)</MudText>
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                </MudPaper>
+
+                <MudPaper Outlined="true" Class="pa-4 today-section" data-section="recent">
+                    <MudText Typo="Typo.h6">Zuletzt bearbeitet</MudText>
+                    @if (_today.RecentlyEdited.Count == 0)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary py-1">Noch nichts bearbeitet.</MudText>
+                    }
+                    else
+                    {
+                        <MudList T="string" Dense="true" Class="pa-0">
+                            @foreach (var record in _today.RecentlyEdited)
+                            {
+                                <MudListItem T="string" @key="record.Id" Class="px-0">
+                                    <div class="d-flex align-center gap-2">
+                                        <MudIcon Icon="@IconOf(record.Type)" Size="Size.Small" Class="mud-text-secondary" />
+                                        <MudLink Href="@LinkOf(record)" Typo="Typo.body2">@record.Name</MudLink>
+                                        <MudSpacer />
+                                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                            @Formats.DateTime(Clock.ToLocal(record.UpdatedAt))
+                                        </MudText>
+                                    </div>
+                                </MudListItem>
+                            }
+                        </MudList>
+                    }
+                </MudPaper>
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private GetToday.Result? _today;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await TodayHandler.Handle(new GetToday.Query(), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        _today = result.Value;
+    }
+
+    /// <summary>Free or linked task (US-11 AK1).</summary>
+    private async Task CreateTaskAsync()
+    {
+        var dialog = await DialogService.ShowAsync<TaskDialog>("Neue Aufgabe", DialogDefaults.Small);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Aufgabe angelegt.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private static string Count(int count) => count > 0 ? $"({count})" : "";
+
+    private static string IconOf(TimelineRecordType type) => type switch
+    {
+        TimelineRecordType.Contact => Icons.Material.Outlined.Person,
+        TimelineRecordType.Organization => Icons.Material.Outlined.Business,
+        _ => Icons.Material.Outlined.Work,
+    };
+
+    private static string LinkOf(GetToday.RecentRecord record) => record.Type switch
+    {
+        TimelineRecordType.Contact => Links.Contact(record.Id),
+        TimelineRecordType.Organization => Links.Organization(record.Id),
+        _ => Links.Opportunity(record.Id),
+    };
+}

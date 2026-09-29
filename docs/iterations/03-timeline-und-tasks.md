@@ -36,7 +36,7 @@
 
 ## Schritt 3 – Tasks (US-11)
 - [x] Use Cases `CreateTask`, `UpdateTask`, `CompleteTask`, `ReopenTask`, `DeleteTask`
-- [ ] Anlage aus der Detailansicht (Bezug vorbelegt) und aus „Heute“ (frei oder mit Bezug) (AK1) – *Detailansicht erledigt, „Heute“ folgt in Schritt 6*
+- [x] Anlage aus der Detailansicht (Bezug vorbelegt) und aus „Heute“ (frei oder mit Bezug) (AK1)
 - [x] Erledigen per Checkbox, danach Snackbar mit „Rückgängig“ für 5 s (AK2)
 - [x] Offene Tasks eines Objekts in der Detailansicht; erledigte erscheinen in der Timeline
 
@@ -55,12 +55,12 @@
 - [x] Responsive: unter 960 px einspaltig (SPEC 3.4)
 
 ## Schritt 6 – Heute-Ansicht (US-12)
-- [ ] `GetToday`: Abschnitte Überfällig (rot), Heute, Eingeschlafene Anfragen, Zuletzt bearbeitet (AK1) sowie eingeklappt „Ohne Termin“ (Entscheidung 4)
-- [ ] Zeitzone aus `App:TimeZone` (Default `Europe/Berlin`) für „heute“/„überfällig“ (Entscheidung 5)
-- [ ] Eingeschlafen = offene, nicht archivierte Anfrage ohne Activity seit `StaleOpportunityDays` Tagen (Default 7); ohne jede Activity zählt `CreatedAt`
-- [ ] Zuletzt bearbeitet: die zuletzt geänderten Kontakte, Organisationen und Anfragen (nach `UpdatedAt`, max. 10)
-- [ ] Tasks direkt auf „Heute“ erledigen und anlegen
-- [ ] Pipeline-Karten zeigen „Tage seit letzter Activity“ (aus It. 2 übernommen)
+- [x] `GetToday`: Abschnitte Überfällig (rot), Heute, Eingeschlafene Anfragen, Zuletzt bearbeitet (AK1) sowie eingeklappt „Ohne Termin“ (Entscheidung 4)
+- [x] Zeitzone aus `App:TimeZone` (Default `Europe/Berlin`) für „heute“/„überfällig“ (Entscheidung 5)
+- [x] Eingeschlafen = offene, nicht archivierte Anfrage ohne Activity seit `StaleOpportunityDays` Tagen (Default 7); ohne jede Activity zählt `CreatedAt`
+- [x] Zuletzt bearbeitet: die zuletzt geänderten Kontakte, Organisationen und Anfragen (nach `UpdatedAt`, max. 10)
+- [x] Tasks direkt auf „Heute“ erledigen und anlegen
+- [x] Pipeline-Karten zeigen „Tage seit letzter Activity“ (aus It. 2 übernommen)
 
 ## Schritt 7 – Einstellungen (S6)
 - [ ] `AppSettingKeys.StaleOpportunityDays` (Default 7)

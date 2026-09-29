@@ -91,6 +91,7 @@ Anschließend **Backup Now** auslösen und prüfen, dass die Datei im Bucket ank
    | `Admin__InitialPassword` | starkes Passwort | nach dem ersten Login ändern, danach kann die Variable entfernt werden |
    | `Serilog__MinimumLevel__Default` | `Information` | optional, zur Fehlersuche `Debug` |
    | `App__BaseUrl` | `https://crm.example.de` | für spätere absolute Links (Webhooks, Mails) |
+   | `App__TimeZone` | `Europe/Berlin` | optional (Default `Europe/Berlin`); IANA-Zeitzone für „Heute“, „überfällig“ und angezeigte Uhrzeiten. Ein ungültiger Wert verhindert den Start |
 
    **Sonderzeichen in Werten:** Coolify reicht die Variablen über eine Docker-Compose-`.env`-Datei weiter. Dabei werden `$` (Variablen-Interpolation) und `\` (Escape-Zeichen, wird z. B. verdoppelt) verändert, Anführungszeichen (`"`, `'`, `` ` ``) und Leerzeichen am Rand können mit in den Wert geraten. Diese Zeichen in Passwörtern vermeiden oder die Variable als **Is Literal** markieren. Was tatsächlich ankommt, zeigt `printenv <Variable>` im Terminal des App-Containers (siehe unten).
 

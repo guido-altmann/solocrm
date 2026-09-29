@@ -26,6 +26,9 @@ public sealed class AppClock(TimeProvider timeProvider, TimeZoneInfo timeZone)
         return new DateTimeOffset(unspecified, TimeZone.GetUtcOffset(unspecified));
     }
 
+    /// <summary>Calendar days from the local date of <paramref name="value"/> until today (0 = today).</summary>
+    public int DaysSince(DateTimeOffset value) => Today.DayNumber - DateOnly.FromDateTime(ToLocal(value).DateTime).DayNumber;
+
     /// <summary>Start of <paramref name="date"/> in the configured time zone, as UTC.</summary>
     public DateTimeOffset StartOfDayUtc(DateOnly date) =>
         FromLocal(date.ToDateTime(TimeOnly.MinValue)).ToUniversalTime();

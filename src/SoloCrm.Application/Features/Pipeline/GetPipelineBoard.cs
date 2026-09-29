@@ -8,6 +8,7 @@ namespace SoloCrm.Application.Features.Pipeline;
 /// The pipeline board: one column per stage with its active requests, the sum of <c>EstimatedValue</c> and,
 /// if retainers are contained, the sum of MRR (US-07, SPEC 3.3 S2). Won/lost stages are drop zones whose cards
 /// are only loaded on request ("Abgeschlossene", US-08 AK3). Sums are grouped by currency (no conversion).
+/// Cards show the days since the last direct activity (or since creation), see <see cref="Card.DaysSinceActivity"/>.
 /// </summary>
 public static class GetPipelineBoard
 {
@@ -26,7 +27,9 @@ public static class GetPipelineBoard
         decimal? EstimatedValue,
         decimal? MonthlyRecurringValue,
         LostReason? LostReason,
-        DateTimeOffset? ClosedAt);
+        DateTimeOffset? ClosedAt,
+        DateTimeOffset LastActivityAt,
+        int DaysSinceActivity);
 
     public sealed record Column(
         Guid StageId,
@@ -38,7 +41,7 @@ public static class GetPipelineBoard
 
     public sealed record Result(IReadOnlyList<Column> Columns);
 
-    public sealed class Handler(ICrmDbContextFactory dbFactory, IAppSettings settings) : IQueryHandler<Query, Result>
+    public sealed class Handler(ICrmDbContextFactory dbFactory, IAppSettings settings, AppClock clock) : IQueryHandler<Query, Result>
     {
         public async Task<Result<Result>> Handle(Query query, CancellationToken cancellationToken)
         {
@@ -65,6 +68,7 @@ public static class GetPipelineBoard
                     o.Utilization,
                     o.LostReason,
                     o.ClosedAt,
+                    LastActivityAt = db.Activities.Where(a => a.OpportunityId == o.Id).Max(a => (DateTimeOffset?)a.OccurredAt) ?? o.CreatedAt,
                 })
                 .ToListAsync(cancellationToken);
 
@@ -80,7 +84,9 @@ public static class GetPipelineBoard
                     OpportunityValuation.EstimatedValue(o.Pricing, o.Duration, o.Utilization, valuation),
                     OpportunityValuation.MonthlyRecurringValue(o.Pricing),
                     o.LostReason,
-                    o.ClosedAt))
+                    o.ClosedAt,
+                    o.LastActivityAt,
+                    clock.DaysSince(o.LastActivityAt)))
                 .ToLookup(c => c.StageId);
 
             var columns = stages

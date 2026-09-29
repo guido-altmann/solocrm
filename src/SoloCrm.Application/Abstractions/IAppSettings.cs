@@ -26,6 +26,9 @@ public static class AppSettingKeys
     public static AppSettingKey<string> DefaultCurrency { get; } = new(nameof(DefaultCurrency), "EUR");
 
     public static AppSettingKey<PricingModel> DefaultPricingModel { get; } = new(nameof(DefaultPricingModel), PricingModel.Hourly);
+
+    /// <summary>Open requests without an activity for this many days are „eingeschlafen“ (US-12).</summary>
+    public static AppSettingKey<int> StaleOpportunityDays { get; } = new(nameof(StaleOpportunityDays), 7);
 }
 
 public static class AppSettingsExtensions

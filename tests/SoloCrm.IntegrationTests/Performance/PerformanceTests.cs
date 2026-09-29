@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Features.Timeline;
+using SoloCrm.Application.Features.Today;
 using SoloCrm.IntegrationTests.Features;
 
 namespace SoloCrm.IntegrationTests.Performance;
@@ -14,7 +15,7 @@ public sealed class PerformanceTests(PostgresFixture postgres) : HandlerTest(pos
     private static readonly TimeSpan Budget = TimeSpan.FromMilliseconds(200);
 
     [Fact]
-    public async Task GetTimeline_LargeDataset_StaysWithinBudget()
+    public async Task GetTimelineAndToday_LargeDataset_StayWithinBudget()
     {
         await using (var db = OpenDb())
         {
@@ -35,10 +36,16 @@ public sealed class PerformanceTests(PostgresFixture postgres) : HandlerTest(pos
         var contact = await MeasureAsync(() => QueryAsync<GetTimeline.Query, GetTimeline.Result>(
             new GetTimeline.Query(TimelineRecordType.Contact, contactId)));
 
-        TestContext.Current.TestOutputHelper?.WriteLine($"Timeline organization: {organization.Median.TotalMilliseconds:F1} ms, contact: {contact.Median.TotalMilliseconds:F1} ms");
+        var today = await MeasureAsync(() => QueryAsync<GetToday.Query, GetToday.Result>(new GetToday.Query()));
+
+        TestContext.Current.TestOutputHelper?.WriteLine(
+            $"Timeline organization: {organization.Median.TotalMilliseconds:F1} ms, contact: {contact.Median.TotalMilliseconds:F1} ms, "
+            + $"Heute: {today.Median.TotalMilliseconds:F1} ms");
         organization.Result.Value.Entries.Should().HaveCount(GetTimeline.DefaultLimit);
         organization.Median.Should().BeLessThan(Budget);
         contact.Median.Should().BeLessThan(Budget);
+        today.Result.Value.StaleOpportunities.Should().NotBeEmpty();
+        today.Median.Should().BeLessThan(Budget);
     }
 
     private static async Task<(T Result, TimeSpan Median)> MeasureAsync<T>(Func<Task<T>> action)
