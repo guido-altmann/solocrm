@@ -6,6 +6,7 @@ using SoloCrm.Application.Abstractions;
 using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Persistence;
 using SoloCrm.Infrastructure.Persistence.Interceptors;
+using SoloCrm.Infrastructure.Settings;
 
 namespace SoloCrm.Infrastructure;
 
@@ -21,15 +22,21 @@ public static class DependencyInjection
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<TimestampInterceptor>();
+        services.AddSingleton<AuditInterceptor>();
+        services.AddSingleton<OutboxInterceptor>();
 
         // Registers IDbContextFactory<CrmDbContext> (for handlers) and a scoped CrmDbContext
         // (for Identity stores and health checks).
         services.AddDbContextFactory<CrmDbContext>((sp, options) => options
             .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
-            .AddInterceptors(sp.GetRequiredService<TimestampInterceptor>()));
+            .AddInterceptors(
+                sp.GetRequiredService<TimestampInterceptor>(),
+                sp.GetRequiredService<AuditInterceptor>(),
+                sp.GetRequiredService<OutboxInterceptor>()));
 
         services.AddSingleton<ICrmDbContextFactory, CrmDbContextFactory>();
+        services.AddSingleton<IAppSettings, AppSettings>();
 
         return services;
     }

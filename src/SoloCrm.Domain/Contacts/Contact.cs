@@ -5,7 +5,7 @@ namespace SoloCrm.Domain.Contacts;
 /// <summary>
 /// A person the freelancer is in touch with (SPEC 2.3).
 /// </summary>
-public sealed class Contact : Entity
+public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
 {
     public const int FirstNameMaxLength = 100;
     public const int LastNameMaxLength = 100;
@@ -37,6 +37,8 @@ public sealed class Contact : Entity
     public string? JobTitle { get; private set; }
 
     public string? LinkedInUrl { get; private set; }
+
+    public IReadOnlyDictionary<string, string> ExtraFields { get; private set; } = new Dictionary<string, string>();
 
     /// <summary>
     /// Creates a contact. At least a first or a last name is required; blank values are stored as <c>null</c>.

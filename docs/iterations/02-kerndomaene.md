@@ -16,13 +16,13 @@
 ---
 
 ## Schritt 1 – Querschnitt: Audit, Archivierung, Einstellungen
-- [ ] `AuditEntry` (SPEC 2.4) + EF-Konfiguration (`changes` als jsonb)
-- [ ] `AuditInterceptor` (ADR-006): `Created`/`Updated`/`Deleted`/`Archived` mit Feld-Diffs; Complex Types (`Pricing`, `Duration`) als einzelne Felder diffen; läuft in derselben Transaktion wie die Änderung
-- [ ] Integrationstest: Anlage eines Kontakts schreibt einen AuditEntry `Created` (**US-01 AK3**)
-- [ ] Archivierung als gemeinsamer Baustein: `IsArchived` plus `Archive()`/`Restore()` für Contact, Organization und Opportunity; der Audit-Interceptor schreibt dafür `Archived` statt `Updated`
-- [ ] `ExtraFields` (jsonb, `Dictionary<string,string>`) für Contact, Organization und Opportunity, vorerst ohne UI
-- [ ] `AppSetting` + `IAppSettings` (typisiertes Lesen mit Defaults: `HoursPerDay` = 8, `RetainerValuationMonths` = 12, `DefaultCurrency` = EUR, `DefaultPricingModel` = Hourly)
-- [ ] `OutboxMessage` (SPEC 2.4) + `OutboxInterceptor` (ADR-010): Domain Events aller Entitäten transaktional in die Outbox schreiben, danach `ClearDomainEvents()`; die Verarbeitung und die Webhooks folgen in It. 5
+- [x] `AuditEntry` (SPEC 2.4) + EF-Konfiguration (`changes` als jsonb)
+- [x] `AuditInterceptor` (ADR-006): `Created`/`Updated`/`Deleted`/`Archived` mit Feld-Diffs; Complex Types (`Pricing`, `Duration`) als einzelne Felder diffen; läuft in derselben Transaktion wie die Änderung
+- [x] Integrationstest: Anlage eines Kontakts schreibt einen AuditEntry `Created` (**US-01 AK3**)
+- [x] Archivierung als gemeinsamer Baustein: `IsArchived` plus `Archive()`/`Restore()` für Contact, Organization und Opportunity; der Audit-Interceptor schreibt dafür `Archived` statt `Updated`
+- [x] `ExtraFields` (jsonb, `Dictionary<string,string>`) für Contact, Organization und Opportunity, vorerst ohne UI
+- [x] `AppSetting` + `IAppSettings` (typisiertes Lesen mit Defaults: `HoursPerDay` = 8, `RetainerValuationMonths` = 12, `DefaultCurrency` = EUR, `DefaultPricingModel` = Hourly)
+- [x] `OutboxMessage` (SPEC 2.4) + `OutboxInterceptor` (ADR-010): Domain Events aller Entitäten transaktional in die Outbox schreiben, danach `ClearDomainEvents()`; die Verarbeitung und die Webhooks folgen in It. 5
 
 ## Schritt 2 – Organization (US-03, US-04, US-05)
 - [ ] Entität `Organization` (SPEC 2.3) inkl. `OrganizationType` (als string gespeichert), Website-Validierung und Normalisierung (Vorbereitung auf Enrichment, SPEC 9.5); Event `OrganizationCreated`
@@ -80,6 +80,9 @@
 1. **Outbox-Schreiben vorgezogen:** `OutboxMessage` + `OutboxInterceptor` entstehen in It. 2, damit `OpportunityStageChanged` (US-07 AK1) und die übrigen Events nicht verloren gehen. Verarbeitung und Webhooks bleiben in It. 5.
 2. **Wiedereröffnen erlaubt:** Der Wechsel von `Won`/`Lost` auf eine offene Stage leert `ClosedAt` und `LostReason`; die alten Werte bleiben im AuditEntry erhalten.
 3. **Preis-Defaults:** In It. 2 nur über `IAppSettings`; die Oberfläche folgt in It. 3.
+
+## Entscheidungen während der Umsetzung (2026-09-29)
+4. **Wiederherstellen im Audit:** `Restore()` wird als `Updated` mit dem Diff `IsArchived: true → false` protokolliert (die Spec kennt keine Aktion `Restored`). `Created` enthält nur gesetzte Werte, `Deleted` die alten Werte.
 
 ## Definition of Done
 - CI grün (Build + alle Tests); `EstimatedValue` für alle vier Preismodelle vollständig unit-getestet

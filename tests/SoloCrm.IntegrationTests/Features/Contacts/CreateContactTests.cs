@@ -1,12 +1,9 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
-using SoloCrm.Application;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.Contacts;
-using SoloCrm.Infrastructure;
+using SoloCrm.Domain.Auditing;
 using SoloCrm.IntegrationTests.Web;
 
 namespace SoloCrm.IntegrationTests.Features.Contacts;
@@ -28,17 +25,7 @@ public sealed class CreateContactTests(PostgresFixture postgres) : IClassFixture
     public async ValueTask InitializeAsync()
     {
         _connectionString = await CrmWebApplicationFactory.CreateDatabaseAsync(postgres, TestContext.Current.CancellationToken);
-
-        var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Crm"] = _connectionString })
-            .Build();
-
-        var services = new ServiceCollection();
-        services.AddSingleton<TimeProvider>(new FakeTimeProvider(Now));
-        services.Configure<IdentityOptions>(options => options.Stores.SchemaVersion = IdentitySchemaVersions.Version3);
-        services.AddApplication();
-        services.AddInfrastructure(configuration);
-        _services = services.BuildServiceProvider();
+        _services = CrmServices.Create(_connectionString, new FakeTimeProvider(Now));
     }
 
     public async ValueTask DisposeAsync() => await _services.DisposeAsync();
@@ -71,6 +58,44 @@ public sealed class CreateContactTests(PostgresFixture postgres) : IClassFixture
         stored.JobTitle.Should().Be("CTO");
         stored.CreatedAt.Should().Be(Now);
         stored.UpdatedAt.Should().Be(Now);
+    }
+
+    [Fact]
+    public async Task Handle_ValidCommand_WritesCreatedAuditEntry()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await Handler.Handle(new CreateContact.Command("Ada", "Lovelace", "ada@example.test"), ct);
+
+        await using var db = CrmWebApplicationFactory.CreateDbContext(_connectionString);
+        var entry = await db.AuditEntries.SingleAsync(ct);
+        entry.EntityType.Should().Be("Contact");
+        entry.EntityId.Should().Be(result.Value.Id);
+        entry.Action.Should().Be(AuditAction.Created);
+        entry.OccurredAt.Should().Be(Now);
+        entry.Changes.Should().BeEquivalentTo(
+        [
+            new AuditChange("Email", null, "ada@example.test"),
+            new AuditChange("FirstName", null, "Ada"),
+            new AuditChange("LastName", null, "Lovelace"),
+        ]);
+    }
+
+    [Fact]
+    public async Task Handle_ValidCommand_WritesContactCreatedToOutbox()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var result = await Handler.Handle(new CreateContact.Command("Ada", null), ct);
+
+        await using var db = CrmWebApplicationFactory.CreateDbContext(_connectionString);
+        var message = await db.OutboxMessages.SingleAsync(ct);
+        message.Type.Should().Be("contact.created");
+        message.Payload.Should().Be($$"""{"contactId": "{{result.Value.Id}}"}""");
+        message.OccurredAt.Should().Be(Now);
+        message.NextAttemptAt.Should().Be(Now);
+        message.ProcessedAt.Should().BeNull();
+        message.Attempts.Should().Be(0);
     }
 
     [Fact]
