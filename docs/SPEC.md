@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** Entwurf v0.11 · **Stand:** 2026-09-29 · **Owner:** Guido Altmann
+> **Status:** Entwurf v0.12 · **Stand:** 2026-09-30 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, konkrete Iterationsaufträge in `docs/iterations/`.
 
@@ -188,7 +188,12 @@ Activities lassen sich bearbeiten (Art, Zeitpunkt, Betreff, Text; die Bezüge bl
 Titel und Fälligkeit sind bearbeitbar; Tasks lassen sich hart löschen (AuditEntry `Deleted`). Beim harten Löschen eines Kontakts werden seine Tasks mitgelöscht (US-20); bei Organisation und Anfrage wird der Bezug geleert.
 
 #### Tag
-Name (eindeutig, case-insensitive), Color (Hex aus einer festen Palette mit geprüftem Kontrast; neue Tags bekommen reihum die nächste Farbe). n:m-Beziehungen zu Contact, Organization und Opportunity über drei typisierte Join-Tabellen. Zuordnungen werden auditiert, erscheinen aber nicht in der Timeline (2.5).
+| Feld | Typ | Hinweis |
+|---|---|---|
+| Name | citext(50) | ✅ eindeutig (case-insensitive); Leerraum wird normalisiert („ Kunde   A “ → „Kunde A“) |
+| Color | string(7) | Hex aus einer festen Palette von 12 Farben; weiße Schrift hat auf jeder Farbe einen Kontrast ≥ 4,5:1 (hell und dunkel); neue Tags bekommen reihum die Farbe nach der des zuletzt angelegten Tags |
+
+n:m-Beziehungen zu Contact, Organization und Opportunity über drei typisierte Join-Tabellen (`contact_tags`, `organization_tags`, `opportunity_tags`, `ON DELETE CASCADE`). Neue Tags entstehen inline in der Chip-Eingabe („Neu anlegen: …“); ein Name, der sich nur in Groß-/Kleinschreibung unterscheidet, verwendet den bestehenden Tag. Zuordnungen werden als `Updated` des Datensatzes mit dem Feld `Tags` auditiert (alter bzw. neuer Wert = Tag-Name), erscheinen aber nicht in der Timeline (2.5). Beim Löschen eines Tags werden seine Zuordnungen einzeln entfernt, sodass jeder betroffene Datensatz seinen AuditEntry erhält.
 
 ### 2.4 Technische / unterstützende Entitäten
 | Entität | Zweck | Felder (Kern) |
@@ -244,25 +249,28 @@ Events werden in der Entität gesammelt (`AddDomainEvent`) und **innerhalb derse
 ### 3.2 Tastenkürzel
 | Kürzel | Aktion |
 |---|---|
-| `Ctrl/Cmd + K` | Command Palette |
-| `N` | Quick-Add (kontextabhängig: Kontakt / Anfrage / Notiz) |
-| `G` dann `H` / `P` / `K` / `O` | Gehe zu Heute / Pipeline / Kontakte / Organisationen |
-| `?` | Übersicht der Tastenkürzel |
-| `Esc` | Dialog schließen / Inline-Edit abbrechen |
+| `Ctrl/Cmd + K` | Command Palette (auch in Eingabefeldern und Dialogen) |
+| `N` | Quick-Add (kontextabhängig: Kontakt / Organisation / Anfrage / Notiz) |
+| `G` dann `H` / `P` / `K` / `O` | Gehe zu Heute / Pipeline / Kontakte / Organisationen (zweite Taste innerhalb von 1 s) |
+| `?` | Übersicht der Tastenkürzel (statischer Dialog) |
+| `Esc` | Dialog oder Palette schließen / Inline-Edit abbrechen |
+| `Enter` / `F2` | Stammdatenfeld in der Detailansicht bearbeiten; `Enter` (mehrzeilig `Ctrl/Cmd + Enter`) speichert |
+
+Außer `Ctrl/Cmd + K` wirken die Kürzel nur außerhalb von Eingabefeldern und Dialogen. In der Command Palette wählen `↑`/`↓` einen Eintrag, `Enter` öffnet ihn.
 
 ### 3.3 Screens (MVP)
 | # | Screen | Route | Inhalt |
 |---|---|---|---|
 | S1 | **Heute** | `/` | Überfällige Tasks (rot), heute fällige Tasks, „eingeschlafene“ Anfragen (offen, nicht archiviert, seit mindestens N Kalendertagen keine direkte Activity bzw. seit der Anlage, Default 7), zuletzt bearbeitet (max. 10, ohne Archivierte); eingeklappt: Tasks ohne Termin. „Heute“ und alle Tagesgrenzen gelten in der konfigurierten Zeitzone (`App__TimeZone`, Default `Europe/Berlin`) |
-| S2 | **Pipeline** | `/pipeline` | Kanban je offener Stage; Karten mit Titel, Endkunde/Vermittler, Preis im Modellformat (z. B. „95 €/h“, „2.500 €/Monat“), Tage seit letzter Activity (Definition wie S1); Klick öffnet die Detailansicht; Drag & Drop; je Spalte Summe `EstimatedValue` und – falls Retainer enthalten – Summe MRR; Won/Lost als Drop-Zonen |
+| S2 | **Pipeline** | `/pipeline` | Kanban je offener Stage; Karten mit Titel, Endkunde/Vermittler, Preis im Modellformat (z. B. „95 €/h“, „2.500 €/Monat“), Tags, Tage seit letzter Activity (Definition wie S1); Klick öffnet die Detailansicht; Drag & Drop; je Spalte Summe `EstimatedValue` und – falls Retainer enthalten – Summe MRR; Won/Lost als Drop-Zonen |
 | S3 | **Kontakte** | `/contacts` | Tabelle mit Suche (dieselbe tippfehlertolerante Suche wie die Command Palette), Filter (Organisation, Tags ODER-verknüpft, Quelle), Sortierung, Paging (serverseitig) |
 | S4 | **Organisationen** | `/organizations` | analog S3, Filter nach Typ |
-| S5 | **Detailansicht** | `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}` | Links Stammdaten (inline editierbar ab It. 4; ersetzt dort den Bearbeiten-Dialog), Tags, verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe; `N` fokussiert die Eingabe |
+| S5 | **Detailansicht** | `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}` | Links Stammdaten (inline editierbar ab It. 4; ersetzt dort den Bearbeiten-Dialog; bei Anfragen Preis und Laufzeit als Gruppe mit Live-Wert, Wechsel auf „Verloren“ fragt den Absagegrund ab; Archivieren im Kopf), Tags als Chip-Eingabe, verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe; `N` fokussiert die Eingabe |
 | S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Webhooks, Import, Konto (Passwort, 2FA) |
 
 ### 3.4 Layout
 - Linke Navigation (einklappbar): Heute, Pipeline, Kontakte, Organisationen, Einstellungen
-- Obere Leiste: Suchfeld (öffnet Command Palette), Quick-Add-Button, Theme-Toggle
+- Obere Leiste: Suchfeld (öffnet per Klick oder `Enter` die Command Palette; bewusst nicht schon beim Fokus, damit Tab-Navigation keinen Dialog öffnet, WCAG 3.2.1), Quick-Add-Button, Theme-Toggle
 - Responsive: Unter 960 px wird die Navigation zum Drawer und die Detailansicht einspaltig.
 
 ---
@@ -507,7 +515,7 @@ public static class CreateContact
 | Audit | `AuditInterceptor` liest den ChangeTracker vor dem Speichern und schreibt `AuditEntry` (Feld-Diffs) in derselben Transaktion |
 | Domain Events → Outbox | `OutboxInterceptor` sammelt Events aus Entitäten und serialisiert sie als `OutboxMessage` in derselben Transaktion |
 | Outbox-Verarbeitung | Hangfire-Recurring-Job (alle 10 s) bzw. `BackgroundService`; `SELECT … FOR UPDATE SKIP LOCKED`; Versand an Subscriptions; Backoff |
-| Suche | generierte `tsvector`-Spalte (Konfiguration `simple`) + GIN-Index; zusätzlich `pg_trgm` GIN-Index auf Namen/Titel; Ranking kombiniert beide; Command Palette, Listen und Autocompletes nutzen dieselbe Suche |
+| Suche | generierte `tsvector`-Spalte (Konfiguration `simple`, Shadow Property) + GIN-Index; zusätzlich `pg_trgm` GIN-Index auf Namen/Titel; Treffer bei Präfix-Volltext **oder** Wortähnlichkeit ≥ 0,6 (`<%`); Ranking = Wortähnlichkeit + `ts_rank`; Command Palette, Listen und Autocompletes nutzen dieselbe Suche ab 2 Zeichen (Palette) bzw. 1 Zeichen (Listen); Details siehe ADR-007 |
 | JSONB | `ExtraFields` als `Dictionary<string,string>` → jsonb (Npgsql) |
 | Value Objects | `Pricing` und `Duration` als unveränderliche Records, gemappt als EF Core **Complex Types** (`ComplexProperty`, nullable) – Spalten direkt in `opportunities` (ADR-011) |
 | IDs | UUIDv7, im Konstruktor der Entität gesetzt (nicht durch die DB) |
@@ -627,3 +635,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.8 | 2026-09-29 | Abschluss It. 2: mindestens eine offene Stage bleibt erhalten; Ziel-Stage beim Löschen mit gleichem Status (2.3); Umsetzungsentscheidungen in `docs/iterations/02-kerndomaene.md` |
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
+| 0.12 | 2026-09-30 | Abschluss It. 4: Tag-Felder und -Regeln (2.3); Tastenkürzel präzisiert (3.2, u. a. `Enter`/`F2` für Inline-Edit, 1-s-Fenster für `G`); Suchfeld öffnet die Palette per Klick statt Fokus (3.4); Tags auf Pipeline-Karten, Archivieren der Anfrage im Detailkopf (S2/S5); Such-Mechanik (7.4, ADR-007) |

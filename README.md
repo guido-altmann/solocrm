@@ -12,10 +12,13 @@ Schlankes, selbst gehostetes CRM für Freelancer und Einzelunternehmer: Kontakte
 ## Stand
 - **Iteration 1 (Walking Skeleton):** Login (Single-User), CI auf GitHub Actions, Image in GHCR, Deployment auf Coolify mit HTTPS, persistenten Data-Protection-Keys und S3-Backups.
 - **Iteration 2 (Kerndomäne):** Organisationen (Endkunde, Vermittler, Partner) und Kontakte mit Firmenzuordnung, Filtern, Sortierung und Archivierung; Projektanfragen mit Preismodell (Stunden-/Tagessatz, Festpreis, Retainer), Laufzeit und live berechnetem Wert; Pipeline-Board mit Drag & Drop, Won/Lost inklusive Absagegrund; Phasen in den Einstellungen verwalten. Jede Änderung wird per EF-Interceptor auditiert, Domain Events landen transaktional in der Outbox.
-
 - **Iteration 3 (Timeline & Tasks):** Detailansichten für Kontakte, Organisationen und Anfragen mit einer chronologischen Timeline aus Activities (Notiz, Anruf, Meeting, E-Mail, Bewerbung; Markdown, rückdatierbar), Tasks und lesbaren Änderungen („Phase: Beworben → Im Gespräch“, „Preis: 95 €/h → 105 €/h“). Organisationen sehen auch die Einträge ihrer Kontakte und Anfragen („via …“). Follow-up-Tasks lassen sich per Checkbox erledigen, mit „Rückgängig“ für 5 Sekunden. Die Ansicht „Heute“ zeigt überfällige und heute fällige Aufgaben, eingeschlafene Anfragen und zuletzt Bearbeitetes. Preis-Defaults und der Schwellwert für „eingeschlafen“ sind in den Einstellungen pflegbar.
 
-Weitere Funktionen (Command Palette, Inline-Editing, Tags, API/Webhooks) folgen gemäß [Iterationsplan](docs/SPEC.md#8-iterationsplan).
+- **Iteration 4 (Suche & Komfort):** Command Palette (`Ctrl/Cmd + K`) mit tippfehlertoleranter Suche über Kontakte (inkl. E-Mail und Firma), Organisationen und Anfragen – PostgreSQL-Volltext plus `pg_trgm`, „Schmitt“ findet „Schmidt“ – sowie Aktionen wie „Neuer Kontakt“ oder „Gehe zu Pipeline“. Dieselbe Suche steckt in Listen und Autocompletes. Tastenkürzel `G` + `H/P/K/O` und eine Übersicht per `?`. Stammdaten werden direkt in der Detailansicht bearbeitet (Enter/Blur speichert, Esc bricht ab, Fehler am Feld). Farbige Tags für Kontakte, Organisationen und Anfragen, inline anlegbar, filterbar und in den Einstellungen verwaltbar.
+
+Weitere Funktionen (CSV-Import, REST-API, Webhooks) folgen gemäß [Iterationsplan](docs/SPEC.md#8-iterationsplan).
+
+![Command Palette: „schmitt“ findet Schmitz, Schmidt und Schmid samt Firma, Organisation und Anfrage](docs/images/command-palette.png)
 
 ![Heute: überfällige und fällige Aufgaben, eingeschlafene Anfragen, zuletzt bearbeitet](docs/images/today.png)
 
