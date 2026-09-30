@@ -1,4 +1,4 @@
-# ADR-008: Hintergrundjobs mit Hangfire (PostgreSQL-Storage)
+# ADR-008: Hintergrundjobs – eigener BackgroundService statt Hangfire
 
 **Status:** Accepted · **Datum:** 2026-09-25 (entschieden 2026-09-30) · **Entscheider:** Guido Altmann
 
