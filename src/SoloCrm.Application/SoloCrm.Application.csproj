@@ -6,7 +6,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
-    <!-- Provider-specific query functions (EF.Functions.ILike); PostgreSQL is fixed by ADR-002. -->
+    <!-- Provider-specific query functions (full-text search, pg_trgm); PostgreSQL is fixed by ADR-002. -->
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />

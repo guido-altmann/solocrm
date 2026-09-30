@@ -109,7 +109,8 @@
         CancellationToken cancellationToken)
     {
         var sort = state.SortDefinitions.FirstOrDefault();
-        var sortBy = Enum.TryParse<GetOrganizations.SortField>(sort?.SortBy, out var field) ? field : GetOrganizations.SortField.Name;
+        // Without a sorted column, search results come by relevance.
+        GetOrganizations.SortField? sortBy = Enum.TryParse<GetOrganizations.SortField>(sort?.SortBy, out var field) ? field : null;
 
         var result = await GetOrganizationsHandler.Handle(
             new GetOrganizations.Query(_search, _type, _includeArchived, sortBy, sort?.Descending ?? false, state.Page, state.PageSize),

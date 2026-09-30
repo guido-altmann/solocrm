@@ -7,7 +7,8 @@ namespace SoloCrm.IntegrationTests.Performance;
 /// <summary>
 /// Bulk data for the NFR check (SPEC 6): 10k contacts in 500 organizations, 50k activities over two years,
 /// 2k opportunities, 5k tasks and 30k audit entries (mostly invisible changes). Timestamps are relative to
-/// <see cref="Now"/>.
+/// <see cref="Now"/>. Names are spread like real data for the search: 30 common first names and 8,000 last names
+/// built from three syllables, organizations named like „Kamlinhof GmbH“.
 /// </summary>
 public static class LargeDataset
 {
@@ -21,15 +22,24 @@ public static class LargeDataset
     {
         // Only constants of this class are interpolated.
         var sql = $"""
-            CREATE TEMP TABLE seed_base AS SELECT timestamptz '{Now:O}' AS now;
+            CREATE TEMP TABLE seed_base AS SELECT timestamptz '{Now:O}' AS now,
+                ARRAY['Anna', 'Ben', 'Clara', 'David', 'Emma', 'Felix', 'Greta', 'Hannah', 'Jonas', 'Julia',
+                      'Karl', 'Lea', 'Lukas', 'Marie', 'Max', 'Mia', 'Noah', 'Paul', 'Sophie', 'Tim',
+                      'Laura', 'Jan', 'Lisa', 'Tobias', 'Katrin', 'Stefan', 'Sabine', 'Thomas', 'Petra', 'Michael'] AS first_names,
+                ARRAY['ber', 'kam', 'lin', 'sch', 'mid', 'hof', 'mann', 'wag', 'ner', 'bau',
+                      'er', 'kel', 'lor', 'sten', 'feld', 'ha', 'gen', 'rich', 'ter', 'wald'] AS syllables;
 
             INSERT INTO organizations (id, name, type, is_archived, extra_fields, created_at, updated_at)
-            SELECT gen_random_uuid(), 'Organisation ' || g, 'Client', false, jsonb_build_object(), b.now - interval '2 years', b.now - (g % 300) * interval '1 hour'
+            SELECT gen_random_uuid(),
+                   initcap(b.syllables[g % 20 + 1] || b.syllables[(g / 20) % 20 + 1] || b.syllables[(g * 7) % 20 + 1]) || ' GmbH',
+                   'Client', false, jsonb_build_object(), b.now - interval '2 years', b.now - (g % 300) * interval '1 hour'
             FROM generate_series(0, {Organizations - 1}) g, seed_base b;
 
             WITH o AS (SELECT id, row_number() OVER (ORDER BY id) - 1 AS n FROM organizations)
             INSERT INTO contacts (id, first_name, last_name, organization_id, is_archived, extra_fields, created_at, updated_at)
-            SELECT gen_random_uuid(), 'Vorname ' || g, 'Nachname ' || g, o.id, false, jsonb_build_object(), b.now - interval '2 years', b.now - (g % 900) * interval '1 hour'
+            SELECT gen_random_uuid(), b.first_names[g % 30 + 1],
+                   initcap(b.syllables[g % 20 + 1] || b.syllables[(g / 20) % 20 + 1] || b.syllables[(g / 400) % 20 + 1]),
+                   o.id, false, jsonb_build_object(), b.now - interval '2 years', b.now - (g % 900) * interval '1 hour'
             FROM generate_series(0, {Contacts - 1}) g JOIN o ON o.n = g % {Organizations}, seed_base b;
 
             WITH c AS (SELECT id, row_number() OVER (ORDER BY id) - 1 AS n FROM contacts)

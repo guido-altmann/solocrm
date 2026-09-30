@@ -1,12 +1,15 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Search;
 using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Application.Features.Organizations;
 
 /// <summary>
-/// Pages through organizations with search, type filter and sorting; archived ones only on request (US-03, US-04, US-05).
+/// Pages through organizations with search (name, website, city; same search as the command palette, ADR-007), type
+/// filter and sorting; archived ones only on request (US-03, US-04, US-05). Without an explicit sort field, search
+/// results are ordered by relevance and everything else by name.
 /// </summary>
 public static class GetOrganizations
 {
@@ -22,7 +25,7 @@ public static class GetOrganizations
         string? Search = null,
         OrganizationType? Type = null,
         bool IncludeArchived = false,
-        SortField SortBy = SortField.Name,
+        SortField? SortBy = null,
         bool SortDescending = false,
         int PageIndex = 0,
         int PageSize = Paging.DefaultPageSize) : IPagedQuery;
@@ -73,18 +76,19 @@ public static class GetOrganizations
                 organizations = organizations.Where(o => o.Type == type);
             }
 
-            if (!string.IsNullOrWhiteSpace(query.Search))
+            var term = SearchTerm.Parse(query.Search);
+            if (term is not null)
             {
-                var pattern = LikePattern.Contains(query.Search);
-                organizations = organizations.Where(o =>
-                    EF.Functions.ILike(o.Name, pattern, LikePattern.Escape)
-                    || EF.Functions.ILike(o.City ?? "", pattern, LikePattern.Escape)
-                    || EF.Functions.ILike(o.Website ?? "", pattern, LikePattern.Escape));
+                organizations = organizations.Where(SearchPredicates.OrganizationMatches(term));
             }
 
             var totalCount = await organizations.CountAsync(cancellationToken);
 
-            var items = await Sort(organizations, query.SortBy, query.SortDescending)
+            var sorted = query.SortBy is null && term is not null
+                ? organizations.OrderByDescending(SearchPredicates.OrganizationRelevance(term))
+                : Sort(organizations, query.SortBy ?? SortField.Name, query.SortDescending);
+
+            var items = await sorted
                 .ThenBy(o => o.Id)
                 .Page(query)
                 .Select(o => new Item(o.Id, o.Name, o.Type, o.Website, o.City, o.IsArchived, o.CreatedAt))

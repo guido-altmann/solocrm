@@ -126,8 +126,10 @@
         return new GridData<GetContacts.Item> { Items = result.Value.Items, TotalItems = result.Value.TotalCount };
     }
 
-    private static GetContacts.SortField ToSortField(string? column) => column switch
+    // Without a sorted column, search results come by relevance.
+    private static GetContacts.SortField? ToSortField(string? column) => column switch
     {
+        null => null,
         nameof(GetContacts.Item.OrganizationName) => GetContacts.SortField.Organization,
         nameof(GetContacts.Item.Email) => GetContacts.SortField.Email,
         _ => GetContacts.SortField.Name,

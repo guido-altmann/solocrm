@@ -29,11 +29,11 @@
 - [x] Migration (additiv, siehe ADR-009)
 
 ## Schritt 2 – Suche: Use Case und Listen (US-13 AK2/AK3)
-- [ ] `Search(Text, Limit)`: Treffer über Kontakte (Name, E-Mail, Firma), Organisationen und Anfragen (Titel); Ranking kombiniert `ts_rank` und `similarity` (ADR-007); ab 2 Zeichen; Archivierte ausgeschlossen (US-05 AK1)
-- [ ] Tippfehlertoleranz: „Schmitt“ findet „Schmidt“ (AK3); Schwellwert für `similarity` festlegen und begründen
-- [ ] Firma bei Kontakten: Treffer über den Namen der zugeordneten Organisation (per Join, keine denormalisierte Spalte)
-- [ ] Listen- und Autocomplete-Suche (`GetContacts`, `GetOrganizations`, `SearchOrganizations`, `SearchOpportunities`) auf dieselbe Suche umstellen (Entscheidung 1)
-- [ ] Integrationstest: Relevanz-Reihenfolge, Tippfehler, Archivierte, Laufzeit < 200 ms bei 10k Kontakten (NFR Kap. 6, `LargeDataset` aus It. 3 wiederverwenden)
+- [x] `Search(Text, Limit)`: Treffer über Kontakte (Name, E-Mail, Firma), Organisationen und Anfragen (Titel); Ranking kombiniert `ts_rank` und `similarity` (ADR-007); ab 2 Zeichen; Archivierte ausgeschlossen (US-05 AK1)
+- [x] Tippfehlertoleranz: „Schmitt“ findet „Schmidt“ (AK3); Schwellwert für `similarity` festlegen und begründen
+- [x] Firma bei Kontakten: Treffer über den Namen der zugeordneten Organisation (per Join, keine denormalisierte Spalte)
+- [x] Listen- und Autocomplete-Suche (`GetContacts`, `GetOrganizations`, `SearchOrganizations`, `SearchOpportunities`) auf dieselbe Suche umstellen (Entscheidung 1)
+- [x] Integrationstest: Relevanz-Reihenfolge, Tippfehler, Archivierte, Laufzeit < 200 ms bei 10k Kontakten (NFR Kap. 6, `LargeDataset` aus It. 3 wiederverwenden)
 
 ## Schritt 3 – Command Palette (US-13)
 - [ ] `Ctrl/Cmd + K` öffnet die Palette; ein Klick oder Fokus auf das Suchfeld in der App-Leiste ebenfalls (`TODO(US-13)` auflösen) (AK1)

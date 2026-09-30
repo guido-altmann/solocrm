@@ -1,14 +1,16 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Search;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
 
 namespace SoloCrm.Application.Features.Contacts;
 
 /// <summary>
-/// Pages through contacts with search (name, email, organization), filters and sorting;
-/// archived contacts only on request (US-04, US-05).
+/// Pages through contacts with search (name, email, organization; same search as the command palette, ADR-007),
+/// filters and sorting; archived contacts only on request (US-04, US-05). Without an explicit sort field, search
+/// results are ordered by relevance and everything else by name.
 /// </summary>
 public static class GetContacts
 {
@@ -27,7 +29,7 @@ public static class GetContacts
         Guid? OrganizationId = null,
         LeadSource? Source = null,
         bool IncludeArchived = false,
-        SortField SortBy = SortField.Name,
+        SortField? SortBy = null,
         bool SortDescending = false,
         int PageIndex = 0,
         int PageSize = DefaultPageSize) : IPagedQuery;
@@ -87,20 +89,20 @@ public static class GetContacts
                 contacts = contacts.Where(c => c.Source == source);
             }
 
-            if (!string.IsNullOrWhiteSpace(query.Search))
+            var term = SearchTerm.Parse(query.Search);
+            if (term is not null)
             {
-                var pattern = LikePattern.Contains(query.Search);
-                contacts = contacts.Where(c =>
-                    EF.Functions.ILike(c.FirstName ?? "", pattern, LikePattern.Escape)
-                    || EF.Functions.ILike(c.LastName ?? "", pattern, LikePattern.Escape)
-                    || EF.Functions.ILike((c.FirstName ?? "") + " " + (c.LastName ?? ""), pattern, LikePattern.Escape)
-                    || EF.Functions.ILike(c.Email ?? "", pattern, LikePattern.Escape)
-                    || EF.Functions.ILike(c.Organization!.Name ?? "", pattern, LikePattern.Escape));
+                var organizationIds = await db.MatchingOrganizationIdsAsync(term, cancellationToken);
+                contacts = contacts.Where(SearchPredicates.ContactMatches(term, organizationIds));
             }
 
             var totalCount = await contacts.CountAsync(cancellationToken);
 
-            var items = await Sort(contacts, query.SortBy, query.SortDescending)
+            var sorted = query.SortBy is null && term is not null
+                ? contacts.OrderByDescending(SearchPredicates.ContactRelevance(term))
+                : Sort(contacts, query.SortBy ?? SortField.Name, query.SortDescending);
+
+            var items = await sorted
                 .ThenBy(c => c.Id)
                 .Page(query)
                 .Select(c => new Item(

@@ -1,13 +1,15 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Search;
 using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Application.Features.Organizations;
 
 /// <summary>
 /// Autocomplete over active organizations. Organizations of the preferred type are listed first,
-/// all others stay selectable (US-02 AK1, US-06 AK2).
+/// all others stay selectable (US-02 AK1, US-06 AK2). Uses the search of the command palette (ADR-007); within a
+/// type, hits are ordered by relevance.
 /// </summary>
 public static class SearchOrganizations
 {
@@ -44,18 +46,17 @@ public static class SearchOrganizations
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
 
             var organizations = db.Organizations.AsNoTracking().Where(o => !o.IsArchived);
-            var startsWith = "";
+            var byType = organizations.OrderBy(o => o.Type == query.PreferredType ? 0 : 1);
 
-            if (!string.IsNullOrWhiteSpace(query.Search))
+            if (SearchTerm.Parse(query.Search) is { } term)
             {
-                var contains = LikePattern.Contains(query.Search);
-                startsWith = LikePattern.StartsWith(query.Search);
-                organizations = organizations.Where(o => EF.Functions.ILike(o.Name, contains, LikePattern.Escape));
+                byType = organizations
+                    .Where(SearchPredicates.OrganizationMatches(term))
+                    .OrderBy(o => o.Type == query.PreferredType ? 0 : 1)
+                    .ThenByDescending(SearchPredicates.OrganizationRelevance(term));
             }
 
-            var items = await organizations
-                .OrderBy(o => o.Type == query.PreferredType ? 0 : 1)
-                .ThenBy(o => EF.Functions.ILike(o.Name, startsWith, LikePattern.Escape) ? 0 : 1)
+            var items = await byType
                 .ThenBy(o => o.Name)
                 .ThenBy(o => o.Id)
                 .Take(query.Limit)

@@ -116,7 +116,8 @@ public sealed class OrganizationHandlerTests(PostgresFixture postgres) : Handler
 
         (await ListAsync(new GetOrganizations.Query(Type: OrganizationType.Agency))).Select(o => o.Name)
             .Should().Equal("Alpha Recruiting", "Beta Consulting");
-        (await ListAsync(new GetOrganizations.Query(Search: "hamb", SortDescending: true))).Select(o => o.Name)
+        (await ListAsync(new GetOrganizations.Query(Search: "hamb", SortBy: GetOrganizations.SortField.Name, SortDescending: true)))
+            .Select(o => o.Name)
             .Should().Equal("Gamma AG", "Beta Consulting");
         (await ListAsync(new GetOrganizations.Query(SortBy: GetOrganizations.SortField.City))).Select(o => o.City)
             .Should().Equal("Hamburg", "Hamburg", "München");
@@ -127,12 +128,14 @@ public sealed class OrganizationHandlerTests(PostgresFixture postgres) : Handler
     }
 
     [Fact]
-    public async Task GetOrganizations_SearchWithWildcardCharacters_MatchesLiterally()
+    public async Task GetOrganizations_SearchWithQuerySyntax_TreatsInputAsWords()
     {
-        await CreateAsync("100% Digital");
-        await CreateAsync("1000 Ideas");
+        await CreateAsync("Rock & Roll GmbH");
+        await CreateAsync("Rolling Stones Ltd");
 
-        (await ListAsync(new GetOrganizations.Query(Search: "100%"))).Select(o => o.Name).Should().Equal("100% Digital");
+        (await ListAsync(new GetOrganizations.Query(Search: "rock & !(roll:*"))).Select(o => o.Name)
+            .Should().Equal("Rock & Roll GmbH");
+        (await ListAsync(new GetOrganizations.Query(Search: "%_&|"))).Should().HaveCount(2, "input without words does not filter");
     }
 
     [Fact]
@@ -155,7 +158,9 @@ public sealed class OrganizationHandlerTests(PostgresFixture postgres) : Handler
         var result = await QueryAsync<SearchOrganizations.Query, SearchOrganizations.Result>(
             new SearchOrganizations.Query("contoso", OrganizationType.Agency));
 
-        result.Value.Items.Select(o => o.Name).Should().Equal("Contoso Staffing", "Big Contoso", "Contoso Bank");
+        var names = result.Value.Items.Select(o => o.Name).ToList();
+        names.Take(2).Should().BeEquivalentTo("Contoso Staffing", "Big Contoso");
+        names.Last().Should().Be("Contoso Bank");
     }
 
     [Fact]

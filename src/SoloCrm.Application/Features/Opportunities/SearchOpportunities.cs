@@ -1,12 +1,14 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Search;
 using SoloCrm.Domain.Opportunities;
 
 namespace SoloCrm.Application.Features.Opportunities;
 
 /// <summary>
-/// Autocomplete over active requests by title (e.g. linking a task from „Heute“); open requests first.
+/// Autocomplete over active requests by title (e.g. linking a task from „Heute“); open requests first, then by
+/// relevance. Uses the search of the command palette (ADR-007).
 /// </summary>
 public static class SearchOpportunities
 {
@@ -43,18 +45,17 @@ public static class SearchOpportunities
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
 
             var opportunities = db.Opportunities.AsNoTracking().Where(o => !o.IsArchived);
-            var startsWith = "";
+            var openFirst = opportunities.OrderBy(o => o.ClosedAt == null ? 0 : 1);
 
-            if (!string.IsNullOrWhiteSpace(query.Search))
+            if (SearchTerm.Parse(query.Search) is { } term)
             {
-                var contains = LikePattern.Contains(query.Search);
-                startsWith = LikePattern.StartsWith(query.Search);
-                opportunities = opportunities.Where(o => EF.Functions.ILike(o.Title, contains, LikePattern.Escape));
+                openFirst = opportunities
+                    .Where(SearchPredicates.OpportunityMatches(term))
+                    .OrderBy(o => o.ClosedAt == null ? 0 : 1)
+                    .ThenByDescending(SearchPredicates.OpportunityRelevance(term));
             }
 
-            var items = await opportunities
-                .OrderBy(o => o.ClosedAt == null ? 0 : 1)
-                .ThenBy(o => EF.Functions.ILike(o.Title, startsWith, LikePattern.Escape) ? 0 : 1)
+            var items = await openFirst
                 .ThenBy(o => o.Title)
                 .ThenBy(o => o.Id)
                 .Take(query.Limit)
