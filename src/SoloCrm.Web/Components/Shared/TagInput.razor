@@ -1,0 +1,134 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Tags
+@using SoloCrm.Application.Features.Timeline
+@using SoloCrm.Domain.Tags
+@inject IQueryHandler<GetRecordTags.Query, GetRecordTags.Result> GetRecordTagsHandler
+@inject IQueryHandler<SearchTags.Query, SearchTags.Result> SearchHandler
+@inject ICommandHandler<AssignTag.Command, AssignTag.Result> AssignHandler
+@inject ICommandHandler<RemoveTag.Command, RemoveTag.Result> RemoveHandler
+@inject ISnackbar Snackbar
+
+@* Chip input for the tags of a detail view (US-15 AK1): suggests existing tags, „Neu anlegen: …“ creates one inline.
+   Every change is saved immediately. *@
+<div class="tag-input">
+    @if (_tags.Count > 0)
+    {
+        <div class="d-flex flex-wrap gap-1 mb-2" role="list" aria-label="Tags">
+            @foreach (var tag in _tags)
+            {
+                <div role="listitem">
+                    <TagChip Name="@tag.Name" Color="@tag.Color" OnRemove="() => RemoveAsync(tag)" />
+                </div>
+            }
+        </div>
+    }
+    <MudAutocomplete @ref="_autocomplete" T="TagOption" Value="_selected" ValueChanged="AssignAsync" SearchFunc="SearchAsync"
+                     ToStringFunc="@(t => t?.Name)" Placeholder="Tag hinzufügen…" aria-label="Tag hinzufügen"
+                     ResetValueOnEmptyText="true" CoerceText="false" DebounceInterval="150" MaxItems="null"
+                     Dense="true" Margin="Margin.Dense" Disabled="_busy"
+                     AdornmentIcon="@Icons.Material.Filled.LocalOffer" Adornment="Adornment.Start">
+        <ItemTemplate>
+            @if (context.IsNew)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                    <MudIcon Icon="@Icons.Material.Filled.Add" Size="Size.Small" />
+                    <span>Neu anlegen: „@context.Name“</span>
+                </MudStack>
+            }
+            else
+            {
+                <TagChip Name="@context.Name" Color="@(context.Color ?? "")" />
+            }
+        </ItemTemplate>
+    </MudAutocomplete>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public TimelineRecordType RecordType { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid RecordId { get; set; }
+
+    private MudAutocomplete<TagOption>? _autocomplete;
+    private IReadOnlyList<TagRef> _tags = [];
+    private TagOption? _selected;
+    private bool _busy;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await GetRecordTagsHandler.Handle(new GetRecordTags.Query(RecordType, RecordId), CancellationToken.None);
+        _tags = result.IsSuccess ? result.Value.Items : [];
+    }
+
+    /// <summary>Tags not yet assigned, plus „Neu anlegen“ unless a tag has exactly this name (ignoring case).</summary>
+    private async Task<IEnumerable<TagOption>> SearchAsync(string? text, CancellationToken cancellationToken)
+    {
+        var result = await SearchHandler.Handle(new SearchTags.Query(text), cancellationToken);
+        if (result.IsFailure)
+        {
+            return [];
+        }
+
+        var options = result.Value.Items
+            .Where(t => _tags.All(assigned => assigned.Id != t.Id))
+            .Select(t => new TagOption(t.Id, t.Name, t.Color))
+            .ToList();
+
+        var name = text is null ? "" : string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (name.Length is > 0 and <= Tag.NameMaxLength
+            && !result.Value.Items.Any(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            options.Add(new TagOption(null, name, null));
+        }
+
+        return options;
+    }
+
+    private async Task AssignAsync(TagOption? option)
+    {
+        if (option is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await AssignHandler.Handle(
+                new AssignTag.Command(RecordType, RecordId, option.Id, option.IsNew ? option.Name : null), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(Message(result.Error), Severity.Error);
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+            _selected = null;
+            if (_autocomplete is not null)
+            {
+                await _autocomplete.ClearAsync();
+            }
+        }
+    }
+
+    private async Task RemoveAsync(TagRef tag)
+    {
+        var result = await RemoveHandler.Handle(new RemoveTag.Command(RecordType, RecordId, tag.Id), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(Message(result.Error), Severity.Error);
+        }
+
+        await LoadAsync();
+    }
+
+    private static string Message(Error error) => error is ValidationError validation
+        ? string.Join(" ", validation.Errors.Values.SelectMany(m => m))
+        : error.Message;
+}

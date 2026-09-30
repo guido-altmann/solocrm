@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.Search;
+using SoloCrm.Application.Features.Tags;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
 
@@ -9,7 +10,7 @@ namespace SoloCrm.Application.Features.Contacts;
 
 /// <summary>
 /// Pages through contacts with search (name, email, organization; same search as the command palette, ADR-007),
-/// filters and sorting; archived contacts only on request (US-04, US-05). Without an explicit sort field, search
+/// filters (organization, source, tags OR-combined) and sorting; archived contacts only on request (US-04, US-05). Without an explicit sort field, search
 /// results are ordered by relevance and everything else by name.
 /// </summary>
 public static class GetContacts
@@ -32,7 +33,8 @@ public static class GetContacts
         SortField? SortBy = null,
         bool SortDescending = false,
         int PageIndex = 0,
-        int PageSize = DefaultPageSize) : IPagedQuery;
+        int PageSize = DefaultPageSize,
+        IReadOnlyCollection<Guid>? TagIds = null) : IPagedQuery;
 
     public sealed record Item(
         Guid Id,
@@ -45,7 +47,8 @@ public static class GetContacts
         string? OrganizationName,
         LeadSource? Source,
         bool IsArchived,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        IReadOnlyList<TagRef> Tags);
 
     public sealed record Result(IReadOnlyList<Item> Items, int TotalCount);
 
@@ -89,6 +92,12 @@ public static class GetContacts
                 contacts = contacts.Where(c => c.Source == source);
             }
 
+            // Several tags are OR-combined (US-04 AK2).
+            if (query.TagIds is { Count: > 0 } tagIds)
+            {
+                contacts = contacts.Where(c => db.ContactTags.Any(t => t.ContactId == c.Id && tagIds.Contains(t.TagId)));
+            }
+
             var term = SearchTerm.Parse(query.Search);
             if (term is not null)
             {
@@ -116,7 +125,12 @@ public static class GetContacts
                     c.Organization!.Name,
                     c.Source,
                     c.IsArchived,
-                    c.CreatedAt))
+                    c.CreatedAt,
+                    db.ContactTags
+                        .Where(t => t.ContactId == c.Id)
+                        .OrderBy(t => t.Tag!.Name)
+                        .Select(t => new TagRef(t.TagId, t.Tag!.Name, t.Tag.Color))
+                        .ToList()))
                 .ToListAsync(cancellationToken);
 
             return new Result(items, totalCount);

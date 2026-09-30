@@ -30,6 +30,7 @@
                           Immediate="true" DebounceInterval="300" Clearable="true" Class="mt-0" Style="max-width: 360px;" />
             <OrganizationAutocomplete Value="_organization" ValueChanged="OnOrganizationChanged" Margin="Margin.Dense"
                                       Style="max-width: 260px;" />
+            <TagFilter Selected="_tagIds" SelectedChanged="OnTagsChanged" Style="min-width: 180px; max-width: 280px;" />
             <MudSelect T="LeadSource?" Value="_source" ValueChanged="OnSourceChanged" Label="Quelle" Dense="true"
                        Clearable="true" Style="max-width: 180px;">
                 @foreach (var source in Enum.GetValues<LeadSource>())
@@ -58,6 +59,9 @@
         <PropertyColumn Property="c => c.Source" Title="Quelle" Sortable="false">
             <CellTemplate>@(context.Item.Source is { } source ? Labels.For(source) : null)</CellTemplate>
         </PropertyColumn>
+        <TemplateColumn T="GetContacts.Item" Title="Tags" Sortable="false">
+            <CellTemplate><TagChips Tags="context.Item.Tags" /></CellTemplate>
+        </TemplateColumn>
         <TemplateColumn T="GetContacts.Item" Sortable="false" CellClass="d-flex justify-end">
             <CellTemplate>
                 <MudTooltip Text="Bearbeiten">
@@ -94,9 +98,11 @@
     private string? _search;
     private OrganizationOption? _organization;
     private LeadSource? _source;
+    private IReadOnlyCollection<Guid> _tagIds = [];
     private bool _includeArchived;
 
-    private bool IsFiltered => !string.IsNullOrWhiteSpace(_search) || _organization is not null || _source is not null;
+    private bool IsFiltered =>
+        !string.IsNullOrWhiteSpace(_search) || _organization is not null || _source is not null || _tagIds.Count > 0;
 
     protected override void OnInitialized() => QuickAdd.ContactCreated += OnContactCreated;
 
@@ -111,7 +117,8 @@
             ToSortField(sort?.SortBy),
             sort?.Descending ?? false,
             state.Page,
-            state.PageSize);
+            state.PageSize,
+            _tagIds);
 
         var result = await GetContactsHandler.Handle(query, cancellationToken);
 
@@ -148,6 +155,12 @@
     private async Task OnSourceChanged(LeadSource? source)
     {
         _source = source;
+        await ReloadAsync();
+    }
+
+    private async Task OnTagsChanged(IReadOnlyCollection<Guid> tagIds)
+    {
+        _tagIds = tagIds;
         await ReloadAsync();
     }
 

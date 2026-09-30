@@ -1,0 +1,17 @@
+@using SoloCrm.Application.Features.Tags
+
+@* Read-only tags of a list row or pipeline card (US-15). *@
+@if (Tags.Count > 0)
+{
+    <div class="d-flex flex-wrap gap-1">
+        @foreach (var tag in Tags)
+        {
+            <TagChip Name="@tag.Name" Color="@tag.Color" />
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TagRef> Tags { get; set; } = [];
+}

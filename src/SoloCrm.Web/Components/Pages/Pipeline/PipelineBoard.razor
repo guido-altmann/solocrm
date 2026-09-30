@@ -115,6 +115,10 @@ else
                             }
                         </MudStack>
                     }
+                    @if (context.Tags.Count > 0)
+                    {
+                        <div class="mt-1"><TagChips Tags="context.Tags" /></div>
+                    }
                     @if (context.LostReason is { } reason)
                     {
                         <MudText Typo="Typo.caption" Color="Color.Error">@Labels.For(reason)</MudText>

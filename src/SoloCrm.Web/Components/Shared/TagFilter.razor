@@ -1,0 +1,40 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Tags
+@inject IQueryHandler<GetTags.Query, GetTags.Result> GetTagsHandler
+
+@* Filter by several tags, OR-combined (US-04 AK2). Hidden while no tags exist. *@
+@if (_tags.Count > 0)
+{
+    <MudSelect T="Guid" MultiSelection="true" SelectedValues="Selected" SelectedValuesChanged="OnSelectedChanged"
+               Label="Tags" Dense="true" Clearable="true" Style="@Style"
+               MultiSelectionTextFunc="@(_ => string.Join(", ", _tags.Where(t => Selected.Contains(t.Id)).Select(t => t.Name)))">
+        @foreach (var tag in _tags)
+        {
+            <MudSelectItem T="Guid" Value="tag.Id">
+                <TagChip Name="@tag.Name" Color="@tag.Color" />
+            </MudSelectItem>
+        }
+    </MudSelect>
+}
+
+@code {
+    [Parameter]
+    public IReadOnlyCollection<Guid> Selected { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<IReadOnlyCollection<Guid>> SelectedChanged { get; set; }
+
+    [Parameter]
+    public string? Style { get; set; }
+
+    private IReadOnlyList<GetTags.Item> _tags = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await GetTagsHandler.Handle(new GetTags.Query(), CancellationToken.None);
+        _tags = result.IsSuccess ? result.Value.Items : [];
+    }
+
+    private Task OnSelectedChanged(IEnumerable<Guid>? selected) =>
+        SelectedChanged.InvokeAsync([.. selected ?? []]);
+}

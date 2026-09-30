@@ -2,14 +2,15 @@ using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.Search;
+using SoloCrm.Application.Features.Tags;
 using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Application.Features.Organizations;
 
 /// <summary>
-/// Pages through organizations with search (name, website, city; same search as the command palette, ADR-007), type
-/// filter and sorting; archived ones only on request (US-03, US-04, US-05). Without an explicit sort field, search
-/// results are ordered by relevance and everything else by name.
+/// Pages through organizations with search (name, website, city; same search as the command palette, ADR-007),
+/// filters (type, tags OR-combined) and sorting; archived ones only on request (US-03, US-04, US-05). Without an
+/// explicit sort field, search results are ordered by relevance and everything else by name.
 /// </summary>
 public static class GetOrganizations
 {
@@ -28,7 +29,8 @@ public static class GetOrganizations
         SortField? SortBy = null,
         bool SortDescending = false,
         int PageIndex = 0,
-        int PageSize = Paging.DefaultPageSize) : IPagedQuery;
+        int PageSize = Paging.DefaultPageSize,
+        IReadOnlyCollection<Guid>? TagIds = null) : IPagedQuery;
 
     public sealed record Item(
         Guid Id,
@@ -37,7 +39,8 @@ public static class GetOrganizations
         string? Website,
         string? City,
         bool IsArchived,
-        DateTimeOffset CreatedAt);
+        DateTimeOffset CreatedAt,
+        IReadOnlyList<TagRef> Tags);
 
     public sealed record Result(IReadOnlyList<Item> Items, int TotalCount);
 
@@ -76,6 +79,12 @@ public static class GetOrganizations
                 organizations = organizations.Where(o => o.Type == type);
             }
 
+            // Several tags are OR-combined (US-04 AK2).
+            if (query.TagIds is { Count: > 0 } tagIds)
+            {
+                organizations = organizations.Where(o => db.OrganizationTags.Any(t => t.OrganizationId == o.Id && tagIds.Contains(t.TagId)));
+            }
+
             var term = SearchTerm.Parse(query.Search);
             if (term is not null)
             {
@@ -91,7 +100,19 @@ public static class GetOrganizations
             var items = await sorted
                 .ThenBy(o => o.Id)
                 .Page(query)
-                .Select(o => new Item(o.Id, o.Name, o.Type, o.Website, o.City, o.IsArchived, o.CreatedAt))
+                .Select(o => new Item(
+                    o.Id,
+                    o.Name,
+                    o.Type,
+                    o.Website,
+                    o.City,
+                    o.IsArchived,
+                    o.CreatedAt,
+                    db.OrganizationTags
+                        .Where(t => t.OrganizationId == o.Id)
+                        .OrderBy(t => t.Tag!.Name)
+                        .Select(t => new TagRef(t.TagId, t.Tag!.Name, t.Tag.Color))
+                        .ToList()))
                 .ToListAsync(cancellationToken);
 
             return new Result(items, totalCount);

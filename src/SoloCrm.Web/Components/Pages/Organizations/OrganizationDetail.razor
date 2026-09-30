@@ -55,6 +55,11 @@ else
                 </MudPaper>
 
                 <MudPaper Outlined="true" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Tags</MudText>
+                    <TagInput RecordType="TimelineRecordType.Organization" RecordId="Id" />
+                </MudPaper>
+
+                <MudPaper Outlined="true" Class="pa-4">
                     <MudText Typo="Typo.h6" Class="mb-1">Kontakte</MudText>
                     @if (_contacts.Count == 0)
                     {

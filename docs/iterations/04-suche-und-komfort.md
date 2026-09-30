@@ -57,10 +57,10 @@
 - [x] Migration (additiv)
 
 ## Schritt 6 – Tags: Oberfläche (US-15, US-04 AK2)
-- [ ] Chip-Eingabe in allen drei Detailansichten: Autocomplete auf bestehende Tags, „Neu anlegen: <Eingabe>“ legt den Tag inline an (AK1)
-- [ ] Tags als farbige Chips in den Listen (Kontakte, Organisationen) und auf Pipeline-Karten
-- [ ] Filter nach Tag in `/contacts` und `/organizations` (US-04 AK2): mehrere Tags, ODER-verknüpft; kein Pipeline-Filter (Entscheidung 4)
-- [ ] Kontrast der Tag-Farben im Hell- und Dunkelmodus prüfen (NFR Barrierearmut)
+- [x] Chip-Eingabe in allen drei Detailansichten: Autocomplete auf bestehende Tags, „Neu anlegen: <Eingabe>“ legt den Tag inline an (AK1)
+- [x] Tags als farbige Chips in den Listen (Kontakte, Organisationen) und auf Pipeline-Karten
+- [x] Filter nach Tag in `/contacts` und `/organizations` (US-04 AK2): mehrere Tags, ODER-verknüpft; kein Pipeline-Filter (Entscheidung 4)
+- [x] Kontrast der Tag-Farben im Hell- und Dunkelmodus prüfen (NFR Barrierearmut): weiße Schrift auf jeder Palettenfarbe ≥ 4,5:1, per Unit-Test berechnet; im Browser in beiden Modi gesichtet
 
 ## Schritt 7 – Inline-Editing (US-14)
 - [ ] Wiederverwendbare Inline-Felder: Text, mehrzeiliger Text, Auswahl, Zahl, Datum, Organisations-/Kontakt-Autocomplete

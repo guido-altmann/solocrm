@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Tags;
 using SoloCrm.Domain.Opportunities;
 
 namespace SoloCrm.Application.Features.Pipeline;
@@ -29,7 +30,8 @@ public static class GetPipelineBoard
         LostReason? LostReason,
         DateTimeOffset? ClosedAt,
         DateTimeOffset LastActivityAt,
-        int DaysSinceActivity);
+        int DaysSinceActivity,
+        IReadOnlyList<TagRef> Tags);
 
     public sealed record Column(
         Guid StageId,
@@ -69,6 +71,11 @@ public static class GetPipelineBoard
                     o.LostReason,
                     o.ClosedAt,
                     LastActivityAt = db.Activities.Where(a => a.OpportunityId == o.Id).Max(a => (DateTimeOffset?)a.OccurredAt) ?? o.CreatedAt,
+                    Tags = db.OpportunityTags
+                        .Where(t => t.OpportunityId == o.Id)
+                        .OrderBy(t => t.Tag!.Name)
+                        .Select(t => new TagRef(t.TagId, t.Tag!.Name, t.Tag.Color))
+                        .ToList(),
                 })
                 .ToListAsync(cancellationToken);
 
@@ -86,7 +93,8 @@ public static class GetPipelineBoard
                     o.LostReason,
                     o.ClosedAt,
                     o.LastActivityAt,
-                    clock.DaysSince(o.LastActivityAt)))
+                    clock.DaysSince(o.LastActivityAt),
+                    o.Tags))
                 .ToLookup(c => c.StageId);
 
             var columns = stages

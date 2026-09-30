@@ -78,6 +78,11 @@ else
                     </MudStack>
                 </MudPaper>
 
+                <MudPaper Outlined="true" Class="pa-4">
+                    <MudText Typo="Typo.h6" Class="mb-2">Tags</MudText>
+                    <TagInput RecordType="TimelineRecordType.Opportunity" RecordId="Id" />
+                </MudPaper>
+
                 <OpenTasksCard LinkedTo="_linkedTo" OnChanged="ReloadTimelineAsync" />
             </MudStack>
         </MudItem>
