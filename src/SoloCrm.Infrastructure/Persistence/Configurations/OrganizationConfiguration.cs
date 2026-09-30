@@ -16,5 +16,12 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
         builder.Property(o => o.Notes);
 
         builder.HasIndex(o => o.Name);
+
+        // Search (ADR-007): full-text over name, website (split into words) and city; trigram similarity over the name.
+        builder.HasTrigramIndex(nameof(Organization.Name), "ix_organizations_name_trgm");
+        builder.HasSearchVector(
+            ("name", 'A'),
+            (SearchConfiguration.SplitIntoWords("website"), 'B'),
+            ("city", 'B'));
     }
 }

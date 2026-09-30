@@ -39,6 +39,7 @@ public class CrmDbContext(DbContextOptions options)
     {
         base.OnModelCreating(builder);
         builder.HasPostgresExtension("citext");
+        builder.HasPostgresExtension("pg_trgm");
         builder.ApplyConfigurationsFromAssembly(typeof(CrmDbContext).Assembly);
         ConfigureEntityConventions(builder);
     }

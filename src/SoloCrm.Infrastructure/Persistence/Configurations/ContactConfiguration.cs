@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using SoloCrm.Application.Features.Search;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Organizations;
 
@@ -33,5 +34,14 @@ internal sealed class ContactConfiguration : IEntityTypeConfiguration<Contact>
             .WithMany()
             .HasForeignKey(c => c.OrganizationId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Search (ADR-007): full-text over name and e-mail, trigram similarity over the full name.
+        builder.Property<string>(SearchColumns.Name)
+            .HasComputedColumnSql("btrim(coalesce(first_name, '') || ' ' || coalesce(last_name, ''))", stored: true);
+        builder.HasTrigramIndex(SearchColumns.Name, "ix_contacts_search_name_trgm");
+        builder.HasSearchVector(
+            ("first_name", 'A'),
+            ("last_name", 'A'),
+            (SearchConfiguration.SplitIntoWords("email::text"), 'B'));
     }
 }

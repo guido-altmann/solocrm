@@ -11,7 +11,7 @@ namespace SoloCrm.Infrastructure.Persistence.Interceptors;
 /// <summary>
 /// Records every change of an <see cref="IAuditable"/> entity as <see cref="AuditEntry"/> with field diffs (ADR-006).
 /// The entries are added to the same <c>SaveChanges</c> call and therefore share its transaction.
-/// Complex type members are diffed as individual fields (<c>Pricing.Amount</c>).
+/// Complex type members are diffed as individual fields (<c>Pricing.Amount</c>); generated columns are skipped.
 /// </summary>
 public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInterceptor
 {
@@ -99,7 +99,8 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
 
     private static IEnumerable<Field> Fields(EntityEntry entry)
     {
-        foreach (var property in entry.Properties)
+        // Generated columns (e.g. the search vector, ADR-007) are derived data, not changes.
+        foreach (var property in entry.Properties.Where(p => p.Metadata.GetComputedColumnSql() is null))
         {
             yield return new Field(property.Metadata.Name, property.OriginalValue, property.CurrentValue);
         }

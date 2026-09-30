@@ -22,11 +22,11 @@
 ---
 
 ## Schritt 1 – Suche: Datenbank (ADR-007)
-- [ ] Extension `pg_trgm` per Migration aktivieren (analog `citext`)
-- [ ] Generierte `tsvector`-Spalten (Konfiguration `simple`) mit GIN-Index: Kontakte (Vorname, Nachname, E-Mail), Organisationen (Name, Website/Domain), Anfragen (Titel)
-- [ ] `pg_trgm`-GIN-Indizes auf Kontaktname, Organisationsname und Anfragetitel
-- [ ] Früh verifizieren: generierte `tsvector`-Spalten mit EF Core 10 + Npgsql (Mapping, Migration, keine Schreibzugriffe aus EF); bei Problemen ADR-007 ergänzen
-- [ ] Migration (additiv, siehe ADR-009)
+- [x] Extension `pg_trgm` per Migration aktivieren (analog `citext`)
+- [x] Generierte `tsvector`-Spalten (Konfiguration `simple`) mit GIN-Index: Kontakte (Vorname, Nachname, E-Mail), Organisationen (Name, Website/Domain), Anfragen (Titel)
+- [x] `pg_trgm`-GIN-Indizes auf Kontaktname, Organisationsname und Anfragetitel
+- [x] Früh verifizieren: generierte `tsvector`-Spalten mit EF Core 10 + Npgsql (Mapping, Migration, keine Schreibzugriffe aus EF); bei Problemen ADR-007 ergänzen
+- [x] Migration (additiv, siehe ADR-009)
 
 ## Schritt 2 – Suche: Use Case und Listen (US-13 AK2/AK3)
 - [ ] `Search(Text, Limit)`: Treffer über Kontakte (Name, E-Mail, Firma), Organisationen und Anfragen (Titel); Ranking kombiniert `ts_rank` und `similarity` (ADR-007); ab 2 Zeichen; Archivierte ausgeschlossen (US-05 AK1)

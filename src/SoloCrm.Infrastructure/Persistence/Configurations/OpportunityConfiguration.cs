@@ -54,5 +54,9 @@ internal sealed class OpportunityConfiguration : IEntityTypeConfiguration<Opport
             .WithMany()
             .HasForeignKey(o => o.PrimaryContactId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // Search (ADR-007): full-text and trigram similarity over the title.
+        builder.HasTrigramIndex(nameof(Opportunity.Title), "ix_opportunities_title_trgm");
+        builder.HasSearchVector(("title", 'A'));
     }
 }
