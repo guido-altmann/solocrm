@@ -6,8 +6,8 @@
 **Referenzen:** `docs/SPEC.md` Kap. 2.4 (WebhookSubscription, WebhookDelivery, ApiKey), 2.6 (Domain Events), 3.3 S6 (Einstellungen), 4 (US-16 – US-18), 5 (REST-API, Webhook-Payload), 6 (Sicherheit, Datenschutz, Performance), 7.4 (Outbox-Verarbeitung); ADR-008, ADR-009, ADR-010
 
 **Aus früheren Iterationen übernommen:**
-- Die Outbox wird seit Iteration 2 transaktional befüllt (`OutboxInterceptor`), aber noch nicht verarbeitet. In Produktion liegen daher bereits unverarbeitete Nachrichten (siehe Frage 3).
-- ADR-008 (Hangfire vs. eigener `BackgroundService`) ist noch *Proposed* und wird hier entschieden (Frage 1).
+- Die Outbox wird seit Iteration 2 transaktional befüllt (`OutboxInterceptor`), aber noch nicht verarbeitet. In Produktion liegen daher bereits unverarbeitete Nachrichten (siehe Entscheidung 3).
+- ADR-008 ist entschieden: eigener `BackgroundService` (Entscheidung 1).
 - Events enthalten bewusst nur Ids und Status, keine personenbezogenen Inhalte (z. B. `ActivityLogged` ohne Betreff und Text).
 - Rate-Limiting existiert bisher nur für den Login (`LoginRateLimiting`).
 
@@ -20,17 +20,17 @@
 ---
 
 ## Schritt 1 – Outbox-Verarbeitung (ADR-008, ADR-010)
-- [ ] Hintergrundprozess gemäß Frage 1: fällige Nachrichten (`ProcessedAt IS NULL AND NextAttemptAt <= now`) in Blöcken per `SELECT … FOR UPDATE SKIP LOCKED` holen (auch bei zwei parallel laufenden Containern während eines Rolling Updates korrekt, ADR-009)
+- [ ] `BackgroundService` mit `PeriodicTimer` (Entscheidung 1): fällige Nachrichten (`ProcessedAt IS NULL AND NextAttemptAt <= now`) in Blöcken per `SELECT … FOR UPDATE SKIP LOCKED` holen (auch bei zwei parallel laufenden Containern während eines Rolling Updates korrekt, ADR-009)
 - [ ] Je Nachricht: an alle aktiven, passenden Subscriptions zustellen; Nachricht gilt als verarbeitet, wenn jede Zustellung erfolgreich war oder endgültig aufgegeben wurde
 - [ ] Retry mit exponentiellem Backoff, max. 6 Versuche (US-18 AK3); Zeitplan festlegen (z. B. 1 min, 5 min, 30 min, 2 h, 12 h)
 - [ ] `TimeProvider` für alle Zeitpunkte; Intervall konfigurierbar
-- [ ] Umgang mit Alt-Nachrichten und Nachrichten ohne passende Subscription (Frage 3)
-- [ ] ADR-008 auf *Accepted* setzen (mit Begründung)
+- [ ] Alt-Nachrichten und Nachrichten ohne passende Subscription als verarbeitet markieren (Entscheidung 3)
+- [ ] ADR-008 mit den Erfahrungen ergänzen
 
 ## Schritt 2 – Webhooks: Domäne und Verwaltung (US-18 AK1)
 - [ ] Entitäten `WebhookSubscription` (Name, Url, Events, Secret, IsActive) und `WebhookDelivery` (SubscriptionId, OutboxMessageId, Versuch, StatusCode, DurationMs, Error, AttemptedAt) (SPEC 2.4)
 - [ ] Secret wird generiert (kryptografisch zufällig), per Data Protection verschlüsselt gespeichert und einmalig im Klartext angezeigt; „Neu erzeugen“ möglich (ADR-010)
-- [ ] URL-Validierung: nur `https` (Ausnahme `http` in Development, Frage 7)
+- [ ] URL-Validierung: nur `https` (`http` nur für `Webhooks__AllowedHttpHosts`, Entscheidung 7)
 - [ ] Event-Auswahl aus den Typen in SPEC 2.6 (öffentliche Namen wie `opportunity.stage_changed`)
 - [ ] Use Cases `CreateWebhook`, `UpdateWebhook`, `RegenerateWebhookSecret`, `DeleteWebhook`, `GetWebhooks`, `GetWebhookDeliveries`
 - [ ] Abschnitt „Webhooks“ in `/settings` mit Versandprotokoll je Subscription (US-18 AK3)
@@ -38,11 +38,11 @@
 
 ## Schritt 3 – Webhook-Versand (US-18 AK2/AK3)
 - [ ] `HttpClient` über `IHttpClientFactory` mit Timeout (z. B. 10 s), ohne automatische Redirects
-- [ ] Payload gemäß SPEC 5 (`id`, `type`, `occurredAt`, `data`) mit Inhalt gemäß Frage 2
-- [ ] Signatur `X-SoloCrm-Signature: sha256=<hex>` über den Body (HMAC-SHA256 mit dem Secret); Zeitstempel gegen Replay (Frage 6)
+- [ ] Payload gemäß SPEC 5 (`id`, `type`, `occurredAt`, `data`) nur mit Ids und Status (Entscheidung 2)
+- [ ] Signatur `X-SoloCrm-Signature: sha256=<hex>` über den Body (HMAC-SHA256 mit dem Secret); mitsignierter Zeitstempel `X-SoloCrm-Timestamp` gegen Replay (Entscheidung 6)
 - [ ] Erfolg = HTTP 2xx; jeder Versuch landet im Protokoll; Logs ohne Bodies und Secrets (SPEC 6)
 - [ ] „Test senden“ (Event `webhook.ping`) aus den Einstellungen
-- [ ] Aufbewahrung des Protokolls und verarbeiteter Outbox-Nachrichten (Frage 8)
+- [ ] Aufräumen nach 30 Tagen: Protokoll und verarbeitete Outbox-Nachrichten (Entscheidung 8)
 
 ## Schritt 4 – API-Keys (US-17 AK1)
 - [ ] Entität `ApiKey` (Name, Prefix, KeyHash SHA-256, CreatedAt, LastUsedAt, RevokedAt) (SPEC 2.4)
@@ -56,9 +56,9 @@
 - [ ] Rate-Limit 60 Requests/Minute je Key (US-17 AK2), 429 mit `Retry-After`
 - [ ] Minimal-API-Endpoints unter `/api/v1` gemäß SPEC 5 in `Web/Endpoints/`; rufen dieselben Handler wie die UI
 - [ ] Fehler als RFC 9457 Problem Details; Validierungsfehler mit Feldnamen (camelCase)
-- [ ] `PATCH` als Teil-Update (Frage 4); `PATCH /opportunities/{id}` mit `stageId` löst den Stage-Wechsel aus
+- [ ] `PATCH` als JSON Merge Patch (Entscheidung 4); `PATCH /opportunities/{id}` mit `stageId` löst den Stage-Wechsel aus
 - [ ] Listen mit `search`, `tag`, `page`, `pageSize` (dieselbe Suche wie die UI)
-- [ ] OpenAPI unter `/openapi/v1.json`, UI via Scalar (US-17 AK3), Zugriff gemäß Frage 5
+- [ ] OpenAPI unter `/openapi/v1.json`, UI via Scalar (US-17 AK3), nur für den angemeldeten Nutzer (Entscheidung 5)
 - [ ] Architekturtest: Endpoints greifen nicht auf den DbContext zu
 
 ## Schritt 6 – CSV-Import: Use Case (US-16)
@@ -67,12 +67,11 @@
 - [ ] Spalten-Mapping auf Kontaktfelder inkl. Organisation (Name → bestehende Organisation oder neu anlegen)
 - [ ] Dubletten per E-Mail (case-insensitive), Option überspringen/aktualisieren (AK2); Dubletten innerhalb der Datei
 - [ ] Ergebnisbericht: angelegt, aktualisiert, übersprungen, fehlerhaft mit Zeile und Grund (AK3)
-- [ ] Mapping-Vorlage für den HubSpot-Kontaktexport (AK4, Frage 9)
-- [ ] Ausführung synchron oder als Hintergrundjob (Frage 10); Audit und Events wie bei manueller Anlage (`ContactCreated` je Kontakt → ggf. viele Webhooks, Frage 11)
+- [ ] Mapping-Vorlage für den HubSpot-Kontaktexport (AK4, Entscheidung 9)
+- [ ] Synchrone Ausführung in Blöcken zu 100 Zeilen mit Fortschritt (Entscheidung 10); Audit und `ContactCreated` je Kontakt wie bei manueller Anlage (Entscheidung 11)
 
 ## Schritt 7 – CSV-Import: Oberfläche (US-16)
 - [ ] Seite bzw. Abschnitt „Import“ in `/settings`: Upload → Vorschau → Mapping (Vorlage wählbar) → Import → Bericht
-- [ ] Fehlerhafte Zeilen als CSV herunterladbar (optional, Frage 12)
 
 ## Schritt 8 – Tests
 - [ ] Unit-Tests: Signatur, Backoff-Zeitplan, Key-Erzeugung und -Prüfung, CSV-Mapping
@@ -90,20 +89,20 @@
 - [ ] README-Stand, Beispiel-Workflow für n8n (Signaturprüfung) und Screenshot
 - [ ] SPEC nachziehen (Entscheidungen, Payload, API-Details)
 
-## Offene Fragen (vor dem Start zu klären)
-1. **Hintergrundprozess:** Hangfire (ADR-008 Option A; neue Pakete `Hangfire.AspNetCore` und `Hangfire.PostgreSql`, Dashboard unter `/jobs`) oder ein eigener `BackgroundService` mit `PeriodicTimer` (Option B)? Retries und Backoff steckt ohnehin in der Outbox (`Attempts`, `NextAttemptAt`), Hangfire bräuchte man eher für den Import und spätere Jobs. *Vorschlag: eigener `BackgroundService` für die Outbox (lehrreich, keine Zusatztabellen); Hangfire erst, wenn weitere Jobarten hinzukommen. Der Import läuft synchron (Frage 10).*
-2. **Payload-Inhalt:** Nur Ids wie in den Events (n8n holt Details per API nach) oder angereicherte Daten (z. B. Name und E-Mail des Kontakts)? *Vorschlag: nur Ids und Status wie in SPEC 5 („schlanke Events“). Das hält personenbezogene Daten aus der Outbox und aus den Protokollen fern; n8n ruft bei Bedarf `GET /api/v1/contacts/{id}` auf.*
-3. **Alt-Nachrichten und Nachrichten ohne Subscription:** Seit Iteration 2 liegen unverarbeitete Nachrichten in der Outbox. Sollen sie bei der ersten Verarbeitung an neue Subscriptions gehen? *Vorschlag: nein. Eine Subscription erhält nur Events, die nach ihrer Anlage aufgetreten sind; Nachrichten ohne passende Subscription werden sofort als verarbeitet markiert.*
-4. **PATCH-Semantik:** JSON Merge Patch (RFC 7396: fehlendes Feld = unverändert, `null` = leeren) oder JSON Patch (RFC 6902)? *Vorschlag: Merge Patch; umgesetzt, indem der Endpoint den aktuellen Stand lädt, die gesendeten Felder überschreibt und den bestehenden `Update…`-Handler aufruft (wie beim Inline-Editing).*
-5. **OpenAPI/Scalar-Zugriff:** Öffentlich, nur für angemeldete Nutzer (Cookie) oder nur in Development? *Vorschlag: nur für den angemeldeten Nutzer, auch in Produktion. Neue Pakete: `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore`.*
-6. **Replay-Schutz der Signatur:** Nur HMAC über den Body (wie in US-18 AK2) oder zusätzlich ein Zeitstempel-Header `X-SoloCrm-Timestamp`, der mitsigniert wird (`<timestamp>.<body>`, ähnlich Stripe)? *Vorschlag: mit Zeitstempel; die n8n-Vorlage prüft Signatur und Alter (z. B. < 5 min).*
-7. **Webhook-Ziele:** Nur `https`, oder auch `http` für n8n im selben internen Netz (z. B. `http://n8n:5678`)? Sollen private IP-Bereiche erlaubt sein (SSRF-Schutz)? *Vorschlag: `https` und zusätzlich `http` nur für explizit konfigurierte Hosts (`Webhooks__AllowedHttpHosts`); private Adressen erlaubt, da Single-User und n8n oft intern läuft.*
-8. **Aufbewahrung:** Wie lange bleiben verarbeitete Outbox-Nachrichten und das Versandprotokoll erhalten? *Vorschlag: 30 Tage, täglich aufgeräumt durch denselben Hintergrundprozess.*
-9. **HubSpot-Vorlage:** Die Frage aus SPEC 10 („Welche HubSpot-Felder werden tatsächlich benötigt?“) ist noch offen. **Bitte eine Kopfzeile eines echten HubSpot-Kontaktexports bereitstellen** (nur die Spaltennamen, keine Daten); daraus entsteht die Vorlage. *Vorschlag: First Name, Last Name, Email, Phone Number, Job Title, Company Name, LinkedIn-URL, Original Source → Quelle.*
-10. **Import synchron oder als Job:** Bei bis zu einigen tausend Zeilen dauert ein Import Sekunden. *Vorschlag: synchron im Blazor-Circuit mit Fortschrittsanzeige und einer Transaktion je Block (z. B. 100 Zeilen); kein Hintergrundjob.*
-11. **Events beim Import:** Soll jeder importierte Kontakt ein `ContactCreated` auslösen (→ ggf. tausende Webhooks)? *Vorschlag: ja, konsistent mit der manuellen Anlage; die Outbox verarbeitet sie gestaffelt. Alternative wäre ein zusammenfassendes `contacts.imported`.*
-12. **Fehlerhafte Zeilen herunterladen:** Nötig oder reicht die Anzeige im Bericht? *Vorschlag: Anzeige genügt; Download nur, wenn es beim echten HubSpot-Import stört.*
-13. **Neue Pakete:** Je nach Antworten `CsvHelper` (SPEC 7.1), `Microsoft.AspNetCore.OpenApi`, `Scalar.AspNetCore` und ggf. `Hangfire.AspNetCore`/`Hangfire.PostgreSql`. Einverstanden?
+## Entscheidungen (2026-09-30)
+1. **Hintergrundprozess:** eigener `BackgroundService` mit `PeriodicTimer` für die Outbox (ADR-008 Option B); Retry und Backoff über `Attempts`/`NextAttemptAt` der Outbox. Hangfire erst, wenn weitere Jobarten hinzukommen.
+2. **Payload:** nur Ids und Status wie in den Domain Events (SPEC 5); Details holt n8n per REST-API. Keine personenbezogenen Daten in Outbox und Versandprotokoll.
+3. **Alt-Nachrichten:** Eine Subscription erhält nur Events, die nach ihrer Anlage aufgetreten sind; Nachrichten ohne passende Subscription werden sofort als verarbeitet markiert.
+4. **PATCH:** JSON Merge Patch (RFC 7396): fehlendes Feld bleibt unverändert, `null` leert es. Der Endpoint lädt den aktuellen Stand, überschreibt die gesendeten Felder und ruft den bestehenden `Update…`-Handler auf.
+5. **OpenAPI/Scalar:** nur für den angemeldeten Nutzer (Cookie), auch in Produktion.
+6. **Signatur:** HMAC-SHA256 über `<timestamp>.<body>`; Header `X-SoloCrm-Timestamp` (Unix-Sekunden) und `X-SoloCrm-Signature: sha256=<hex>`. Empfänger prüfen Signatur und Alter (< 5 min).
+7. **Webhook-Ziele:** `https`; `http` nur für explizit konfigurierte Hosts (`Webhooks__AllowedHttpHosts`). Private Adressen sind erlaubt (Single-User, n8n läuft oft intern).
+8. **Aufbewahrung:** verarbeitete Outbox-Nachrichten und Versandprotokoll 30 Tage; tägliches Aufräumen durch denselben Hintergrundprozess.
+9. **HubSpot-Vorlage:** Kopfzeile eines echten HubSpot-Exports folgt noch; bis dahin gilt der Vorschlag (First Name, Last Name, Email, Phone Number, Job Title, Company Name, LinkedIn-URL, Original Source → Quelle). **Offen, blockiert Schritt 6 (Vorlage) nicht vollständig.**
+10. **Import:** synchron im Blazor-Circuit mit Fortschrittsanzeige, Transaktion je Block (100 Zeilen), kein Hintergrundjob.
+11. **Events beim Import:** jeder importierte Kontakt löst `ContactCreated` aus (konsistent mit der manuellen Anlage); die Outbox verarbeitet sie gestaffelt.
+12. **Fehlerhafte Zeilen:** Anzeige im Bericht genügt; Download erst bei Bedarf.
+13. **Neue Pakete:** `CsvHelper`, `Microsoft.AspNetCore.OpenApi` (erzeugt das OpenAPI-Dokument) und `Scalar.AspNetCore` (interaktive API-Referenz zum Dokument, US-17 AK3). Kein Hangfire.
 
 ## Definition of Done
 - CI grün (Build + alle Tests); keine Warnings
