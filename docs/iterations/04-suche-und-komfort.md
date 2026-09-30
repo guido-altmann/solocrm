@@ -78,7 +78,7 @@
 - [x] Browser-Smoke-Test der Tastenkürzel (`Ctrl/Cmd + K`, `G` + `H/P/K/O`), da die JS-Logik in bUnit nicht läuft: lokal per Playwright gegen eine Wegwerf-DB (Sequenz-Timeout, keine Kürzel in Eingabefeldern und Dialogen, `?`, `Esc`); zusätzlich Palette, Tags und Inline-Editing im Browser geprüft
 
 ## Schritt 9 – Abschluss
-- [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – erzeugt und additiv (`AddSearch`, `AddTags`); Rollout steht nach dem Push aus
+- [x] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – erzeugt und additiv (`AddSearch`, `AddTags`); Rollout steht nach dem Push aus
 - [x] ADR-007: Erfahrungen mit generierten `tsvector`-Spalten, `pg_trgm`-Schwellwert und Ranking dokumentieren
 - [x] README-Stand und Screenshot (Command Palette) aktualisieren
 - [x] SPEC nachziehen (Entscheidungen, Tastenkürzel, Tag-Regeln)
