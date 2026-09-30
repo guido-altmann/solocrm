@@ -256,3 +256,26 @@ kbd {
     width: 45%;
     white-space: nowrap;
 }
+
+/* Tags (US-15): palette swatches in the settings */
+.tag-color-swatch {
+    width: 24px;
+    height: 24px;
+    border: 2px solid transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    flex: none;
+}
+
+.tag-color-swatch:focus-visible,
+.tag-color-swatch.selected {
+    outline: 2px solid var(--mud-palette-text-primary);
+    outline-offset: 2px;
+}
+
+.tag-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 8px 0 12px 4px;
+}

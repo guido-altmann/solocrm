@@ -8,6 +8,7 @@ using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Settings;
+using SoloCrm.Domain.Tags;
 using SoloCrm.Domain.Tasks;
 using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Persistence.Outbox;
@@ -28,6 +29,14 @@ public class CrmDbContext(DbContextOptions options)
     public DbSet<Activity> Activities => Set<Activity>();
 
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
+
+    public DbSet<Tag> Tags => Set<Tag>();
+
+    public DbSet<ContactTag> ContactTags => Set<ContactTag>();
+
+    public DbSet<OrganizationTag> OrganizationTags => Set<OrganizationTag>();
+
+    public DbSet<OpportunityTag> OpportunityTags => Set<OpportunityTag>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 

@@ -4,6 +4,7 @@ using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
+using SoloCrm.Domain.Tags;
 using SoloCrm.Domain.Tasks;
 
 namespace SoloCrm.Application.Abstractions;
@@ -24,6 +25,14 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
     DbSet<Activity> Activities { get; }
 
     DbSet<TaskItem> Tasks { get; }
+
+    DbSet<Tag> Tags { get; }
+
+    DbSet<ContactTag> ContactTags { get; }
+
+    DbSet<OrganizationTag> OrganizationTags { get; }
+
+    DbSet<OpportunityTag> OpportunityTags { get; }
 
     /// <summary>Read by the timeline; entries are written exclusively by the audit interceptor.</summary>
     DbSet<AuditEntry> AuditEntries { get; }

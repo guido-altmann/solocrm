@@ -1,0 +1,31 @@
+@* A tag as a filled chip in its palette color with white text (contrast ≥ 4.5:1, TagPalette). *@
+@if (OnRemove.HasDelegate)
+{
+    <MudChip T="string" Size="@Size" Style="@ChipStyle" Class="tag-chip ma-0" OnClose="RemoveAsync"
+             CloseIcon="@Icons.Material.Filled.Close">
+        @Name
+    </MudChip>
+}
+else
+{
+    <MudChip T="string" Size="@Size" Style="@ChipStyle" Class="tag-chip ma-0">@Name</MudChip>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string Color { get; set; } = "";
+
+    [Parameter]
+    public Size Size { get; set; } = Size.Small;
+
+    /// <summary>Shows a close button that removes the tag.</summary>
+    [Parameter]
+    public EventCallback OnRemove { get; set; }
+
+    private string ChipStyle => $"background-color: {Color}; color: #fff;";
+
+    private Task RemoveAsync(MudChip<string> chip) => OnRemove.InvokeAsync();
+}

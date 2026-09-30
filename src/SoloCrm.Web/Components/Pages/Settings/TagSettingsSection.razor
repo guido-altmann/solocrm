@@ -1,0 +1,189 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Tags
+@using SoloCrm.Domain.Tags
+@inject IQueryHandler<GetTags.Query, GetTags.Result> GetTagsHandler
+@inject ICommandHandler<CreateTag.Command, CreateTag.Result> CreateHandler
+@inject ICommandHandler<RenameTag.Command, RenameTag.Result> RenameHandler
+@inject ICommandHandler<ChangeTagColor.Command, ChangeTagColor.Result> ChangeColorHandler
+@inject ICommandHandler<DeleteTag.Command, DeleteTag.Result> DeleteHandler
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* Tag management (US-15, SPEC 3.3 S6): rename, change color, delete. Tags are usually created inline via the chip input. *@
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="tags">
+    <MudText Typo="Typo.h6">Tags</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Tags ordnen Kontakte, Organisationen und Anfragen quer zu ihren Typen. Neue Tags entstehen meist direkt in der Detailansicht.
+    </MudText>
+
+    @if (_tags is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        @if (_tags.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">Noch keine Tags vorhanden.</MudText>
+        }
+
+        <MudStack Spacing="1">
+            @foreach (var tag in _tags)
+            {
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Class="tag-row">
+                    <button type="button" class="tag-color-swatch" style="@($"background-color: {tag.Color};")"
+                            title="Farbe ändern" aria-label="@($"Farbe von {tag.Name} ändern")"
+                            aria-expanded="@(_colorPickerFor == tag.Id ? "true" : "false")"
+                            @onclick="() => _colorPickerFor = _colorPickerFor == tag.Id ? null : tag.Id"></button>
+                    <MudTextField T="string" Value="@_names[tag.Id]" ValueChanged="@(v => _names[tag.Id] = v)" Immediate="true"
+                                  Margin="Margin.Dense" MaxLength="@Tag.NameMaxLength" Class="flex-grow-1 mt-0" aria-label="Name des Tags"
+                                  OnBlur="() => RenameAsync(tag)" OnKeyUp="@(e => e.Key == "Enter" ? RenameAsync(tag) : Task.CompletedTask)" />
+                    <TagChip Name="@tag.Name" Color="@tag.Color" />
+                    <MudTooltip Text="@Breakdown(tag)">
+                        <MudText Typo="Typo.caption" Style="min-width: 110px;" Class="mud-text-secondary">
+                            @Assignments(tag.AssignmentCount)
+                        </MudText>
+                    </MudTooltip>
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="@($"{tag.Name} löschen")"
+                                   Disabled="_busy" OnClick="() => DeleteAsync(tag)" />
+                </MudStack>
+                @if (_colorPickerFor == tag.Id)
+                {
+                    <div class="tag-palette" role="group" aria-label="@($"Farbe für {tag.Name}")">
+                        @foreach (var color in TagPalette.Colors)
+                        {
+                            <button type="button" class="@($"tag-color-swatch{(color == tag.Color ? " selected" : "")}")"
+                                    style="@($"background-color: {color};")" aria-label="@color"
+                                    aria-pressed="@(color == tag.Color ? "true" : "false")"
+                                    @onclick="() => ChangeColorAsync(tag, color)"></button>
+                        }
+                    </div>
+                }
+            }
+        </MudStack>
+
+        <form @onsubmit="CreateAsync">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-4">
+                <MudTextField @bind-Value="_newName" Label="Neuer Tag" Margin="Margin.Dense" MaxLength="@Tag.NameMaxLength"
+                              Immediate="true" Class="flex-grow-1" Error="@(_newNameError is not null)" ErrorText="@_newNameError" />
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add" Disabled="_busy">
+                    Hinzufügen
+                </MudButton>
+            </MudStack>
+        </form>
+    }
+</MudPaper>
+
+@code {
+    private List<GetTags.Item>? _tags;
+    private readonly Dictionary<Guid, string?> _names = [];
+    private string? _newName;
+    private string? _newNameError;
+    private Guid? _colorPickerFor;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await GetTagsHandler.Handle(new GetTags.Query(), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        _tags = [.. result.Value.Items];
+        _names.Clear();
+        foreach (var tag in _tags)
+        {
+            _names[tag.Id] = tag.Name;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        _newNameError = null;
+        var result = await CreateHandler.Handle(new CreateTag.Command(_newName), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            _newNameError = Message(result.Error);
+            return;
+        }
+
+        _newName = null;
+        Snackbar.Add($"Tag „{result.Value.Name}“ angelegt.", Severity.Success);
+        await LoadAsync();
+    }
+
+    private async Task RenameAsync(GetTags.Item tag)
+    {
+        var name = _names[tag.Id];
+        if (name?.Trim() == tag.Name)
+        {
+            return;
+        }
+
+        await RunAsync(() => RenameHandler.Handle(new RenameTag.Command(tag.Id, name), CancellationToken.None), "Tag umbenannt.");
+    }
+
+    private async Task ChangeColorAsync(GetTags.Item tag, string color)
+    {
+        _colorPickerFor = null;
+        if (color != tag.Color)
+        {
+            await RunAsync(() => ChangeColorHandler.Handle(new ChangeTagColor.Command(tag.Id, color), CancellationToken.None), null);
+        }
+    }
+
+    private async Task DeleteAsync(GetTags.Item tag)
+    {
+        var message = tag.AssignmentCount switch
+        {
+            0 => $"Den Tag „{tag.Name}“ wirklich löschen?",
+            1 => $"Der Tag „{tag.Name}“ ist einem Datensatz zugeordnet. Die Zuordnung wird mit gelöscht.",
+            var count => $"Der Tag „{tag.Name}“ ist {count} Datensätzen zugeordnet. Die Zuordnungen werden mit gelöscht.",
+        };
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Tag löschen", message, yesText: "Löschen", cancelText: "Abbrechen", options: DialogDefaults.ExtraSmall);
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        await RunAsync(() => DeleteHandler.Handle(new DeleteTag.Command(tag.Id), CancellationToken.None), "Tag gelöscht.");
+    }
+
+    private async Task RunAsync<T>(Func<Task<Result<T>>> action, string? successMessage)
+    {
+        _busy = true;
+        try
+        {
+            var result = await action();
+            if (result.IsFailure)
+            {
+                Snackbar.Add(Message(result.Error), Severity.Error);
+            }
+            else if (successMessage is not null)
+            {
+                Snackbar.Add(successMessage, Severity.Success);
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private static string Message(Error error) => error is ValidationError validation
+        ? string.Join(" ", validation.Errors.Values.SelectMany(m => m))
+        : error.Message;
+
+    private static string Assignments(int count) => count == 1 ? "1 Zuordnung" : $"{count} Zuordnungen";
+
+    private static string Breakdown(GetTags.Item tag) =>
+        $"Kontakte: {tag.ContactCount} · Organisationen: {tag.OrganizationCount} · Anfragen: {tag.OpportunityCount}";
+}

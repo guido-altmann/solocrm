@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
+using SoloCrm.Domain.Tags;
 
 namespace SoloCrm.Infrastructure.Persistence.Interceptors;
 
@@ -12,9 +13,13 @@ namespace SoloCrm.Infrastructure.Persistence.Interceptors;
 /// Records every change of an <see cref="IAuditable"/> entity as <see cref="AuditEntry"/> with field diffs (ADR-006).
 /// The entries are added to the same <c>SaveChanges</c> call and therefore share its transaction.
 /// Complex type members are diffed as individual fields (<c>Pricing.Amount</c>); generated columns are skipped.
+/// Adding or removing a tag (<see cref="ITagAssignment"/>) is recorded as <c>Updated</c> of the tagged record with the
+/// field <see cref="TagsField"/> and the tag name as new or old value.
 /// </summary>
 public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInterceptor
 {
+    public const string TagsField = "Tags";
+
     private static readonly HashSet<string> IgnoredProperties =
         [nameof(Entity.Id), nameof(Entity.CreatedAt), nameof(Entity.UpdatedAt)];
 
@@ -48,6 +53,7 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
         var auditEntries = context.ChangeTracker.Entries<IAuditable>()
             .Select(entry => CreateAuditEntry(entry, now))
             .OfType<AuditEntry>()
+            .Concat(CreateTagAuditEntries(context, now))
             .ToList();
 
         context.Set<AuditEntry>().AddRange(auditEntries);
@@ -96,6 +102,26 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
                 return null;
         }
     }
+
+    /// <summary>One <c>Updated</c> entry per tagged record, listing all tags added or removed in this save.</summary>
+    private static IEnumerable<AuditEntry> CreateTagAuditEntries(DbContext context, DateTimeOffset now) =>
+        context.ChangeTracker.Entries<ITagAssignment>()
+            .Where(e => e.State is EntityState.Added or EntityState.Deleted)
+            .GroupBy(e => (e.Entity.RecordType, e.Entity.RecordId))
+            .Select(record => new AuditEntry(
+                record.Key.RecordType,
+                record.Key.RecordId,
+                AuditAction.Updated,
+                [
+                    .. record.Select(e =>
+                    {
+                        var tag = e.Entity.Tag?.Name ?? e.Entity.TagId.ToString();
+                        return e.State == EntityState.Added
+                            ? new AuditChange(TagsField, null, tag)
+                            : new AuditChange(TagsField, tag, null);
+                    }),
+                ],
+                now));
 
     private static IEnumerable<Field> Fields(EntityEntry entry)
     {

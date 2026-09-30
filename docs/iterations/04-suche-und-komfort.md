@@ -49,12 +49,12 @@
 - [x] Übersicht der Tastenkürzel per `?` als kleiner, statischer Dialog (Entscheidung 5)
 
 ## Schritt 5 – Tags: Domäne und Verwaltung (US-15)
-- [ ] Entität `Tag` (SPEC 2.3): `Name` (eindeutig, case-insensitive), `Color` aus einer festen Palette mit geprüftem Kontrast, neue Tags bekommen reihum die nächste Farbe (Entscheidung 7); drei typisierte Join-Tabellen `contact_tags`, `organization_tags`, `opportunity_tags` (ADR-005), FKs mit `ON DELETE CASCADE`
-- [ ] Use Cases `CreateTag`, `RenameTag`, `ChangeTagColor` (Auswahl aus der Palette), `DeleteTag`, `GetTags` (mit Anzahl Zuordnungen), `SearchTags` (Autocomplete)
-- [ ] Zuordnen/Entfernen: `AssignTag`/`RemoveTag` je Objekttyp oder ein gemeinsamer Use Case mit `TimelineRecordType`
-- [ ] Abschnitt „Tags“ in `/settings`: umbenennen, Farbe ändern, löschen (mit Hinweis auf Anzahl Zuordnungen)
-- [ ] Audit: Tag-Zuordnungen werden auditiert (hinzugefügt/entfernt), erscheinen aber nicht in der Timeline (Entscheidung 3)
-- [ ] Migration (additiv)
+- [x] Entität `Tag` (SPEC 2.3): `Name` (eindeutig, case-insensitive), `Color` aus einer festen Palette mit geprüftem Kontrast, neue Tags bekommen reihum die nächste Farbe (Entscheidung 7); drei typisierte Join-Tabellen `contact_tags`, `organization_tags`, `opportunity_tags` (ADR-005), FKs mit `ON DELETE CASCADE`
+- [x] Use Cases `CreateTag`, `RenameTag`, `ChangeTagColor` (Auswahl aus der Palette), `DeleteTag`, `GetTags` (mit Anzahl Zuordnungen), `SearchTags` (Autocomplete)
+- [x] Zuordnen/Entfernen: gemeinsame Use Cases `AssignTag`/`RemoveTag` mit `TimelineRecordType`; `AssignTag` legt einen neuen Tag inline an bzw. nutzt einen gleichnamigen (case-insensitive); dazu `GetRecordTags` für die Detailansichten
+- [x] Abschnitt „Tags“ in `/settings`: anlegen, umbenennen, Farbe ändern, löschen (mit Hinweis auf Anzahl Zuordnungen)
+- [x] Audit: Tag-Zuordnungen werden auditiert (hinzugefügt/entfernt, als `Updated` des Datensatzes mit Feld `Tags`), erscheinen aber nicht in der Timeline (Entscheidung 3); `DeleteTag` entfernt die Zuordnungen explizit, damit jeder Datensatz seinen Eintrag bekommt
+- [x] Migration (additiv)
 
 ## Schritt 6 – Tags: Oberfläche (US-15, US-04 AK2)
 - [ ] Chip-Eingabe in allen drei Detailansichten: Autocomplete auf bestehende Tags, „Neu anlegen: <Eingabe>“ legt den Tag inline an (AK1)
