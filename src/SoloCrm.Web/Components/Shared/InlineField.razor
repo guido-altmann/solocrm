@@ -1,0 +1,172 @@
+@using SoloCrm.Application.Abstractions
+
+@* Inline editing of a master data field in a detail view (US-14, SPEC 3.1 Nr. 3). Click, Enter or F2 starts editing;
+   Enter (multiline: Ctrl/Cmd + Enter) or leaving the field saves, Esc cancels. Errors appear at the field and keep it
+   in edit mode. The editor is provided by the typed fields (InlineText, InlineSelect, …) or directly by the page. *@
+<div class="@($"inline-field{(IsEditing ? " editing" : "")}")" data-field="@Field">
+    <MudText Typo="Typo.caption" Class="mud-text-secondary">@Label</MudText>
+    @if (IsEditing)
+    {
+        <div class="inline-field-editor" @onkeydown="OnEditorKeyDownAsync">
+            @Editor(this)
+            @if (ErrorText is not null)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Error" Class="inline-field-error" role="alert">@ErrorText</MudText>
+            }
+            @if (ShowActions || ShowCancel)
+            {
+                <div class="d-flex justify-end gap-1 mt-1">
+                    @if (ShowActions)
+                    {
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary" Disabled="Saving"
+                                   OnClick="() => SaveAsync()">Speichern</MudButton>
+                    }
+                    <MudButton Size="Size.Small" Disabled="Saving" OnClick="() => CancelAsync()">Abbrechen</MudButton>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div @ref="_display" class="inline-field-display" tabindex="0" role="button" aria-label="@($"{Label} bearbeiten")"
+             @onclick="BeginEditAsync" @onkeydown="OnDisplayKeyDownAsync">
+            <div class="inline-field-value">
+                @if (IsEmpty)
+                {
+                    <span class="mud-text-disabled">–</span>
+                }
+                else
+                {
+                    @Display
+                }
+            </div>
+            <MudIcon Icon="@Icons.Material.Outlined.Edit" Size="Size.Small" Class="inline-field-edit-icon" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    /// <summary>Property name of the command; validation errors for it are shown at this field.</summary>
+    [Parameter]
+    public string? Field { get; set; }
+
+    [Parameter]
+    public bool IsEmpty { get; set; }
+
+    [Parameter]
+    public RenderFragment? Display { get; set; }
+
+    [Parameter, EditorRequired]
+    public RenderFragment<InlineField> Editor { get; set; } = default!;
+
+    /// <summary>Prepares the draft value before the editor is shown.</summary>
+    [Parameter]
+    public EventCallback OnBeginEdit { get; set; }
+
+    /// <summary>Saves the draft; returns the error, or <c>null</c> on success.</summary>
+    [Parameter, EditorRequired]
+    public Func<Task<Error?>> Save { get; set; } = default!;
+
+    [Parameter]
+    public InlineSaveKey SaveKey { get; set; } = InlineSaveKey.Enter;
+
+    /// <summary>Save and cancel buttons, for groups of inputs (e.g. price) where leaving one input must not save.</summary>
+    [Parameter]
+    public bool ShowActions { get; set; }
+
+    /// <summary>Only a cancel button, for editors that save on selection (select, date, autocomplete).</summary>
+    [Parameter]
+    public bool ShowCancel { get; set; }
+
+    private ElementReference _display;
+    private Error? _error;
+    private bool _refocus;
+
+    public bool IsEditing { get; private set; }
+
+    public bool Saving { get; private set; }
+
+    public bool HasError => _error is not null;
+
+    public string? ErrorText => _error switch
+    {
+        null => null,
+        ValidationError validation when Field is not null && validation.Errors.TryGetValue(Field, out var messages) =>
+            string.Join(" ", messages),
+        ValidationError validation => string.Join(" ", validation.Errors.Values.SelectMany(m => m)),
+        var error => error.Message,
+    };
+
+    public async Task BeginEditAsync()
+    {
+        if (IsEditing)
+        {
+            return;
+        }
+
+        _error = null;
+        await OnBeginEdit.InvokeAsync();
+        IsEditing = true;
+    }
+
+    /// <param name="refocus">Moves the focus back to the field afterwards (keyboard), not when the user clicked elsewhere.</param>
+    public async Task SaveAsync(bool refocus = true)
+    {
+        if (!IsEditing || Saving)
+        {
+            return;
+        }
+
+        Saving = true;
+        try
+        {
+            _error = await Save();
+            if (_error is null)
+            {
+                IsEditing = false;
+                _refocus = refocus;
+            }
+        }
+        finally
+        {
+            Saving = false;
+            StateHasChanged();
+        }
+    }
+
+    public Task CancelAsync(bool refocus = true)
+    {
+        if (IsEditing && !Saving)
+        {
+            IsEditing = false;
+            _error = null;
+            _refocus = refocus;
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_refocus && !IsEditing)
+        {
+            _refocus = false;
+            await _display.FocusAsync();
+        }
+    }
+
+    private Task OnDisplayKeyDownAsync(KeyboardEventArgs e) =>
+        e.Key is "Enter" or "F2" ? BeginEditAsync() : Task.CompletedTask;
+
+    private Task OnEditorKeyDownAsync(KeyboardEventArgs e) => e.Key switch
+    {
+        "Escape" => CancelAsync(),
+        "Enter" when SaveKey == InlineSaveKey.Enter && !e.ShiftKey => SaveAsync(),
+        "Enter" when SaveKey == InlineSaveKey.CtrlEnter && (e.CtrlKey || e.MetaKey) => SaveAsync(),
+        _ => Task.CompletedTask,
+    };
+}

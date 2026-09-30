@@ -1,0 +1,59 @@
+@using SoloCrm.Application.Abstractions
+
+@* Inline text field (US-14); saves on Enter (multiline: Ctrl/Cmd + Enter) or when leaving the input. *@
+<InlineField Label="@Label" Field="@Field" IsEmpty="string.IsNullOrWhiteSpace(Value)" OnBeginEdit="() => _draft = Value"
+             Save="SaveAsync" SaveKey="@(Multiline ? InlineSaveKey.CtrlEnter : InlineSaveKey.Enter)">
+    <Display>
+        @if (DisplayTemplate is not null)
+        {
+            @DisplayTemplate(Value!)
+        }
+        else
+        {
+            <span class="@(Multiline ? "inline-field-multiline" : null)">@Value</span>
+        }
+    </Display>
+    <Editor>
+        <MudTextField T="string" @bind-Value="_draft" Immediate="true" AutoFocus="true" Margin="Margin.Dense"
+                      Lines="@(Multiline ? 4 : 1)" MaxLength="@MaxLength" InputType="@InputType"
+                      Placeholder="@Placeholder" aria-label="@Label" Error="context.HasError" Class="mt-0"
+                      HelperText="@(Multiline ? "Strg+Enter speichert, Esc bricht ab" : null)"
+                      OnBlur="() => context.SaveAsync(refocus: false)" />
+    </Editor>
+</InlineField>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    [Parameter]
+    public string? Field { get; set; }
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    /// <summary>Saves the new value (blank is sent as is; the handlers store it as <c>null</c>).</summary>
+    [Parameter, EditorRequired]
+    public Func<string?, Task<Error?>> Save { get; set; } = default!;
+
+    [Parameter]
+    public bool Multiline { get; set; }
+
+    [Parameter]
+    public int MaxLength { get; set; } = 524288;
+
+    [Parameter]
+    public InputType InputType { get; set; } = InputType.Text;
+
+    [Parameter]
+    public string? Placeholder { get; set; }
+
+    /// <summary>Custom display of a non-empty value, e.g. as link.</summary>
+    [Parameter]
+    public RenderFragment<string>? DisplayTemplate { get; set; }
+
+    private string? _draft;
+
+    private Task<Error?> SaveAsync() =>
+        (_draft?.Trim() ?? "") == (Value?.Trim() ?? "") ? Task.FromResult<Error?>(null) : Save(_draft);
+}

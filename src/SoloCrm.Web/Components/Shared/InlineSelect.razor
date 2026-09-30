@@ -1,0 +1,63 @@
+@typeparam T
+@using SoloCrm.Application.Abstractions
+
+@* Inline selection (US-14): the list opens right away and choosing a value saves it; Esc or „Abbrechen“ cancels. *@
+<InlineField Label="@Label" Field="@Field" IsEmpty="Value is null" OnBeginEdit="BeginEdit" Save="SaveAsync"
+             SaveKey="InlineSaveKey.None" ShowCancel="true">
+    <Display>@(Value is null ? null : Text(Value))</Display>
+    <Editor>
+        <MudSelect T="T" Value="_draft" ValueChanged="value => OnSelectedAsync(context, value)" @bind-Open="_open"
+                   Clearable="Clearable" Dense="true" Margin="Margin.Dense" aria-label="@Label" Error="context.HasError"
+                   Class="mt-0" ToStringFunc="Text">
+            @foreach (var option in Options)
+            {
+                <MudSelectItem T="T" Value="option">@Text(option)</MudSelectItem>
+            }
+        </MudSelect>
+    </Editor>
+</InlineField>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    [Parameter]
+    public string? Field { get; set; }
+
+    [Parameter]
+    public T? Value { get; set; }
+
+    [Parameter, EditorRequired]
+    public IEnumerable<T> Options { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public Func<T, string> TextOf { get; set; } = value => value?.ToString() ?? "";
+
+    /// <summary>Allows removing the value (only for optional fields).</summary>
+    [Parameter]
+    public bool Clearable { get; set; }
+
+    /// <summary>Saves the chosen value; returns the error, or <c>null</c> on success.</summary>
+    [Parameter, EditorRequired]
+    public Func<T?, Task<Error?>> Save { get; set; } = default!;
+
+    private T? _draft;
+    private bool _open;
+
+    private string Text(T? value) => value is null ? "" : TextOf(value);
+
+    private void BeginEdit()
+    {
+        _draft = Value;
+        _open = true;
+    }
+
+    private async Task OnSelectedAsync(InlineField field, T? value)
+    {
+        _draft = value;
+        await field.SaveAsync();
+    }
+
+    private Task<Error?> SaveAsync() =>
+        EqualityComparer<T>.Default.Equals(_draft, Value) ? Task.FromResult<Error?>(null) : Save(_draft);
+}

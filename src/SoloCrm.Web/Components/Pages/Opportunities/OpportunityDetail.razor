@@ -4,8 +4,13 @@
 @using SoloCrm.Application.Features.Timeline
 @using SoloCrm.Domain.Common
 @using SoloCrm.Domain.Opportunities
+@using SoloCrm.Domain.Organizations
 @implements IDisposable
 @inject IQueryHandler<GetOpportunity.Query, GetOpportunity.Result> GetOpportunityHandler
+@inject IQueryHandler<GetOpportunityDefaults.Query, GetOpportunityDefaults.Result> DefaultsHandler
+@inject ICommandHandler<UpdateOpportunity.Command, UpdateOpportunity.Result> UpdateHandler
+@inject ICommandHandler<ArchiveOpportunity.Command, ArchiveOpportunity.Result> ArchiveHandler
+@inject ICommandHandler<RestoreOpportunity.Command, RestoreOpportunity.Result> RestoreHandler
 @inject QuickAddService QuickAdd
 @inject IDialogService DialogService
 @inject ISnackbar Snackbar
@@ -42,38 +47,133 @@ else
                                 }
                             </div>
                         </div>
-                        <MudTooltip Text="Bearbeiten">
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="Bearbeiten" OnClick="EditAsync" />
+                        <MudTooltip Text="@(o.IsArchived ? "Wiederherstellen" : "Archivieren")">
+                            <MudIconButton Icon="@(o.IsArchived ? Icons.Material.Filled.Unarchive : Icons.Material.Filled.Archive)"
+                                           aria-label="@(o.IsArchived ? "Wiederherstellen" : "Archivieren")" OnClick="ToggleArchiveAsync" />
                         </MudTooltip>
                     </div>
-                    <MudStack Spacing="2" Class="mt-3">
-                        <DetailField Label="Absagegrund" Visible="o.LostReason is not null">
-                            @(o.LostReason is { } reason ? Labels.For(reason) : null)
-                        </DetailField>
-                        <DetailField Label="Endkunde" Visible="o.ClientOrganizationId is not null">
-                            <MudLink Href="@Links.Organization(o.ClientOrganizationId!.Value)">@o.ClientOrganizationName</MudLink>
-                        </DetailField>
-                        <DetailField Label="Vermittler" Visible="o.AgencyOrganizationId is not null">
-                            <MudLink Href="@Links.Organization(o.AgencyOrganizationId!.Value)">@o.AgencyOrganizationName</MudLink>
-                        </DetailField>
-                        <DetailField Label="Ansprechpartner" Visible="o.PrimaryContactId is not null">
-                            <MudLink Href="@Links.Contact(o.PrimaryContactId!.Value)">@o.PrimaryContactName</MudLink>
-                        </DetailField>
-                        <DetailField Label="Preis" Visible="o.Pricing is not null">@o.Pricing?.ToDisplayString()</DetailField>
-                        <DetailField Label="Start" Visible="o.StartDate is not null">
-                            @(o.StartDate is { } start ? Formats.Date(start) : null)
-                        </DetailField>
-                        <DetailField Label="Laufzeit">@(o.Duration?.ToDisplayString() ?? "offen")</DetailField>
-                        <DetailField Label="Auslastung" Visible="o.Utilization is not null">@o.Utilization %</DetailField>
-                        <DetailField Label="Remote" Visible="o.RemotePercentage is not null">@o.RemotePercentage %</DetailField>
+                    @* Master data are edited inline (US-14); each change is saved with all current values. *@
+                    <MudStack Spacing="1" Class="mt-3">
+                        <InlineText Label="Titel" Field="@nameof(IOpportunityFields.Title)" Value="@o.Title"
+                                    MaxLength="@Opportunity.TitleMaxLength" Save="@(v => SaveAsync(c => c with { Title = v }))" />
+                        <InlineSelect T="Guid" Label="Phase" Field="StageId" Value="o.StageId" Options="_stages.Select(s => s.Id)"
+                                      TextOf="StageName" Save="SaveStageAsync" />
+                        @if (o.StageStatus == StageStatus.Lost)
+                        {
+                            <InlineSelect T="LostReason?" Label="Absagegrund" Field="LostReason" Value="o.LostReason" Options="LostReasons"
+                                          TextOf="r => Labels.For(r!.Value)" Save="@(v => SaveAsync(c => c with { LostReason = v }))" />
+                        }
+                        <InlineField Label="Endkunde" Field="@nameof(IOpportunityFields.ClientOrganizationId)" IsEmpty="o.ClientOrganizationId is null"
+                                     OnBeginEdit="() => _organizationDraft = OrganizationOption.Existing(o.ClientOrganizationId, o.ClientOrganizationName, o.ClientOrganizationType)"
+                                     Save="@(() => SaveAsync(c => c with { ClientOrganizationId = _organizationDraft?.Id }))"
+                                     SaveKey="InlineSaveKey.None" ShowCancel="true">
+                            <Display>
+                                <span @onclick:stopPropagation="true">
+                                    <MudLink Href="@Links.Organization(o.ClientOrganizationId!.Value)">@o.ClientOrganizationName</MudLink>
+                                </span>
+                            </Display>
+                            <Editor>
+                                <OrganizationAutocomplete Value="_organizationDraft" ValueChanged="v => ChooseOrganizationAsync(context, v)" Label=""
+                                                          PreferredType="OrganizationType.Client" AutoFocus="true" Margin="Margin.Dense"
+                                                          Error="context.HasError" />
+                            </Editor>
+                        </InlineField>
+                        <InlineField Label="Vermittler" Field="@nameof(IOpportunityFields.AgencyOrganizationId)" IsEmpty="o.AgencyOrganizationId is null"
+                                     OnBeginEdit="() => _organizationDraft = OrganizationOption.Existing(o.AgencyOrganizationId, o.AgencyOrganizationName, o.AgencyOrganizationType)"
+                                     Save="@(() => SaveAsync(c => c with { AgencyOrganizationId = _organizationDraft?.Id }))"
+                                     SaveKey="InlineSaveKey.None" ShowCancel="true">
+                            <Display>
+                                <span @onclick:stopPropagation="true">
+                                    <MudLink Href="@Links.Organization(o.AgencyOrganizationId!.Value)">@o.AgencyOrganizationName</MudLink>
+                                </span>
+                            </Display>
+                            <Editor>
+                                <OrganizationAutocomplete Value="_organizationDraft" ValueChanged="v => ChooseOrganizationAsync(context, v)" Label=""
+                                                          PreferredType="OrganizationType.Agency" AutoFocus="true" Margin="Margin.Dense"
+                                                          Error="context.HasError" />
+                            </Editor>
+                        </InlineField>
+                        <InlineField Label="Ansprechpartner" Field="@nameof(IOpportunityFields.PrimaryContactId)" IsEmpty="o.PrimaryContactId is null"
+                                     OnBeginEdit="BeginContactEdit"
+                                     Save="@(() => SaveAsync(c => c with { PrimaryContactId = _contactDraft?.Id }))"
+                                     SaveKey="InlineSaveKey.None" ShowCancel="true">
+                            <Display>
+                                <span @onclick:stopPropagation="true">
+                                    <MudLink Href="@Links.Contact(o.PrimaryContactId!.Value)">@o.PrimaryContactName</MudLink>
+                                </span>
+                            </Display>
+                            <Editor>
+                                <ContactAutocomplete Value="_contactDraft" ValueChanged="v => ChooseContactAsync(context, v)" Label=""
+                                                     AutoFocus="true" Error="context.HasError" />
+                            </Editor>
+                        </InlineField>
+
+                        @* Price = model + amount + currency, edited as a group with the live value (US-06 AK3/AK5). *@
+                        <InlineField Label="Preis" Field="@nameof(IOpportunityFields.Amount)" IsEmpty="o.Pricing is null"
+                                     OnBeginEdit="BeginPricingEdit" Save="SavePricingAsync" ShowActions="true">
+                            <Display>@o.Pricing?.ToDisplayString()</Display>
+                            <Editor>
+                                <MudStack Spacing="1">
+                                    @* Enter and Esc belong to the open list here, not to the group. *@
+                                    <div @onkeydown:stopPropagation="true">
+                                        <MudSelect T="PricingModel" @bind-Value="_pricingModel" Label="Preismodell" Dense="true" Margin="Margin.Dense">
+                                            @foreach (var model in Enum.GetValues<PricingModel>())
+                                            {
+                                                <MudSelectItem T="PricingModel" Value="model">@Labels.For(model)</MudSelectItem>
+                                            }
+                                        </MudSelect>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <MudNumericField T="decimal?" @bind-Value="_amount" Label="@Labels.AmountLabel(_pricingModel)" Immediate="true"
+                                                         AutoFocus="true" HideSpinButtons="true" Min="0" Margin="Margin.Dense" HelperText="leer = kein Preis"
+                                                         Adornment="Adornment.End" AdornmentText="@Labels.AmountUnit(_pricingModel, _currency)"
+                                                         Error="context.HasError" />
+                                        <MudTextField T="string" Value="_currency" ValueChanged="v => _currency = v?.Trim().ToUpperInvariant() ?? string.Empty"
+                                                      Label="Währung" MaxLength="3" Immediate="true" Margin="Margin.Dense" Style="max-width: 90px;" />
+                                    </div>
+                                    <MudText Typo="Typo.caption" data-test="estimated-value">@ValueHint(DraftPricing, o.Duration, UtilizationFor(_pricingModel))</MudText>
+                                </MudStack>
+                            </Editor>
+                        </InlineField>
+                        <InlineDate Label="Start" Field="@nameof(IOpportunityFields.StartDate)" Value="o.StartDate"
+                                    Save="@(v => SaveAsync(c => c with { StartDate = v }))" />
+                        @* Duration = number + unit; empty means open-ended (US-06 AK4). *@
+                        <InlineField Label="Laufzeit" Field="@nameof(IOpportunityFields.DurationValue)" OnBeginEdit="BeginDurationEdit"
+                                     Save="SaveDurationAsync" ShowActions="true">
+                            <Display>@(o.Duration?.ToDisplayString() ?? "offen")</Display>
+                            <Editor>
+                                <MudStack Spacing="1">
+                                    <div class="d-flex gap-2">
+                                        <MudNumericField T="int?" @bind-Value="_durationValue" Label="Laufzeit" Immediate="true" AutoFocus="true"
+                                                         Min="1" Max="@Duration.MaxValue" Margin="Margin.Dense" HelperText="leer = offen"
+                                                         Error="context.HasError" />
+                                        <div @onkeydown:stopPropagation="true">
+                                            <MudSelect T="DurationUnit" @bind-Value="_durationUnit" Label="Einheit" Dense="true" Margin="Margin.Dense">
+                                                @foreach (var unit in Enum.GetValues<DurationUnit>())
+                                                {
+                                                    <MudSelectItem T="DurationUnit" Value="unit">@Labels.For(unit)</MudSelectItem>
+                                                }
+                                            </MudSelect>
+                                        </div>
+                                    </div>
+                                    <MudText Typo="Typo.caption">@ValueHint(o.Pricing, DraftDuration, o.Utilization)</MudText>
+                                </MudStack>
+                            </Editor>
+                        </InlineField>
+                        @if (Opportunity.UsesUtilization(o.Pricing?.Model ?? _defaultPricingModel))
+                        {
+                            <InlineNumber Label="Auslastung" Field="@nameof(IOpportunityFields.Utilization)" Value="o.Utilization" Min="0" Max="100"
+                                          Suffix=" %" HelperText="leer = 100 %" Save="@(v => SaveAsync(c => c with { Utilization = v }))" />
+                        }
+                        <InlineNumber Label="Remote" Field="@nameof(IOpportunityFields.RemotePercentage)" Value="o.RemotePercentage" Min="0" Max="100"
+                                      Suffix=" %" Save="@(v => SaveAsync(c => c with { RemotePercentage = v }))" />
+                        <InlineSelect T="LeadSource?" Label="Quelle" Field="@nameof(IOpportunityFields.Source)" Value="o.Source" Options="Sources"
+                                      TextOf="s => Labels.For(s!.Value)" Clearable="true" Save="@(v => SaveAsync(c => c with { Source = v }))" />
                         <DetailField Label="Geschätzter Wert" Visible="o.EstimatedValue is not null">
                             @(o.EstimatedValue is { } value ? Currency.Format(decimal.Round(value, 0), o.Pricing!.Currency) : null)
                         </DetailField>
                         <DetailField Label="MRR" Visible="o.MonthlyRecurringValue is not null">
                             @(o.MonthlyRecurringValue is { } mrr ? Currency.Format(mrr, o.Pricing!.Currency) : null)
-                        </DetailField>
-                        <DetailField Label="Quelle" Visible="o.Source is not null">
-                            @(o.Source is { } source ? Labels.For(source) : null)
                         </DetailField>
                     </MudStack>
                 </MudPaper>
@@ -100,7 +200,21 @@ else
     [Parameter]
     public Guid Id { get; set; }
 
+    private static readonly LeadSource?[] Sources = [.. Enum.GetValues<LeadSource>().Cast<LeadSource?>()];
+    private static readonly LostReason?[] LostReasons = [.. Enum.GetValues<LostReason>().Cast<LostReason?>()];
+
     private GetOpportunity.Result? _opportunity;
+    private IReadOnlyList<GetOpportunityDefaults.StageItem> _stages = [];
+    private ValuationSettings? _valuation;
+    private PricingModel _defaultPricingModel;
+    private string _defaultCurrency = Currency.Euro;
+    private OrganizationOption? _organizationDraft;
+    private ContactOption? _contactDraft;
+    private PricingModel _pricingModel;
+    private decimal? _amount;
+    private string _currency = Currency.Euro;
+    private int? _durationValue;
+    private DurationUnit _durationUnit = DurationUnit.Months;
     private LinkedRecords _linkedTo = LinkedRecords.None;
     private IReadOnlyList<ActivityLinkOption> _extraLinks = [];
     private List<BreadcrumbItem> _breadcrumbs = [];
@@ -114,6 +228,13 @@ else
     protected override async Task OnParametersSetAsync()
     {
         _linkedTo = new LinkedRecords(OpportunityId: Id);
+        var defaults = await DefaultsHandler.Handle(new GetOpportunityDefaults.Query(), CancellationToken.None);
+        if (defaults.IsSuccess)
+        {
+            (_stages, _valuation, _defaultPricingModel, _defaultCurrency) =
+                (defaults.Value.Stages, defaults.Value.Valuation, defaults.Value.DefaultPricingModel, defaults.Value.DefaultCurrency);
+        }
+
         await LoadAsync();
     }
 
@@ -144,17 +265,139 @@ else
         _extraLinks = extraLinks;
     }
 
-    private async Task EditAsync()
+    /// <summary>Saves one changed field together with all current values (iteration 4 decision 2).</summary>
+    private async Task<Error?> SaveAsync(Func<UpdateOpportunity.Command, UpdateOpportunity.Command> change)
     {
-        var parameters = new DialogParameters<OpportunityDialog> { { d => d.OpportunityId, Id } };
-        var dialog = await DialogService.ShowAsync<OpportunityDialog>("Anfrage bearbeiten", parameters, DialogDefaults.Medium);
-        if (await dialog.Result is { Canceled: false })
+        var o = _opportunity!;
+        var command = change(new UpdateOpportunity.Command(
+            o.Id, o.Title, o.StageId, o.LostReason, o.ClientOrganizationId, o.AgencyOrganizationId, o.PrimaryContactId,
+            o.Pricing?.Model, o.Pricing?.Amount, o.Pricing?.Currency, o.StartDate, o.Duration?.Value, o.Duration?.Unit,
+            o.Utilization, o.RemotePercentage, o.Source));
+        var result = await UpdateHandler.Handle(command, CancellationToken.None);
+        if (result.IsFailure)
         {
-            Snackbar.Add("Anfrage gespeichert.", Severity.Success);
-            await LoadAsync();
-            await ReloadTimelineAsync();
+            return result.Error;
         }
+
+        await LoadAsync();
+        await ReloadTimelineAsync();
+
+        // The save is triggered by an event of the field, so this page does not re-render on its own.
+        StateHasChanged();
+        return null;
     }
+
+    /// <summary>A change to a lost stage asks for the reason first (US-08 AK1); canceling keeps the stage.</summary>
+    private async Task<Error?> SaveStageAsync(Guid stageId)
+    {
+        LostReason? reason = null;
+        if (_stages.FirstOrDefault(s => s.Id == stageId)?.Status == StageStatus.Lost)
+        {
+            var parameters = new DialogParameters<LostReasonDialog> { { d => d.Title, _opportunity!.Title } };
+            var dialog = await DialogService.ShowAsync<LostReasonDialog>("Anfrage verloren", parameters, DialogDefaults.ExtraSmall);
+            if (await dialog.Result is not { Canceled: false, Data: LostReason chosen })
+            {
+                return null;
+            }
+
+            reason = chosen;
+        }
+
+        return await SaveAsync(c => c with { StageId = stageId, LostReason = reason });
+    }
+
+    private async Task ChooseOrganizationAsync(InlineField field, OrganizationOption? organization)
+    {
+        _organizationDraft = organization;
+        await field.SaveAsync();
+    }
+
+    private void BeginContactEdit()
+    {
+        var o = _opportunity!;
+        _contactDraft = o.PrimaryContactId is { } id ? new ContactOption(id, o.PrimaryContactName ?? "", null) : null;
+    }
+
+    private async Task ChooseContactAsync(InlineField field, ContactOption? contact)
+    {
+        _contactDraft = contact;
+        await field.SaveAsync();
+    }
+
+    private void BeginPricingEdit()
+    {
+        var pricing = _opportunity!.Pricing;
+        _pricingModel = pricing?.Model ?? _defaultPricingModel;
+        _amount = pricing?.Amount;
+        _currency = pricing?.Currency ?? _defaultCurrency;
+    }
+
+    /// <summary>Utilization only applies to hourly and daily rates; it is dropped when switching to another model.</summary>
+    private Task<Error?> SavePricingAsync() => SaveAsync(c => c with
+    {
+        PricingModel = _pricingModel,
+        Amount = _amount,
+        Currency = string.IsNullOrWhiteSpace(_currency) ? null : _currency,
+        Utilization = UtilizationFor(_pricingModel),
+    });
+
+    private void BeginDurationEdit()
+    {
+        var duration = _opportunity!.Duration;
+        _durationValue = duration?.Value;
+        _durationUnit = duration?.Unit ?? DurationUnit.Months;
+    }
+
+    private Task<Error?> SaveDurationAsync() => SaveAsync(c => c with
+    {
+        DurationValue = _durationValue,
+        DurationUnit = _durationValue is null ? null : _durationUnit,
+    });
+
+    private int? UtilizationFor(PricingModel model) => Opportunity.UsesUtilization(model) ? _opportunity!.Utilization : null;
+
+    private Pricing? DraftPricing =>
+        _amount is { } amount && amount > 0 && amount <= Pricing.MaxAmount && decimal.Round(amount, 2) == amount && Currency.IsValid(_currency)
+            ? Pricing.Create(_pricingModel, amount, _currency)
+            : null;
+
+    private Duration? DraftDuration =>
+        _durationValue is >= 1 and <= Duration.MaxValue ? Duration.Create(_durationValue.Value, _durationUnit) : null;
+
+    /// <summary>Live value while editing, calculated like everywhere else (US-06 AK5).</summary>
+    private string ValueHint(Pricing? pricing, Duration? duration, int? utilization)
+    {
+        if (_valuation is null)
+        {
+            return "";
+        }
+
+        var value = OpportunityValuation.EstimatedValue(pricing, duration, utilization, _valuation);
+        var mrr = OpportunityValuation.MonthlyRecurringValue(pricing);
+        return value is null
+            ? pricing is null ? "Für den geschätzten Wert fehlt der Betrag." : "Für den geschätzten Wert fehlt die Laufzeit."
+            : $"Geschätzter Wert: {Currency.Format(decimal.Round(value.Value, 2), pricing!.Currency)}"
+              + (mrr is null ? "" : $" · MRR: {Currency.Format(mrr.Value, pricing.Currency)}/Monat");
+    }
+
+    private async Task ToggleArchiveAsync()
+    {
+        var o = _opportunity!;
+        var error = o.IsArchived
+            ? (await RestoreHandler.Handle(new RestoreOpportunity.Command(o.Id), CancellationToken.None)).Match(_ => (Error?)null, e => e)
+            : (await ArchiveHandler.Handle(new ArchiveOpportunity.Command(o.Id), CancellationToken.None)).Match(_ => (Error?)null, e => e);
+        if (error is not null)
+        {
+            Snackbar.Add(error.Message, Severity.Error);
+            return;
+        }
+
+        Snackbar.Add(o.IsArchived ? "Anfrage wiederhergestellt." : "Anfrage archiviert.", Severity.Success);
+        await LoadAsync();
+        await ReloadTimelineAsync();
+    }
+
+    private string StageName(Guid stageId) => _stages.FirstOrDefault(s => s.Id == stageId)?.Name ?? "";
 
     private Task ReloadTimelineAsync() => _timeline?.ReloadAsync() ?? Task.CompletedTask;
 

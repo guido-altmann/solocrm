@@ -45,6 +45,13 @@ public static class KeyboardShortcuts
                 new(["↑"], "Vorheriger Eintrag"),
                 new(["Enter"], "Eintrag öffnen bzw. Aktion ausführen"),
             ]),
+            new("Inline-Bearbeitung (Detailansicht)",
+            [
+                new(["Enter"], "Feld bearbeiten bzw. speichern"),
+                new(["F2"], "Feld bearbeiten"),
+                new([modifier, "Enter"], "Mehrzeiliges Feld speichern"),
+                new(["Esc"], "Bearbeiten abbrechen"),
+            ]),
         ];
     }
 }

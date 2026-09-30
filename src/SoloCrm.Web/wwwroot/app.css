@@ -279,3 +279,46 @@ kbd {
     gap: 10px;
     padding: 8px 0 12px 4px;
 }
+
+/* Inline editing in the detail views (US-14) */
+.inline-field-display {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    min-height: 26px;
+    margin: 0 -6px;
+    padding: 2px 6px;
+    border-radius: var(--mud-default-borderradius);
+    cursor: pointer;
+    font-size: var(--mud-typography-body2-size);
+    line-height: var(--mud-typography-body2-lineheight);
+}
+
+.inline-field-display:hover {
+    background: var(--mud-palette-action-default-hover);
+}
+
+.inline-field-display:focus-visible {
+    outline: 2px solid var(--mud-palette-primary);
+    outline-offset: 1px;
+}
+
+.inline-field-value {
+    flex-grow: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.inline-field-multiline {
+    white-space: pre-wrap;
+}
+
+.inline-field-edit-icon {
+    opacity: 0;
+    color: var(--mud-palette-text-secondary);
+}
+
+.inline-field-display:hover .inline-field-edit-icon,
+.inline-field-display:focus-visible .inline-field-edit-icon {
+    opacity: 1;
+}

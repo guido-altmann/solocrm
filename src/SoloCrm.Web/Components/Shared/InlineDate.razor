@@ -1,0 +1,35 @@
+@using SoloCrm.Application.Abstractions
+
+@* Inline date (US-14) as native date input, so it behaves like the text fields: Enter or leaving the input saves,
+   Esc cancels, an empty input removes the date. MudDatePicker would open its calendar on Enter instead. *@
+<InlineField Label="@Label" Field="@Field" IsEmpty="Value is null" OnBeginEdit="() => _draft = Value?.ToDateTime(TimeOnly.MinValue)"
+             Save="SaveAsync">
+    <Display>@(Value is { } date ? Formats.Date(date) : null)</Display>
+    <Editor>
+        <MudTextField T="DateTime?" @bind-Value="_draft" InputType="InputType.Date" Format="yyyy-MM-dd" Immediate="true"
+                      AutoFocus="true" Margin="Margin.Dense" aria-label="@Label" Error="context.HasError" Class="mt-0"
+                      OnBlur="() => context.SaveAsync(refocus: false)" />
+    </Editor>
+</InlineField>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    [Parameter]
+    public string? Field { get; set; }
+
+    [Parameter]
+    public DateOnly? Value { get; set; }
+
+    [Parameter, EditorRequired]
+    public Func<DateOnly?, Task<Error?>> Save { get; set; } = default!;
+
+    private DateTime? _draft;
+
+    private Task<Error?> SaveAsync()
+    {
+        var date = _draft is { } value ? DateOnly.FromDateTime(value) : (DateOnly?)null;
+        return date == Value ? Task.FromResult<Error?>(null) : Save(date);
+    }
+}

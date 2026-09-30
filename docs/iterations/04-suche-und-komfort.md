@@ -63,12 +63,12 @@
 - [x] Kontrast der Tag-Farben im Hell- und Dunkelmodus prüfen (NFR Barrierearmut): weiße Schrift auf jeder Palettenfarbe ≥ 4,5:1, per Unit-Test berechnet; im Browser in beiden Modi gesichtet
 
 ## Schritt 7 – Inline-Editing (US-14)
-- [ ] Wiederverwendbare Inline-Felder: Text, mehrzeiliger Text, Auswahl, Zahl, Datum, Organisations-/Kontakt-Autocomplete
-- [ ] Klick auf ein Feld (oder `Enter`/`F2` per Tastatur) → Bearbeiten → `Enter`/Blur speichert, `Esc` bricht ab (SPEC 3.1 Nr. 3)
-- [ ] Validierung und Fehlermeldung am Feld; Fehler aus den bestehenden Validatoren und `…Errors.FieldOf` nutzen (AK1)
-- [ ] Anfrage: zusammengesetzte Felder als Gruppe bearbeiten (Preis = Modell + Betrag + Währung, Laufzeit = Zahl + Einheit), inklusive Live-Wert; Phasenwechsel auf `Lost` öffnet den Absagegrund-Dialog
-- [ ] Speichern über die bestehenden `Update…`-Handler mit allen aktuellen Werten („last write wins“, Entscheidung 2); danach Timeline neu laden (Änderungen erscheinen dort)
-- [ ] Bearbeiten-Dialog (Stift) aus den Detailansichten entfernen; Quick-Add, Listen und Pipeline behalten ihre Dialoge (Entscheidung 2)
+- [x] Wiederverwendbare Inline-Felder: Text, mehrzeiliger Text, Auswahl, Zahl, Datum, Organisations-/Kontakt-Autocomplete (Hülle `InlineField`; Datum als natives Datumsfeld, weil `MudDatePicker` bei Enter den Kalender öffnet)
+- [x] Klick auf ein Feld (oder `Enter`/`F2` per Tastatur) → Bearbeiten → `Enter`/Blur speichert, `Esc` bricht ab (SPEC 3.1 Nr. 3)
+- [x] Validierung und Fehlermeldung am Feld; Fehler aus den bestehenden Validatoren und `…Errors.FieldOf` nutzen (AK1)
+- [x] Anfrage: zusammengesetzte Felder als Gruppe bearbeiten (Preis = Modell + Betrag + Währung, Laufzeit = Zahl + Einheit), inklusive Live-Wert; Phasenwechsel auf `Lost` öffnet den Absagegrund-Dialog
+- [x] Speichern über die bestehenden `Update…`-Handler mit allen aktuellen Werten („last write wins“, Entscheidung 2); danach Timeline neu laden (Änderungen erscheinen dort)
+- [x] Bearbeiten-Dialog (Stift) aus den Detailansichten entfernen; Quick-Add, Listen und Pipeline behalten ihre Dialoge (Entscheidung 2); „Archivieren/Wiederherstellen“ der Anfrage wandert aus dem Dialog in den Kopf der Detailansicht
 
 ## Schritt 8 – Tests
 - [ ] Unit-Tests `Tag` (Name, Farbe, Normalisierung)

@@ -4,13 +4,13 @@
 @using SoloCrm.Application.Features.Organizations
 @using SoloCrm.Application.Features.Timeline
 @using SoloCrm.Domain.Common
+@using SoloCrm.Domain.Organizations
 @implements IDisposable
 @inject IQueryHandler<GetOrganization.Query, GetOrganization.Result> GetOrganizationHandler
+@inject ICommandHandler<UpdateOrganization.Command, UpdateOrganization.Result> UpdateOrganizationHandler
 @inject IQueryHandler<GetOrganizationContacts.Query, GetOrganizationContacts.Result> GetContactsHandler
 @inject IQueryHandler<GetRelatedOpportunities.Query, GetRelatedOpportunities.Result> GetOpportunitiesHandler
 @inject QuickAddService QuickAdd
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
 
 <PageTitle>@(_organization?.Name ?? "Organisation") · SoloCRM</PageTitle>
 
@@ -30,27 +30,31 @@ else
         <MudItem xs="12" md="4">
             <MudStack Spacing="4">
                 <MudPaper Outlined="true" Class="pa-4">
-                    <div class="d-flex align-start">
-                        <div class="flex-grow-1">
-                            <MudText Typo="Typo.h5">@_organization.Name</MudText>
-                            <MudText Typo="Typo.body2" Class="mud-text-secondary">@Labels.For(_organization.Type)</MudText>
-                            @if (_organization.IsArchived)
-                            {
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-0">Archiviert</MudChip>
-                            }
-                        </div>
-                        <MudTooltip Text="Bearbeiten">
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="Bearbeiten" OnClick="EditAsync" />
-                        </MudTooltip>
-                    </div>
-                    <MudStack Spacing="2" Class="mt-3">
-                        <DetailField Label="Website" Visible="_organization.Website is not null">
-                            <MudLink Href="@_organization.Website" Target="_blank" rel="noopener noreferrer">@_organization.Website</MudLink>
-                        </DetailField>
-                        <DetailField Label="Ort" Visible="_organization.City is not null">@_organization.City</DetailField>
-                        <DetailField Label="Notizen" Visible="_organization.Notes is not null">
-                            <span style="white-space: pre-line;">@_organization.Notes</span>
-                        </DetailField>
+                    <MudText Typo="Typo.h5">@_organization.Name</MudText>
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary">@Labels.For(_organization.Type)</MudText>
+                    @if (_organization.IsArchived)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-0">Archiviert</MudChip>
+                    }
+                    @* Master data are edited inline (US-14); each change is saved with all current values. *@
+                    <MudStack Spacing="1" Class="mt-3">
+                        <InlineText Label="Name" Field="@nameof(IOrganizationFields.Name)" Value="@_organization.Name"
+                                    MaxLength="@Organization.NameMaxLength" Save="@(v => SaveAsync(o => o with { Name = v }))" />
+                        <InlineSelect T="OrganizationType" Label="Typ" Field="@nameof(IOrganizationFields.Type)" Value="_organization.Type"
+                                      Options="Enum.GetValues<OrganizationType>()" TextOf="Labels.For"
+                                      Save="@(v => SaveAsync(o => o with { Type = v }))" />
+                        <InlineText Label="Website" Field="@nameof(IOrganizationFields.Website)" Value="@_organization.Website" InputType="InputType.Url"
+                                    MaxLength="@Organization.WebsiteMaxLength" Save="@(v => SaveAsync(o => o with { Website = v }))">
+                            <DisplayTemplate>
+                                <span @onclick:stopPropagation="true">
+                                    <MudLink Href="@context" Target="_blank" rel="noopener noreferrer">@context</MudLink>
+                                </span>
+                            </DisplayTemplate>
+                        </InlineText>
+                        <InlineText Label="Ort" Field="@nameof(IOrganizationFields.City)" Value="@_organization.City"
+                                    MaxLength="@Organization.CityMaxLength" Save="@(v => SaveAsync(o => o with { City = v }))" />
+                        <InlineText Label="Notizen" Field="@nameof(IOrganizationFields.Notes)" Value="@_organization.Notes" Multiline="true"
+                                    Save="@(v => SaveAsync(o => o with { Notes = v }))" />
                     </MudStack>
                 </MudPaper>
 
@@ -146,16 +150,23 @@ else
         _opportunities = opportunities.IsSuccess ? opportunities.Value.Items : [];
     }
 
-    private async Task EditAsync()
+    /// <summary>Saves one changed field together with all current values (iteration 4 decision 2).</summary>
+    private async Task<Error?> SaveAsync(Func<UpdateOrganization.Command, UpdateOrganization.Command> change)
     {
-        var parameters = new DialogParameters<OrganizationDialog> { { d => d.OrganizationId, Id } };
-        var dialog = await DialogService.ShowAsync<OrganizationDialog>("Organisation bearbeiten", parameters, DialogDefaults.Small);
-        if (await dialog.Result is { Canceled: false })
+        var o = _organization!;
+        var command = change(new UpdateOrganization.Command(o.Id, o.Name, o.Type, o.Website, o.City, o.Notes));
+        var result = await UpdateOrganizationHandler.Handle(command, CancellationToken.None);
+        if (result.IsFailure)
         {
-            Snackbar.Add("Organisation gespeichert.", Severity.Success);
-            await LoadAsync();
-            await ReloadTimelineAsync();
+            return result.Error;
         }
+
+        await LoadAsync();
+        await ReloadTimelineAsync();
+
+        // The save is triggered by an event of the field, so this page does not re-render on its own.
+        StateHasChanged();
+        return null;
     }
 
     private Task ReloadTimelineAsync() => _timeline?.ReloadAsync() ?? Task.CompletedTask;

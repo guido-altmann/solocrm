@@ -1,0 +1,43 @@
+@using SoloCrm.Application.Abstractions
+
+@* Inline integer field (US-14); empty means „not set“. Saves on Enter or when leaving the input. *@
+<InlineField Label="@Label" Field="@Field" IsEmpty="Value is null" OnBeginEdit="() => _draft = Value" Save="SaveAsync">
+    <Display>@Value@Suffix</Display>
+    <Editor>
+        <MudNumericField T="int?" @bind-Value="_draft" Immediate="true" AutoFocus="true" Margin="Margin.Dense" HideSpinButtons="true"
+                         Min="Min" Max="Max" aria-label="@Label" Error="context.HasError" Class="mt-0" HelperText="@HelperText"
+                         Adornment="@(Suffix is null ? Adornment.None : Adornment.End)" AdornmentText="@Suffix?.Trim()"
+                         OnBlur="() => context.SaveAsync(refocus: false)" />
+    </Editor>
+</InlineField>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    [Parameter]
+    public string? Field { get; set; }
+
+    [Parameter]
+    public int? Value { get; set; }
+
+    [Parameter, EditorRequired]
+    public Func<int?, Task<Error?>> Save { get; set; } = default!;
+
+    [Parameter]
+    public int? Min { get; set; }
+
+    [Parameter]
+    public int? Max { get; set; }
+
+    /// <summary>Unit after the value, e.g. <c>" %"</c>.</summary>
+    [Parameter]
+    public string? Suffix { get; set; }
+
+    [Parameter]
+    public string? HelperText { get; set; }
+
+    private int? _draft;
+
+    private Task<Error?> SaveAsync() => _draft == Value ? Task.FromResult<Error?>(null) : Save(_draft);
+}

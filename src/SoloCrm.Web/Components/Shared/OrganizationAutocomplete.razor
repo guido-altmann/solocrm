@@ -6,7 +6,7 @@
 <MudAutocomplete T="OrganizationOption" Value="Value" ValueChanged="ValueChanged" Label="@Label"
                  SearchFunc="SearchAsync" ToStringFunc="@(o => o?.Name)" Clearable="true" ResetValueOnEmptyText="true"
                  DebounceInterval="200" MaxItems="null" Dense="true" Margin="Margin"
-                 Error="Error" ErrorText="@ErrorText" Class="@Class" Style="@Style">
+                 AutoFocus="AutoFocus" Error="Error" ErrorText="@ErrorText" Class="@Class" Style="@Style">
     <ItemTemplate>
         @if (context.IsNew)
         {
@@ -45,6 +45,9 @@
     /// <summary>Offers „Neu anlegen: &lt;Eingabe&gt;“ when no organization has exactly this name (US-02 AK2).</summary>
     [Parameter]
     public bool AllowCreate { get; set; }
+
+    [Parameter]
+    public bool AutoFocus { get; set; }
 
     [Parameter]
     public bool Error { get; set; }

@@ -4,7 +4,7 @@
 
 <MudAutocomplete T="ContactOption" Value="Value" ValueChanged="ValueChanged" Label="@Label"
                  SearchFunc="SearchAsync" ToStringFunc="@(c => c?.Name)" Clearable="true" ResetValueOnEmptyText="true"
-                 DebounceInterval="200" MaxItems="null" Dense="true" Error="Error" ErrorText="@ErrorText">
+                 DebounceInterval="200" MaxItems="null" Dense="true" AutoFocus="AutoFocus" Error="Error" ErrorText="@ErrorText">
     <ItemTemplate>
         <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
             <span>@context.Name</span>
@@ -27,6 +27,9 @@
 
     [Parameter]
     public string Label { get; set; } = "Ansprechpartner";
+
+    [Parameter]
+    public bool AutoFocus { get; set; }
 
     [Parameter]
     public bool Error { get; set; }

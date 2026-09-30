@@ -4,12 +4,12 @@
 @using SoloCrm.Application.Features.Opportunities
 @using SoloCrm.Application.Features.Timeline
 @using SoloCrm.Domain.Common
+@using SoloCrm.Domain.Contacts
 @implements IDisposable
 @inject IQueryHandler<GetContact.Query, GetContact.Result> GetContactHandler
+@inject ICommandHandler<UpdateContact.Command, UpdateContact.Result> UpdateContactHandler
 @inject IQueryHandler<GetRelatedOpportunities.Query, GetRelatedOpportunities.Result> GetOpportunitiesHandler
 @inject QuickAddService QuickAdd
-@inject IDialogService DialogService
-@inject ISnackbar Snackbar
 
 <PageTitle>@(_contact is null ? "Kontakt" : Name) · SoloCRM</PageTitle>
 
@@ -29,38 +29,59 @@ else
         <MudItem xs="12" md="4">
             <MudStack Spacing="4">
                 <MudPaper Outlined="true" Class="pa-4">
-                    <div class="d-flex align-start">
-                        <div class="flex-grow-1">
-                            <MudText Typo="Typo.h5">@Name</MudText>
-                            @if (_contact.JobTitle is not null)
-                            {
-                                <MudText Typo="Typo.body2" Class="mud-text-secondary">@_contact.JobTitle</MudText>
-                            }
-                            @if (_contact.IsArchived)
-                            {
-                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-0">Archiviert</MudChip>
-                            }
-                        </div>
-                        <MudTooltip Text="Bearbeiten">
-                            <MudIconButton Icon="@Icons.Material.Filled.Edit" aria-label="Bearbeiten" OnClick="EditAsync" />
-                        </MudTooltip>
-                    </div>
-                    <MudStack Spacing="2" Class="mt-3">
-                        <DetailField Label="Organisation" Visible="_contact.OrganizationId is not null">
-                            <MudLink Href="@Links.Organization(_contact.OrganizationId!.Value)">@_contact.OrganizationName</MudLink>
-                        </DetailField>
-                        <DetailField Label="E-Mail" Visible="_contact.Email is not null">
-                            <MudLink Href="@($"mailto:{_contact.Email}")">@_contact.Email</MudLink>
-                        </DetailField>
-                        <DetailField Label="Telefon" Visible="_contact.Phone is not null">
-                            <MudLink Href="@($"tel:{_contact.Phone}")">@_contact.Phone</MudLink>
-                        </DetailField>
-                        <DetailField Label="LinkedIn" Visible="_contact.LinkedInUrl is not null">
-                            <MudLink Href="@_contact.LinkedInUrl" Target="_blank" rel="noopener noreferrer">Profil öffnen</MudLink>
-                        </DetailField>
-                        <DetailField Label="Quelle" Visible="_contact.Source is not null">
-                            @(_contact.Source is { } source ? Labels.For(source) : null)
-                        </DetailField>
+                    <MudText Typo="Typo.h5">@Name</MudText>
+                    @if (_contact.JobTitle is not null)
+                    {
+                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@_contact.JobTitle</MudText>
+                    }
+                    @if (_contact.IsArchived)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-0">Archiviert</MudChip>
+                    }
+                    @* Master data are edited inline (US-14); each change is saved with all current values. *@
+                    <MudStack Spacing="1" Class="mt-3">
+                        <InlineText Label="Vorname" Field="@nameof(IContactFields.FirstName)" Value="@_contact.FirstName"
+                                    MaxLength="@Contact.FirstNameMaxLength" Save="@(v => SaveAsync(c => c with { FirstName = v }))" />
+                        <InlineText Label="Nachname" Field="@nameof(IContactFields.LastName)" Value="@_contact.LastName"
+                                    MaxLength="@Contact.LastNameMaxLength" Save="@(v => SaveAsync(c => c with { LastName = v }))" />
+                        <InlineField Label="Organisation" Field="@nameof(IContactFields.OrganizationId)" IsEmpty="_contact.OrganizationId is null"
+                                     OnBeginEdit="BeginOrganizationEdit" Save="SaveOrganizationAsync" SaveKey="InlineSaveKey.None" ShowCancel="true">
+                            <Display>
+                                <span @onclick:stopPropagation="true">
+                                    <MudLink Href="@Links.Organization(_contact.OrganizationId!.Value)">@_contact.OrganizationName</MudLink>
+                                </span>
+                            </Display>
+                            <Editor>
+                                <OrganizationAutocomplete Value="_organizationDraft" ValueChanged="o => ChooseOrganizationAsync(context, o)"
+                                                          Label="" AllowCreate="true" AutoFocus="true" Margin="Margin.Dense"
+                                                          Error="context.HasError" />
+                            </Editor>
+                        </InlineField>
+                        <InlineText Label="E-Mail" Field="@nameof(IContactFields.Email)" Value="@_contact.Email" InputType="InputType.Email"
+                                    MaxLength="@Contact.EmailMaxLength" Save="@(v => SaveAsync(c => c with { Email = v }))">
+                            <DisplayTemplate>
+                                <span @onclick:stopPropagation="true"><MudLink Href="@($"mailto:{context}")">@context</MudLink></span>
+                            </DisplayTemplate>
+                        </InlineText>
+                        <InlineText Label="Telefon" Field="@nameof(IContactFields.Phone)" Value="@_contact.Phone" InputType="InputType.Telephone"
+                                    MaxLength="@Contact.PhoneMaxLength" Save="@(v => SaveAsync(c => c with { Phone = v }))">
+                            <DisplayTemplate>
+                                <span @onclick:stopPropagation="true"><MudLink Href="@($"tel:{context}")">@context</MudLink></span>
+                            </DisplayTemplate>
+                        </InlineText>
+                        <InlineText Label="Rolle" Field="@nameof(IContactFields.JobTitle)" Value="@_contact.JobTitle" Placeholder="z. B. Recruiterin, CTO"
+                                    MaxLength="@Contact.JobTitleMaxLength" Save="@(v => SaveAsync(c => c with { JobTitle = v }))" />
+                        <InlineText Label="LinkedIn" Field="@nameof(IContactFields.LinkedInUrl)" Value="@_contact.LinkedInUrl" InputType="InputType.Url"
+                                    MaxLength="@Contact.LinkedInUrlMaxLength" Save="@(v => SaveAsync(c => c with { LinkedInUrl = v }))">
+                            <DisplayTemplate>
+                                <span @onclick:stopPropagation="true">
+                                    <MudLink Href="@context" Target="_blank" rel="noopener noreferrer">Profil öffnen</MudLink>
+                                </span>
+                            </DisplayTemplate>
+                        </InlineText>
+                        <InlineSelect T="LeadSource?" Label="Quelle" Field="@nameof(IContactFields.Source)" Value="_contact.Source"
+                                      Options="Sources" TextOf="s => Labels.For(s!.Value)" Clearable="true"
+                                      Save="@(v => SaveAsync(c => c with { Source = v }))" />
                     </MudStack>
                 </MudPaper>
 
@@ -90,7 +111,10 @@ else
     [Parameter]
     public Guid Id { get; set; }
 
+    private static readonly LeadSource?[] Sources = [.. Enum.GetValues<LeadSource>().Cast<LeadSource?>()];
+
     private GetContact.Result? _contact;
+    private OrganizationOption? _organizationDraft;
     private IReadOnlyList<GetRelatedOpportunities.Item> _opportunities = [];
     private LinkedRecords _linkedTo = LinkedRecords.None;
     private List<BreadcrumbItem> _breadcrumbs = [];
@@ -125,16 +149,45 @@ else
         _opportunities = opportunities.IsSuccess ? opportunities.Value.Items : [];
     }
 
-    private async Task EditAsync()
+    /// <summary>Saves one changed field together with all current values (iteration 4 decision 2).</summary>
+    private async Task<Error?> SaveAsync(Func<UpdateContact.Command, UpdateContact.Command> change)
     {
-        var parameters = new DialogParameters<ContactDialog> { { d => d.ContactId, Id } };
-        var dialog = await DialogService.ShowAsync<ContactDialog>("Kontakt bearbeiten", parameters, DialogDefaults.Small);
-        if (await dialog.Result is { Canceled: false })
+        var c = _contact!;
+        var command = change(new UpdateContact.Command(
+            c.Id, c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle, c.LinkedInUrl, c.OrganizationId, null, c.Source));
+        var result = await UpdateContactHandler.Handle(command, CancellationToken.None);
+        if (result.IsFailure)
         {
-            Snackbar.Add("Kontakt gespeichert.", Severity.Success);
-            await LoadAsync();
-            await ReloadTimelineAsync();
+            return result.Error;
         }
+
+        await LoadAsync();
+        await ReloadTimelineAsync();
+
+        // The save is triggered by an event of the field, so this page does not re-render on its own.
+        StateHasChanged();
+        return null;
+    }
+
+    private void BeginOrganizationEdit() =>
+        _organizationDraft = OrganizationOption.Existing(_contact!.OrganizationId, _contact.OrganizationName, _contact.OrganizationType);
+
+    private async Task ChooseOrganizationAsync(InlineField field, OrganizationOption? organization)
+    {
+        _organizationDraft = organization;
+        await field.SaveAsync();
+    }
+
+    /// <summary>An existing organization, a new one created inline (US-02 AK2), or none.</summary>
+    private Task<Error?> SaveOrganizationAsync()
+    {
+        if (_organizationDraft?.Id == _contact!.OrganizationId && _organizationDraft?.IsNew != true)
+        {
+            return Task.FromResult<Error?>(null);
+        }
+
+        var (id, newName) = OrganizationOption.ToCommand(_organizationDraft);
+        return SaveAsync(c => c with { OrganizationId = id, NewOrganizationName = newName });
     }
 
     private Task ReloadTimelineAsync() => _timeline?.ReloadAsync() ?? Task.CompletedTask;
