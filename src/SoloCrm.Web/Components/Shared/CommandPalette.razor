@@ -1,0 +1,214 @@
+@using SoloCrm.Application.Abstractions
+@using SearchFeature = SoloCrm.Application.Features.Search.Search
+@implements IAsyncDisposable
+@inject IQueryHandler<SearchFeature.Query, SearchFeature.Result> SearchHandler
+@inject IJSRuntime JS
+
+@* Command palette (US-13, SPEC 3.1 Nr. 2): search over contacts, organizations and requests plus actions.
+   Opened via CommandPaletteService, which also runs the chosen entry after the dialog has closed. *@
+@* The palette focuses its input itself; the focus trap would focus the dialog element instead. *@
+<MudDialog ContentClass="pa-0" Class="command-palette" DefaultFocus="DefaultFocus.None">
+    <DialogContent>
+        <div class="command-palette-input">
+            <MudIcon Icon="@Icons.Material.Filled.Search" Class="mud-text-secondary" />
+            <input @ref="_input" type="text" value="@_text" @oninput="OnInputAsync" @onkeydown="OnKeyDown"
+                   placeholder="Suchen oder Befehl eingeben…" aria-label="Suchen oder Befehl eingeben"
+                   role="combobox" aria-autocomplete="list" aria-controls="@ListId"
+                   aria-expanded="@(_items.Count > 0 ? "true" : "false")" aria-activedescendant="@ActiveId"
+                   autocomplete="off" spellcheck="false" />
+            @if (_searching)
+            {
+                <MudProgressCircular Size="Size.Small" Indeterminate="true" />
+            }
+        </div>
+        <div id="@ListId" role="listbox" aria-label="Treffer und Aktionen" class="command-palette-list">
+            @foreach (var group in _items.Select((item, index) => (item, index)).GroupBy(e => e.item.Group))
+            {
+                <div role="presentation" class="command-palette-group">@GroupLabel(group.Key)</div>
+                @foreach (var (item, index) in group)
+                {
+                    <div id="@ItemId(index)" role="option" aria-selected="@(index == _selected ? "true" : "false")"
+                         class="@($"command-palette-item{(index == _selected ? " selected" : "")}")"
+                         @onclick="() => Choose(item)">
+                        <MudIcon Icon="@item.Icon" Size="Size.Small" Class="mud-text-secondary" />
+                        <span class="command-palette-label">@item.Label</span>
+                        @if (item.Detail is not null)
+                        {
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary ml-auto">@item.Detail</MudText>
+                        }
+                    </div>
+                }
+            }
+            @if (_items.Count == 0 && !_searching)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary pa-4">Keine Treffer.</MudText>
+            }
+        </div>
+        <div class="command-palette-hint mud-text-secondary">
+            <span><kbd>↑</kbd> <kbd>↓</kbd> auswählen</span>
+            <span><kbd>Enter</kbd> öffnen</span>
+            <span><kbd>Esc</kbd> schließen</span>
+        </div>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    private const string ListId = "command-palette-list";
+
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Waits for a pause in typing before searching, so fast typing does not flood the database.</summary>
+    [Parameter]
+    public TimeSpan Debounce { get; set; } = TimeSpan.FromMilliseconds(150);
+
+    private ElementReference _input;
+    private IJSObjectReference? _module;
+    private CancellationTokenSource? _pending;
+    private string _text = "";
+    private IReadOnlyList<PaletteItem> _hits = [];
+    private List<PaletteItem> _items = [.. PaletteItem.Actions];
+    private int _selected;
+    private bool _searching;
+    private bool _reveal;
+
+    private string? ActiveId => _items.Count > 0 ? ItemId(_selected) : null;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _input.FocusAsync();
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/command-palette.js");
+            await _module.InvokeVoidAsync("init", _input);
+        }
+        else if (_reveal && _module is not null && ActiveId is { } id)
+        {
+            _reveal = false;
+            await _module.InvokeVoidAsync("reveal", id);
+        }
+    }
+
+    private async Task OnInputAsync(ChangeEventArgs e)
+    {
+        _text = e.Value as string ?? "";
+        CancelPending();
+
+        if (_text.Trim().Length < SearchFeature.MinLength)
+        {
+            _hits = [];
+            _searching = false;
+            Rebuild();
+            return;
+        }
+
+        Rebuild();
+        await SearchAsync(_text);
+    }
+
+    /// <summary>Each keystroke cancels the previous debounce or query; only the latest result is shown.</summary>
+    private async Task SearchAsync(string text)
+    {
+        _pending = new CancellationTokenSource();
+        var cancellationToken = _pending.Token;
+        try
+        {
+            await Task.Delay(Debounce, cancellationToken);
+            _searching = true;
+            StateHasChanged();
+
+            var result = await SearchHandler.Handle(new SearchFeature.Query(text), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            _hits = result.IsSuccess ? ToItems(result.Value) : [];
+            _searching = false;
+            Rebuild();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Superseded by a newer input.
+        }
+    }
+
+    private void OnKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown" when _items.Count > 0:
+                Select((_selected + 1) % _items.Count);
+                break;
+            case "ArrowUp" when _items.Count > 0:
+                Select((_selected - 1 + _items.Count) % _items.Count);
+                break;
+            case "Enter" when _items.Count > 0:
+                Choose(_items[_selected]);
+                break;
+            // MudBlazor's CloseOnEscapeKey does not fire without its default focus handling (DefaultFocus.None).
+            case "Escape":
+                CancelPending();
+                MudDialog.Cancel();
+                break;
+        }
+    }
+
+    private void Select(int index)
+    {
+        _selected = index;
+        _reveal = true;
+    }
+
+    private void Choose(PaletteItem item)
+    {
+        CancelPending();
+        MudDialog.Close(DialogResult.Ok(item));
+    }
+
+    private void Rebuild()
+    {
+        _items = [.. PaletteItem.ActionsMatching(_text), .. _hits];
+        _selected = 0;
+    }
+
+    private static List<PaletteItem> ToItems(SearchFeature.Result result) =>
+    [
+        .. result.Contacts.Select(c => new PaletteItem(
+            PaletteGroup.Contacts, c.Name, c.OrganizationName ?? c.Email, Icons.Material.Outlined.Person, Links.Contact(c.Id))),
+        .. result.Organizations.Select(o => new PaletteItem(
+            PaletteGroup.Organizations, o.Name, Labels.For(o.Type), Icons.Material.Outlined.Business, Links.Organization(o.Id))),
+        .. result.Opportunities.Select(o => new PaletteItem(
+            PaletteGroup.Opportunities, o.Title, o.ClientName is null ? o.StageName : $"{o.StageName} · {o.ClientName}",
+            Icons.Material.Outlined.Work, Links.Opportunity(o.Id))),
+    ];
+
+    private static string GroupLabel(PaletteGroup group) => group switch
+    {
+        PaletteGroup.Contacts => "Kontakte",
+        PaletteGroup.Organizations => "Organisationen",
+        PaletteGroup.Opportunities => "Anfragen",
+        _ => "Aktionen",
+    };
+
+    private static string ItemId(int index) => $"command-palette-item-{index}";
+
+    private void CancelPending()
+    {
+        _pending?.Cancel();
+        _pending?.Dispose();
+        _pending = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        CancelPending();
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit is gone.
+            }
+        }
+    }
+}

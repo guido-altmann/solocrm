@@ -8,6 +8,7 @@ using SoloCrm.Application.Features.Tasks;
 using SoloCrm.Application.Features.Timeline;
 using SoloCrm.Application.Features.Today;
 using SoloCrm.Web.Components.Pages;
+using SoloCrm.Web.Components.Shared;
 
 namespace SoloCrm.Web.Tests.Components.Pages;
 
@@ -27,6 +28,7 @@ public sealed class HomeTests : BunitContext
         Services.AddSingleton(Substitute.For<ICommandHandler<CompleteTask.Command, CompleteTask.Result>>());
         Services.AddSingleton(Substitute.For<ICommandHandler<ReopenTask.Command, ReopenTask.Result>>());
         Services.AddSingleton(Substitute.For<ICommandHandler<DeleteTask.Command, DeleteTask.Result>>());
+        Services.AddScoped<QuickAddService>();
         Services.AddSingleton(new AppClock(new FakeTimeProvider(Now), TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")));
     }
 

@@ -27,6 +27,8 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
 
     public event Func<Guid, Task>? OpportunityCreated;
 
+    public event Func<Guid, Task>? TaskCreated;
+
     /// <summary>Raised when <see cref="CurrentTarget"/> may have changed without navigation.</summary>
     public event Action? TargetChanged;
 
@@ -104,6 +106,16 @@ public sealed class QuickAddService(IDialogService dialogService, ISnackbar snac
         {
             snackbar.Add("Anfrage angelegt.", Severity.Success);
             await NotifyAsync(OpportunityCreated, id);
+        }
+    }
+
+    /// <summary>Free task; the dialog offers to link it to a contact, organization or request (US-11 AK1).</summary>
+    public async Task OpenTaskAsync()
+    {
+        if (await ShowAsync<TaskDialog>("Neue Aufgabe") is { } id)
+        {
+            snackbar.Add("Aufgabe angelegt.", Severity.Success);
+            await NotifyAsync(TaskCreated, id);
         }
     }
 

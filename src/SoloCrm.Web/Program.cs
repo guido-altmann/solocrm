@@ -32,6 +32,7 @@ try
 
     builder.Services.AddMudServices();
     builder.Services.AddScoped<QuickAddService>();
+    builder.Services.AddScoped<CommandPaletteService>();
 
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);

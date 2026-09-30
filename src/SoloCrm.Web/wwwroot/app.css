@@ -148,3 +148,105 @@ h1:focus {
 .timeline-body pre {
     white-space: pre-wrap;
 }
+
+/* Search field in the app bar; opens the command palette (SPEC 3.4) */
+.app-search {
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 360px;
+    padding: 4px 8px 4px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: var(--mud-default-borderradius);
+    background: rgba(255, 255, 255, 0.12);
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.app-search:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.app-search:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+
+.app-search-text {
+    flex-grow: 1;
+    text-align: start;
+}
+
+kbd {
+    padding: 0 4px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
+/* Command palette (US-13) */
+.command-palette-input {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--mud-palette-divider);
+}
+
+.command-palette-input input {
+    flex-grow: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--mud-palette-text-primary);
+    font-size: 1.1rem;
+}
+
+.command-palette-list {
+    max-height: min(60vh, 480px);
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.command-palette-group {
+    padding: 8px 16px 4px;
+    color: var(--mud-palette-text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.command-palette-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    cursor: pointer;
+}
+
+.command-palette-item:hover {
+    background: var(--mud-palette-action-default-hover);
+}
+
+.command-palette-item.selected {
+    background: var(--mud-palette-primary-hover);
+    box-shadow: inset 3px 0 0 var(--mud-palette-primary);
+}
+
+.command-palette-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.command-palette-hint {
+    display: flex;
+    gap: 16px;
+    padding: 8px 16px;
+    border-top: 1px solid var(--mud-palette-divider);
+    font-size: 0.75rem;
+}

@@ -3,8 +3,9 @@
 @using SoloCrm.Application.Features.Tasks
 @using SoloCrm.Application.Features.Timeline
 @using SoloCrm.Application.Features.Today
+@implements IDisposable
 @inject IQueryHandler<GetToday.Query, GetToday.Result> TodayHandler
-@inject IDialogService DialogService
+@inject QuickAddService QuickAdd
 @inject ISnackbar Snackbar
 @inject AppClock Clock
 
@@ -17,7 +18,7 @@
         <MudText Typo="Typo.body2" Class="mud-text-secondary">@Formats.LongDate(_today?.Today ?? Clock.Today)</MudText>
     </div>
     <MudSpacer />
-    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddTask" OnClick="CreateTaskAsync">
+    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddTask" OnClick="QuickAdd.OpenTaskAsync">
         Neue Aufgabe
     </MudButton>
 </MudStack>
@@ -117,7 +118,11 @@ else
 @code {
     private GetToday.Result? _today;
 
-    protected override Task OnInitializedAsync() => LoadAsync();
+    protected override Task OnInitializedAsync()
+    {
+        QuickAdd.TaskCreated += OnTaskCreated;
+        return LoadAsync();
+    }
 
     private async Task LoadAsync()
     {
@@ -131,16 +136,8 @@ else
         _today = result.Value;
     }
 
-    /// <summary>Free or linked task (US-11 AK1).</summary>
-    private async Task CreateTaskAsync()
-    {
-        var dialog = await DialogService.ShowAsync<TaskDialog>("Neue Aufgabe", DialogDefaults.Small);
-        if (await dialog.Result is { Canceled: false })
-        {
-            Snackbar.Add("Aufgabe angelegt.", Severity.Success);
-            await LoadAsync();
-        }
-    }
+    // Tasks are created via quick-add (button, command palette), free or linked (US-11 AK1).
+    private Task OnTaskCreated(Guid taskId) => InvokeAsync(LoadAsync);
 
     private static string Count(int count) => count > 0 ? $"({count})" : "";
 
@@ -157,4 +154,6 @@ else
         TimelineRecordType.Organization => Links.Organization(record.Id),
         _ => Links.Opportunity(record.Id),
     };
+
+    public void Dispose() => QuickAdd.TaskCreated -= OnTaskCreated;
 }

@@ -36,11 +36,11 @@
 - [x] Integrationstest: Relevanz-Reihenfolge, Tippfehler, Archivierte, Laufzeit < 200 ms bei 10k Kontakten (NFR Kap. 6, `LargeDataset` aus It. 3 wiederverwenden)
 
 ## Schritt 3 – Command Palette (US-13)
-- [ ] `Ctrl/Cmd + K` öffnet die Palette; ein Klick oder Fokus auf das Suchfeld in der App-Leiste ebenfalls (`TODO(US-13)` auflösen) (AK1)
-- [ ] Treffer nach ≤ 2 Zeichen, gruppiert nach Typ, mit Zusatzinfo (Firma, Phase, Typ) (AK1, AK2)
-- [ ] Pfeiltasten wählen, `Enter` öffnet die Detailansicht, `Esc` schließt (AK4)
-- [ ] Aktionen ohne Suchtext bzw. passend zum Suchtext: „Neuer Kontakt“, „Neue Organisation“, „Neue Anfrage“, „Neue Aufgabe“, „Gehe zu Heute/Pipeline/Kontakte/Organisationen/Einstellungen“ (SPEC 3.1 Nr. 2)
-- [ ] Debounce und Abbruch veralteter Anfragen (`CancellationToken`), damit schnelles Tippen die DB nicht flutet
+- [x] `Ctrl/Cmd + K` öffnet die Palette; ein Klick (bzw. `Enter`) auf das Suchfeld in der App-Leiste ebenfalls (`TODO(US-13)` auflösen) (AK1); bewusst nicht schon beim Fokus, damit Tab-Navigation keinen Dialog öffnet (WCAG 3.2.1)
+- [x] Treffer nach ≤ 2 Zeichen, gruppiert nach Typ, mit Zusatzinfo (Firma, Phase, Typ) (AK1, AK2)
+- [x] Pfeiltasten wählen, `Enter` öffnet die Detailansicht, `Esc` schließt (AK4)
+- [x] Aktionen ohne Suchtext bzw. passend zum Suchtext: „Neuer Kontakt“, „Neue Organisation“, „Neue Anfrage“, „Neue Aufgabe“, „Gehe zu Heute/Pipeline/Kontakte/Organisationen/Einstellungen“ (SPEC 3.1 Nr. 2)
+- [x] Debounce und Abbruch veralteter Anfragen (`CancellationToken`), damit schnelles Tippen die DB nicht flutet
 
 ## Schritt 4 – Tastenkürzel (SPEC 3.2)
 - [ ] `keyboard.js` um Sequenzen erweitern: `G` dann `H`/`P`/`K`/`O` (Zeitfenster z. B. 1 s)

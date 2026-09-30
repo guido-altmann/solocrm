@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @implements IAsyncDisposable
 @inject QuickAddService QuickAdd
+@inject CommandPaletteService Palette
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
@@ -15,11 +16,15 @@
                        aria-label="Navigation ein-/ausblenden" OnClick="ToggleDrawer" />
         <MudText Typo="Typo.h6" Class="ml-2">SoloCRM</MudText>
         <MudSpacer />
-        @* TODO(US-13): open the command palette on focus / Ctrl+K *@
-        <MudTextField T="string" Placeholder="Suchen…" Adornment="Adornment.Start"
-                      AdornmentIcon="@Icons.Material.Filled.Search" Variant="Variant.Outlined"
-                      Margin="Margin.Dense" ReadOnly="true" Disabled="true"
-                      Class="d-none d-sm-flex mx-4" Style="max-width: 360px;" />
+        @* Looks like a search field and opens the command palette (SPEC 3.4). It opens on click or Enter, not on
+           focus alone: tabbing through the app bar must not open a dialog (WCAG 3.2.1). *@
+        <button type="button" class="app-search d-none d-sm-flex mx-4" aria-label="Suchen (Strg+K)" @onclick="Palette.OpenAsync">
+            <MudIcon Icon="@Icons.Material.Filled.Search" Size="Size.Small" />
+            <span class="app-search-text">Suchen…</span>
+            <kbd>@ShortcutLabel</kbd>
+        </button>
+        <MudIconButton Icon="@Icons.Material.Filled.Search" Color="Color.Inherit" Class="d-flex d-sm-none"
+                       aria-label="Suchen" OnClick="Palette.OpenAsync" />
         <MudTooltip Text="@($"{QuickAdd.CurrentLabel} (N)")">
             <MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Inherit"
                            aria-label="@QuickAdd.CurrentLabel" OnClick="QuickAdd.OpenForCurrentPageAsync" />
@@ -54,6 +59,8 @@
     private bool _drawerOpen = true;
     private bool _isDarkMode;
     private IJSObjectReference? _keyboard;
+    private string ShortcutLabel => _isMac ? "⌘K" : "Strg K";
+    private bool _isMac;
     private DotNetObjectReference<MainLayout>? _selfReference;
 
     // The quick-add button depends on the current page.
@@ -82,18 +89,18 @@
 
         _selfReference = DotNetObjectReference.Create(this);
         _keyboard = await JS.InvokeAsync<IJSObjectReference>("import", "./js/keyboard.js");
-        await _keyboard.InvokeVoidAsync("register", _selfReference);
+        _isMac = await _keyboard.InvokeAsync<bool>("register", _selfReference);
+        StateHasChanged();
     }
 
     /// <summary>Called by keyboard.js for global shortcuts (SPEC 3.2).</summary>
     [JSInvokable]
-    public async Task OnShortcut(string key)
+    public Task OnShortcut(string key) => key switch
     {
-        if (key == "n")
-        {
-            await QuickAdd.OpenForCurrentPageAsync();
-        }
-    }
+        "palette" => Palette.OpenAsync(),
+        "n" => QuickAdd.OpenForCurrentPageAsync(),
+        _ => Task.CompletedTask,
+    };
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 
