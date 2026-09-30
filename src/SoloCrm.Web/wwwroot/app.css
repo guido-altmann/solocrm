@@ -250,3 +250,9 @@ kbd {
     border-top: 1px solid var(--mud-palette-divider);
     font-size: 0.75rem;
 }
+
+/* Keyboard shortcut overview („?“, SPEC 3.2) */
+.shortcut-table td.shortcut-keys {
+    width: 45%;
+    white-space: nowrap;
+}

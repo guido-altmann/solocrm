@@ -43,10 +43,10 @@
 - [x] Debounce und Abbruch veralteter Anfragen (`CancellationToken`), damit schnelles Tippen die DB nicht flutet
 
 ## Schritt 4 – Tastenkürzel (SPEC 3.2)
-- [ ] `keyboard.js` um Sequenzen erweitern: `G` dann `H`/`P`/`K`/`O` (Zeitfenster z. B. 1 s)
-- [ ] `Ctrl/Cmd + K` global, auch in Eingabefeldern; alle übrigen Kürzel nur außerhalb von Eingabefeldern und Dialogen (wie `N`)
-- [ ] `Esc` bricht Inline-Edit ab und schließt Dialoge/Palette (einheitlich prüfen)
-- [ ] Übersicht der Tastenkürzel per `?` als kleiner, statischer Dialog (Entscheidung 5)
+- [x] `keyboard.js` um Sequenzen erweitern: `G` dann `H`/`P`/`K`/`O` (Zeitfenster z. B. 1 s)
+- [x] `Ctrl/Cmd + K` global, auch in Eingabefeldern; alle übrigen Kürzel nur außerhalb von Eingabefeldern und Dialogen (wie `N`)
+- [x] `Esc` bricht Inline-Edit ab und schließt Dialoge/Palette (einheitlich prüfen); alle Dialoge und Bestätigungen nutzen `DialogDefaults` (Inline-Edit siehe Schritt 7)
+- [x] Übersicht der Tastenkürzel per `?` als kleiner, statischer Dialog (Entscheidung 5)
 
 ## Schritt 5 – Tags: Domäne und Verwaltung (US-15)
 - [ ] Entität `Tag` (SPEC 2.3): `Name` (eindeutig, case-insensitive), `Color` aus einer festen Palette mit geprüftem Kontrast, neue Tags bekommen reihum die nächste Farbe (Entscheidung 7); drei typisierte Join-Tabellen `contact_tags`, `organization_tags`, `opportunity_tags` (ADR-005), FKs mit `ON DELETE CASCADE`

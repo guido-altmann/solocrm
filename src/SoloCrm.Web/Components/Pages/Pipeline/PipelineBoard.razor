@@ -133,8 +133,6 @@ else
 }
 
 @code {
-    private static readonly DialogOptions WideOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true, CloseOnEscapeKey = true };
-
     private MudDropContainer<GetPipelineBoard.Card>? _container;
     private GetPipelineBoard.Result? _board;
     private bool _includeClosed;
@@ -180,8 +178,7 @@ else
         if (column.Status == StageStatus.Lost && card.LostReason is null)
         {
             var parameters = new DialogParameters<LostReasonDialog> { { d => d.Title, card.Title } };
-            var dialog = await DialogService.ShowAsync<LostReasonDialog>("Anfrage verloren", parameters,
-                new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true });
+            var dialog = await DialogService.ShowAsync<LostReasonDialog>("Anfrage verloren", parameters, DialogDefaults.ExtraSmall);
             if (await dialog.Result is not { Canceled: false, Data: LostReason reason })
             {
                 // Canceling puts the card back into its original column (US-08 AK1).
@@ -209,7 +206,7 @@ else
     private async Task EditAsync(Guid opportunityId)
     {
         var parameters = new DialogParameters<OpportunityDialog> { { d => d.OpportunityId, opportunityId } };
-        var dialog = await DialogService.ShowAsync<OpportunityDialog>("Anfrage bearbeiten", parameters, WideOptions);
+        var dialog = await DialogService.ShowAsync<OpportunityDialog>("Anfrage bearbeiten", parameters, DialogDefaults.Medium);
         if (await dialog.Result is { Canceled: false })
         {
             await LoadAsync();

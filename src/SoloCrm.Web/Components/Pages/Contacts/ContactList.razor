@@ -90,8 +90,6 @@
 </MudDataGrid>
 
 @code {
-    private static readonly DialogOptions EditOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
-
     private MudDataGrid<GetContacts.Item>? _grid;
     private string? _search;
     private OrganizationOption? _organization;
@@ -162,7 +160,7 @@
     private async Task EditAsync(GetContacts.Item item)
     {
         var parameters = new DialogParameters<ContactDialog> { { d => d.ContactId, item.Id } };
-        var dialog = await DialogService.ShowAsync<ContactDialog>("Kontakt bearbeiten", parameters, EditOptions);
+        var dialog = await DialogService.ShowAsync<ContactDialog>("Kontakt bearbeiten", parameters, DialogDefaults.Small);
         if (await dialog.Result is { Canceled: false })
         {
             Snackbar.Add("Kontakt gespeichert.", Severity.Success);

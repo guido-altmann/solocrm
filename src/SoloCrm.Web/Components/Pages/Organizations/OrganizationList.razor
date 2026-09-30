@@ -93,8 +93,6 @@
 </MudDataGrid>
 
 @code {
-    private static readonly DialogOptions EditOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true };
-
     private MudDataGrid<GetOrganizations.Item>? _grid;
     private string? _search;
     private OrganizationType? _type;
@@ -146,7 +144,7 @@
     private async Task EditAsync(GetOrganizations.Item item)
     {
         var parameters = new DialogParameters<OrganizationDialog> { { d => d.OrganizationId, item.Id } };
-        var dialog = await DialogService.ShowAsync<OrganizationDialog>("Organisation bearbeiten", parameters, EditOptions);
+        var dialog = await DialogService.ShowAsync<OrganizationDialog>("Organisation bearbeiten", parameters, DialogDefaults.Small);
         if (await dialog.Result is { Canceled: false })
         {
             Snackbar.Add("Organisation gespeichert.", Severity.Success);

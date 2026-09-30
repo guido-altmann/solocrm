@@ -3,6 +3,7 @@
 @inject QuickAddService QuickAdd
 @inject CommandPaletteService Palette
 @inject NavigationManager Navigation
+@inject IDialogService DialogService
 @inject IJSRuntime JS
 
 <MudThemeProvider @ref="_themeProvider" Theme="SoloCrmTheme.Instance" @bind-IsDarkMode="_isDarkMode" />
@@ -95,12 +96,27 @@
 
     /// <summary>Called by keyboard.js for global shortcuts (SPEC 3.2).</summary>
     [JSInvokable]
-    public Task OnShortcut(string key) => key switch
+    public async Task OnShortcut(string shortcut)
     {
-        "palette" => Palette.OpenAsync(),
-        "n" => QuickAdd.OpenForCurrentPageAsync(),
-        _ => Task.CompletedTask,
-    };
+        if (KeyboardShortcuts.NavigationTarget(shortcut) is { } href)
+        {
+            Navigation.NavigateTo(href);
+            return;
+        }
+
+        await (shortcut switch
+        {
+            "palette" => Palette.OpenAsync(),
+            "n" => QuickAdd.OpenForCurrentPageAsync(),
+            "?" => ShowShortcutsAsync(),
+            _ => Task.CompletedTask,
+        });
+    }
+
+    private Task ShowShortcutsAsync() => DialogService.ShowAsync<KeyboardShortcutsDialog>(
+        "Tastenkürzel",
+        new DialogParameters<KeyboardShortcutsDialog> { { d => d.IsMac, _isMac } },
+        DialogDefaults.Small);
 
     private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
 

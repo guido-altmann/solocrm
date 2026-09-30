@@ -1,0 +1,43 @@
+@* Overview of the keyboard shortcuts, opened with „?“ (SPEC 3.2, iteration 4 decision 5). *@
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+            Außer @(IsMac ? "⌘" : "Strg") + K wirken die Kürzel nur außerhalb von Eingabefeldern und Dialogen.
+        </MudText>
+        @foreach (var group in KeyboardShortcuts.Overview(IsMac))
+        {
+            <MudText Typo="Typo.subtitle2" Class="mt-2">@group.Title</MudText>
+            <MudSimpleTable Dense="true" Elevation="0" Class="shortcut-table">
+                <tbody>
+                    @foreach (var shortcut in group.Shortcuts)
+                    {
+                        <tr>
+                            <td class="shortcut-keys">
+                                @for (var i = 0; i < shortcut.Keys.Count; i++)
+                                {
+                                    @if (i > 0)
+                                    {
+                                        <span class="mud-text-secondary">@(shortcut.InSequence ? " dann " : " + ")</span>
+                                    }
+                                    <kbd>@shortcut.Keys[i]</kbd>
+                                }
+                            </td>
+                            <td>@shortcut.Description</td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => MudDialog.Close()" Color="Color.Primary">Schließen</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public bool IsMac { get; set; }
+}

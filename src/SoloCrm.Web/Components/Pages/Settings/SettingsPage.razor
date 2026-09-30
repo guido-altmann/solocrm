@@ -153,8 +153,7 @@
                 { d => d.OpportunityCount, stage.OpportunityCount },
                 { d => d.Targets, targets },
             };
-            var dialog = await DialogService.ShowAsync<DeleteStageDialog>("Phase löschen", parameters,
-                new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true, CloseOnEscapeKey = true });
+            var dialog = await DialogService.ShowAsync<DeleteStageDialog>("Phase löschen", parameters, DialogDefaults.ExtraSmall);
             if (await dialog.Result is not { Canceled: false, Data: Guid target })
             {
                 return;
@@ -165,7 +164,8 @@
         else
         {
             var confirmed = await DialogService.ShowMessageBoxAsync(
-                "Phase löschen", $"Die Phase „{stage.Name}“ wirklich löschen?", yesText: "Löschen", cancelText: "Abbrechen");
+                "Phase löschen", $"Die Phase „{stage.Name}“ wirklich löschen?", yesText: "Löschen", cancelText: "Abbrechen",
+                options: DialogDefaults.ExtraSmall);
             if (confirmed != true)
             {
                 return;
