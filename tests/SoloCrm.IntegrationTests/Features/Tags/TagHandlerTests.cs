@@ -248,6 +248,36 @@ public sealed class TagHandlerTests(PostgresFixture postgres) : HandlerTest(post
         result.Value.Items.Select(t => t.Name).Should().Equal("Azure", "Remote");
     }
 
+    [Fact]
+    public async Task Rename_BlankName_ReturnsValidationError()
+    {
+        var tag = await CreateTagAsync("Kunde");
+
+        var result = await SendAsync<RenameTag.Command, RenameTag.Result>(new RenameTag.Command(tag.Id, " "));
+
+        result.Error.Should().BeOfType<ValidationError>();
+    }
+
+    [Fact]
+    public async Task SearchTags_InvalidLimit_ReturnsValidationError()
+    {
+        var result = await QueryAsync<SearchTags.Query, SearchTags.Result>(new SearchTags.Query("k", Limit: 0));
+
+        result.Error.Should().BeOfType<ValidationError>();
+    }
+
+    [Fact]
+    public async Task RemoveAndGetRecordTags_UnknownRecordType_ReturnValidationError()
+    {
+        var remove = await SendAsync<RemoveTag.Command, RemoveTag.Result>(
+            new RemoveTag.Command((TimelineRecordType)99, Guid.CreateVersion7(), Guid.CreateVersion7()));
+        var get = await QueryAsync<GetRecordTags.Query, GetRecordTags.Result>(
+            new GetRecordTags.Query((TimelineRecordType)99, Guid.CreateVersion7()));
+
+        remove.Error.Should().BeOfType<ValidationError>();
+        get.Error.Should().BeOfType<ValidationError>();
+    }
+
     private async Task<CreateTag.Result> CreateTagAsync(string name) =>
         (await SendAsync<CreateTag.Command, CreateTag.Result>(new CreateTag.Command(name))).Value;
 

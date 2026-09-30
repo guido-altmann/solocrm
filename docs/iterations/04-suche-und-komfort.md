@@ -71,11 +71,11 @@
 - [x] Bearbeiten-Dialog (Stift) aus den Detailansichten entfernen; Quick-Add, Listen und Pipeline behalten ihre Dialoge (Entscheidung 2); „Archivieren/Wiederherstellen“ der Anfrage wandert aus dem Dialog in den Kopf der Detailansicht
 
 ## Schritt 8 – Tests
-- [ ] Unit-Tests `Tag` (Name, Farbe, Normalisierung)
-- [ ] Handler-Tests (Happy Path + Validierungsfehler) für alle neuen Use Cases
-- [ ] Integrationstests: Suche (Ranking, Tippfehler, Firma, Archivierte, Performance), Tag-Eindeutigkeit (case-insensitive), Löschen eines Tags mit Zuordnungen, Tag-Filter in den Listen, Migration der generierten Spalten
-- [ ] bUnit: Command Palette (Tastaturnavigation, Aktionen), Inline-Feld (Enter/Blur/Esc, Fehler am Feld), Tag-Chip-Eingabe mit „Neu anlegen“
-- [ ] Browser-Smoke-Test der Tastenkürzel (`Ctrl/Cmd + K`, `G` + `H/P/K/O`), da die JS-Logik in bUnit nicht läuft
+- [x] Unit-Tests `Tag` (Name, Farbe, Normalisierung)
+- [x] Handler-Tests (Happy Path + Validierungsfehler) für alle neuen Use Cases
+- [x] Integrationstests: Suche (Ranking, Tippfehler, Firma, Archivierte, Performance), Tag-Eindeutigkeit (case-insensitive), Löschen eines Tags mit Zuordnungen, Tag-Filter in den Listen, Migration der generierten Spalten
+- [x] bUnit: Command Palette (Tastaturnavigation, Aktionen), Inline-Feld (Enter/Blur/Esc, Fehler am Feld), Tag-Chip-Eingabe mit „Neu anlegen“
+- [x] Browser-Smoke-Test der Tastenkürzel (`Ctrl/Cmd + K`, `G` + `H/P/K/O`), da die JS-Logik in bUnit nicht läuft: lokal per Playwright gegen eine Wegwerf-DB (Sequenz-Timeout, keine Kürzel in Eingabefeldern und Dialogen, `?`, `Esc`); zusätzlich Palette, Tags und Inline-Editing im Browser geprüft
 
 ## Schritt 9 – Abschluss
 - [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009)
