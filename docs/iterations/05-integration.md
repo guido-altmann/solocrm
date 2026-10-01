@@ -64,8 +64,8 @@
 ## Schritt 6 – CSV-Import: Use Case (US-16)
 - [ ] Parsing mit CsvHelper: Trennzeichen (`,`/`;`) und Kodierung (UTF-8 mit/ohne BOM, Windows-1252) erkennen, Größenlimit (z. B. 5 MB / 10.000 Zeilen)
 - [ ] Vorschau der ersten 10 Zeilen (AK1)
-- [ ] Spalten-Mapping auf Kontaktfelder inkl. Organisation (Name → bestehende Organisation oder neu anlegen)
-- [ ] Dubletten per E-Mail (case-insensitive), Option überspringen/aktualisieren (AK2); Dubletten innerhalb der Datei
+- [ ] Spalten-Mapping je Zielfeld (Zielfeld → Quellspalte, mit Ersatzspalte) inkl. Organisation (Name → bestehende Organisation oder neu anlegen); Spalten per Index, da Kopfzeilen nicht eindeutig sein müssen
+- [ ] Dubletten per E-Mail (case-insensitive), ohne E-Mail per `HubSpotRecordId`; Option überspringen/aktualisieren (AK2); Dubletten innerhalb der Datei
 - [ ] Ergebnisbericht: angelegt, aktualisiert, übersprungen, fehlerhaft mit Zeile und Grund (AK3)
 - [ ] Mapping-Vorlage für den HubSpot-Kontaktexport (AK4, Entscheidung 9)
 - [ ] Synchrone Ausführung in Blöcken zu 100 Zeilen mit Fortschritt (Entscheidung 10); Audit und `ContactCreated` je Kontakt wie bei manueller Anlage (Entscheidung 11)
@@ -98,7 +98,28 @@
 6. **Signatur:** HMAC-SHA256 über `<timestamp>.<body>`; Header `X-SoloCrm-Timestamp` (Unix-Sekunden) und `X-SoloCrm-Signature: sha256=<hex>`. Empfänger prüfen Signatur und Alter (< 5 min).
 7. **Webhook-Ziele:** `https`; `http` nur für explizit konfigurierte Hosts (`Webhooks__AllowedHttpHosts`). Private Adressen sind erlaubt (Single-User, n8n läuft oft intern).
 8. **Aufbewahrung:** verarbeitete Outbox-Nachrichten und Versandprotokoll 30 Tage; tägliches Aufräumen durch denselben Hintergrundprozess.
-9. **HubSpot-Vorlage:** Kopfzeile eines echten HubSpot-Exports folgt noch; bis dahin gilt der Vorschlag (First Name, Last Name, Email, Phone Number, Job Title, Company Name, LinkedIn-URL, Original Source → Quelle). **Offen, blockiert Schritt 6 (Vorlage) nicht vollständig.**
+9. **HubSpot-Vorlage** (Kopfzeile eines echten Exports vom 2026-10-01, ~300 Spalten, Komma-getrennt, durchgehend in Anführungszeichen):
+
+   | Kontaktfeld | HubSpot-Spalte | Ersatz, wenn leer |
+   |---|---|---|
+   | FirstName | `First Name` | – |
+   | LastName | `Last Name` | – |
+   | Email | `Email` | `Work email` |
+   | Phone | `Phone Number` | `Mobile Phone Number` |
+   | JobTitle | `Job Title` | `lh_current_position` |
+   | LinkedInUrl | `LinkedIn URL` | `lh_linkedin_profile_url` |
+   | Organisation (Name) | `Company Name` | – (bestehende per Name, sonst neu mit Typ `Other`) |
+   | Website der *neu angelegten* Organisation | `Website URL` | – |
+   | Source | `Original Traffic Source` | Werte-Mapping, siehe Frage A |
+   | ExtraFields `HubSpotRecordId` | `Record ID` | – |
+
+   Nicht übernommen: Adressen, Lifecycle-/Lead-Daten (siehe Frage B), Zeitstempel (`Create Date` usw.; `CreatedAt` setzt ausschließlich der Interceptor), Marketing-Kennzahlen, `Associated … IDs`.
+
+   **Technische Folgen:** Spaltennamen sind *nicht eindeutig* (`Billing Contact IDs` kommt dreimal vor) und enthalten maskierte Anführungszeichen (`Date entered ""Kunde …""`). Das Parsing arbeitet daher mit Spaltenindizes, nicht mit Namen; die Vorlage sucht die erste passende Spalte. Bei ~300 Spalten wird das Mapping je *Zielfeld* gewählt (Zielfeld → Quellspalte), nicht je Quellspalte, und die Vorschau zeigt nur die zugeordneten Spalten. Dubletten innerhalb von SoloCRM: zuerst per E-Mail (AK2), bei Kontakten ohne E-Mail per `HubSpotRecordId`, damit ein erneuter Import keine Dubletten erzeugt.
+
+   **Noch zu bestätigen:**
+   - **A – Quelle:** HubSpot-Werte → `LeadSource`: `Referrals` → Empfehlung; `Organic Search`, `Paid Search`, `Direct Traffic`, `AI Referrals` → Website; `Social Media`, `Paid Social` → LinkedIn; alles andere (`Offline Sources`, `Email Marketing`, `Other Campaigns`) → Sonstige. Interne Namen (`ORGANIC_SEARCH` …) werden ebenso erkannt.
+   - **B – Lifecycle Stage als Tag:** `Lifecycle Stage` optional als Tag übernehmen (z. B. „Kunde“, „Lead“)? Dafür bietet das Mapping allgemein das Zielfeld „Tag“ an.
 10. **Import:** synchron im Blazor-Circuit mit Fortschrittsanzeige, Transaktion je Block (100 Zeilen), kein Hintergrundjob.
 11. **Events beim Import:** jeder importierte Kontakt löst `ContactCreated` aus (konsistent mit der manuellen Anlage); die Outbox verarbeitet sie gestaffelt.
 12. **Fehlerhafte Zeilen:** Anzeige im Bericht genügt; Download erst bei Bedarf.

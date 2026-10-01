@@ -601,7 +601,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 - [x] Finaler Projektname / Domain? → Name bleibt **SoloCRM**; die Produktivdomain wird nicht im öffentlichen Repo dokumentiert (Doku nutzt `crm.example.de`)
 - [x] Image-Build in GitHub Actions (GHCR) oder direkt durch Coolify? → GitHub Actions → GHCR (ADR-009)
 - [x] Migrations-Strategie beim Deploy (siehe 7.6) → `efbundle` im Entrypoint (ADR-009)
-- [ ] Welche HubSpot-Felder werden beim Import tatsächlich benötigt? (Export sichten)
+- [x] Welche HubSpot-Felder werden beim Import tatsächlich benötigt? → Vorlage siehe `docs/iterations/05-integration.md`, Entscheidung 9 (Name, E-Mail, Telefon, Rolle, LinkedIn, Firma, Quelle, Record ID)
 - [x] Repo öffentlich ab Iteration 1 oder erst ab MVP? → öffentlich ab Iteration 1
 - [ ] Datenanreicherung: in der App (Hangfire-Job + LLM-API) oder ausgelagert in n8n?
 - [ ] Brauche ich Stundensatz-Varianten (z. B. Remote- vs. Vor-Ort-Satz) oder reicht ein Satz pro Anfrage?
