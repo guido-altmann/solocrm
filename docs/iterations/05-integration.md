@@ -103,7 +103,7 @@
 - [x] Import-Assistent mit Zieltyp (Kontakte / Organisationen, aus den Spalten erkannt und umschaltbar); gemeinsamer Unterbau `ImportRun` für Parsing, Spaltenprüfung, Blöcke, Bericht und Tags
 - [x] Zielfelder: Name, Typ, Website, Anschrift, Tag, HubSpot-ID (Telefon und LinkedIn-Seite hat das Organisationsmodell nicht, sie werden daher nicht übernommen); Dubletten per `HubSpotRecordId`, sonst Name (case-insensitive); überspringen/aktualisieren
 - [x] HubSpot-Firmenvorlage inkl. Typ-Mapping; Spaltennamen aus den Eigenschaftsdefinitionen des HubSpot-Kontos (`Company name`, `Website URL` mit Ersatz `Company Domain Name`, `Type`, Adresse, `Country/Region Code` mit Ersatz `Country/Region`, `Lifecycle Stage` → Tag, `Record ID`)
-- [ ] Kopfzeile eines echten Firmenexports abgleichen (steht aus)
+- [x] Kopfzeile eines echten Firmenexports abgeglichen (2026-10-01, 117 Spalten): alle Vorlagenspalten vorhanden und eindeutig, Zieltyp und Vorlage werden erkannt; als Testfall `HubSpotCompanyExportTests` hinterlegt
 - [x] Audit und `OrganizationCreated` je Organisation wie bei manueller Anlage
 - [x] Fehlt die Hauptspalte einer Vorlage, wird die Ersatzspalte zur Hauptspalte (z. B. nur `Company Domain Name`)
 
@@ -154,7 +154,7 @@
 
 ## Entscheidungen (2026-10-01, Erweiterung)
 14. **Adressen:** Kontakte und Organisationen erhalten je eine vollständige Anschrift als Value Object `Address` (Straße inkl. Hausnummer, Adresszusatz, PLZ, Ort, Bundesland/Region, Land) analog zu `Pricing` (ADR-011). Das Land wird als ISO-3166-1-Alpha-2-Code gespeichert und in der Oberfläche als deutscher Name zur Auswahl angeboten; die Namensliste ist fest im Code (unabhängig von ICU). Der Import erkennt Code, deutschen und englischen Namen. Entscheidung 9 wird insoweit revidiert: Adressen werden übernommen.
-15. **Organisationsimport:** derselbe Assistent mit Zieltyp „Organisationen“ und einer HubSpot-Firmenvorlage. Dubletten per `HubSpotRecordId` (in `ExtraFields`), sonst per Name (case-insensitive). Typ-Mapping: `Prospect` → Endkunde, `Partner` → Partner, `Reseller` → Vermittler, alles andere → Sonstige.
+15. **Organisationsimport:** derselbe Assistent mit Zieltyp „Organisationen“ und einer HubSpot-Firmenvorlage. Dubletten per `HubSpotRecordId` (in `ExtraFields`), sonst per Name (case-insensitive). Typ-Mapping: `Prospect` → Endkunde, `Partner` → Partner, `Reseller` → Vermittler, alles andere → Sonstige. Abgleich mit einem echten Firmenexport (117 Spalten, Komma-getrennt, durchgehend in Anführungszeichen): Name `Company name`, Typ `Type`, Website `Website URL` (Ersatz `Company Domain Name`), Anschrift `Street Address`, `Street Address 2`, `Postal Code`, `City`, `State/Region`, `Country/Region Code` (Ersatz `Country/Region`), Tag `Lifecycle Stage`, HubSpot-ID `Record ID`. Nicht übernommen u. a. `Phone Number`, `LinkedIn Company Page`, `Industry`, `Description` (keine Felder im Modell).
 16. **Verknüpfung:** Der Kontakt-Import verknüpft über die HubSpot-Firmen-ID aus der Zuordnungsspalte des Kontaktexports, ohne Treffer über den Firmennamen. Reihenfolge: erst Organisationen, dann Kontakte; bereits importierte Kontakte lassen sich per „aktualisieren“ nachträglich verknüpfen.
 17. **Einplanung:** Die Erweiterung gehört zu Iteration 5 und geht mit ihr in Produktion.
 
