@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using SoloCrm.Domain.Common;
 
@@ -6,11 +5,12 @@ namespace SoloCrm.Infrastructure.Persistence.Outbox;
 
 /// <summary>
 /// A domain event persisted in the same transaction as the change that raised it (ADR-010).
-/// Processing and webhook delivery follow in iteration 5.
+/// The outbox processor delivers it to the webhook subscriptions and retries with backoff (ADR-008).
 /// </summary>
 public sealed class OutboxMessage
 {
     public const int TypeMaxLength = 100;
+    public const int LastErrorMaxLength = 1000;
 
     // Required by EF Core.
     private OutboxMessage()
@@ -41,6 +41,7 @@ public sealed class OutboxMessage
 
     public DateTimeOffset? ProcessedAt { get; private set; }
 
+    /// <summary>Number of delivery rounds so far.</summary>
     public int Attempts { get; private set; }
 
     public DateTimeOffset NextAttemptAt { get; private set; }
@@ -53,32 +54,28 @@ public sealed class OutboxMessage
 
         var eventType = domainEvent.GetType();
         var payload = JsonSerializer.Serialize(domainEvent, eventType, JsonColumn.Options);
-        return new OutboxMessage(EventTypeName(eventType), payload, occurredAt);
+        return new OutboxMessage(DomainEventNames.Of(eventType), payload, occurredAt);
     }
 
-    /// <summary>
-    /// Derives the public event name from the CLR type: the first word names the aggregate,
-    /// the rest is snake_case (<c>OpportunityStageChanged</c> → <c>opportunity.stage_changed</c>).
-    /// </summary>
-    public static string EventTypeName(Type eventType)
+    /// <summary>No subscription receives the event; nothing was sent (iteration 5 decision 3).</summary>
+    public void MarkSkipped(DateTimeOffset processedAt) => ProcessedAt = processedAt;
+
+    /// <summary>After a delivery round: every delivery succeeded or was given up.</summary>
+    public void MarkProcessed(DateTimeOffset processedAt, string? lastError = null)
     {
-        ArgumentNullException.ThrowIfNull(eventType);
-
-        var name = eventType.Name;
-        var builder = new StringBuilder(name.Length + 4);
-        var separator = '.';
-        for (var i = 0; i < name.Length; i++)
-        {
-            var c = name[i];
-            if (i > 0 && char.IsUpper(c))
-            {
-                builder.Append(separator);
-                separator = '_';
-            }
-
-            builder.Append(char.ToLowerInvariant(c));
-        }
-
-        return builder.ToString();
+        Attempts++;
+        ProcessedAt = processedAt;
+        LastError = Truncate(lastError);
     }
+
+    /// <summary>After a delivery round: at least one delivery failed and will be retried at <paramref name="nextAttemptAt"/>.</summary>
+    public void ScheduleRetry(DateTimeOffset nextAttemptAt, string lastError)
+    {
+        Attempts++;
+        NextAttemptAt = nextAttemptAt;
+        LastError = Truncate(lastError);
+    }
+
+    private static string? Truncate(string? error) =>
+        error is { Length: > LastErrorMaxLength } ? error[..LastErrorMaxLength] : error;
 }

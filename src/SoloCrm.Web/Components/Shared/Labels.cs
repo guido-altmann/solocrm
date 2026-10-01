@@ -98,4 +98,18 @@ public static class Labels
         ActivityType.Email => MudBlazor.Icons.Material.Outlined.Email,
         _ => MudBlazor.Icons.Material.Outlined.Send,
     };
+
+    /// <summary>German name of a webhook event (SPEC 2.6); unknown names are shown as they are.</summary>
+    public static string ForWebhookEvent(string eventType) => eventType switch
+    {
+        "contact.created" => "Kontakt angelegt",
+        "organization.created" => "Organisation angelegt",
+        "opportunity.created" => "Anfrage angelegt",
+        "opportunity.stage_changed" => "Phase der Anfrage geändert",
+        "task.completed" => "Aufgabe erledigt",
+        "task.reopened" => "Aufgabe wieder geöffnet",
+        "activity.logged" => "Aktivität erfasst",
+        "webhook.ping" => "Test",
+        _ => eventType,
+    };
 }

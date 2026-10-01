@@ -20,15 +20,18 @@ public abstract class HandlerTest(PostgresFixture postgres) : IClassFixture<Post
 
     protected string ConnectionString { get; private set; } = "";
 
+    /// <summary>Additional configuration values for the service provider.</summary>
+    protected virtual IReadOnlyDictionary<string, string?> Settings { get; } = new Dictionary<string, string?>();
+
     protected static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    public async ValueTask InitializeAsync()
+    public virtual async ValueTask InitializeAsync()
     {
         ConnectionString = await CrmWebApplicationFactory.CreateDatabaseAsync(postgres, Ct);
-        _services = CrmServices.Create(ConnectionString, Time);
+        _services = CrmServices.Create(ConnectionString, Time, Settings);
     }
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         if (_services is not null)
         {

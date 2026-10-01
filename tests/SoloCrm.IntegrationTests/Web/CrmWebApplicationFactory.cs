@@ -49,6 +49,8 @@ public sealed class CrmWebApplicationFactory(string connectionString, string? ad
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:Crm", ConnectionString);
         builder.UseSetting("DataProtection:KeysPath", "");
+        // Tests drive the outbox processor directly; the background service would race with them.
+        builder.UseSetting("Outbox:Enabled", "false");
         // Explicit values (also when empty) so local user secrets never leak into tests.
         builder.UseSetting("Admin:Email", adminEmail ?? "");
         builder.UseSetting("Admin:InitialPassword", adminPassword ?? "");

@@ -11,10 +11,12 @@ namespace SoloCrm.IntegrationTests;
 /// </summary>
 public static class CrmServices
 {
-    public static ServiceProvider Create(string connectionString, TimeProvider timeProvider)
+    public static ServiceProvider Create(
+        string connectionString, TimeProvider timeProvider, IReadOnlyDictionary<string, string?>? settings = null)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:Crm"] = connectionString })
+            .AddInMemoryCollection(settings ?? new Dictionary<string, string?>())
             .Build();
 
         var services = new ServiceCollection();

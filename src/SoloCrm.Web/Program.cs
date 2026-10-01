@@ -36,6 +36,7 @@ try
 
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddOutboxProcessing(builder.Configuration);
 
     builder.Services.AddReverseProxySupport(builder.Configuration);
     builder.Services.AddPersistentDataProtection(builder.Configuration);

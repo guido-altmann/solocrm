@@ -10,6 +10,7 @@ using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Settings;
 using SoloCrm.Domain.Tags;
 using SoloCrm.Domain.Tasks;
+using SoloCrm.Domain.Webhooks;
 using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Persistence.Outbox;
 
@@ -39,6 +40,10 @@ public class CrmDbContext(DbContextOptions options)
     public DbSet<OpportunityTag> OpportunityTags => Set<OpportunityTag>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
+
+    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

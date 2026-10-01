@@ -6,6 +6,7 @@ using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Tags;
 using SoloCrm.Domain.Tasks;
+using SoloCrm.Domain.Webhooks;
 
 namespace SoloCrm.Application.Abstractions;
 
@@ -36,6 +37,11 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
 
     /// <summary>Read by the timeline; entries are written exclusively by the audit interceptor.</summary>
     DbSet<AuditEntry> AuditEntries { get; }
+
+    DbSet<WebhookSubscription> WebhookSubscriptions { get; }
+
+    /// <summary>Read by the delivery log; entries are written by the outbox processor and the ping.</summary>
+    DbSet<WebhookDelivery> WebhookDeliveries { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -1,0 +1,127 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Webhooks
+@using SoloCrm.Domain.Webhooks
+@inject ICommandHandler<CreateWebhook.Command, CreateWebhook.Result> CreateHandler
+@inject ICommandHandler<UpdateWebhook.Command, UpdateWebhook.Result> UpdateHandler
+
+@* Creates or edits a webhook (US-18 AK1). On creation the dialog returns the plaintext secret. *@
+<form @onsubmit="SaveAsync">
+    <MudDialog>
+        <DialogContent>
+            <MudStack Spacing="2">
+                <MudTextField @bind-Value="_name" Label="Name" Placeholder="z. B. n8n" Immediate="true" AutoFocus="true"
+                              MaxLength="@WebhookSubscription.NameMaxLength"
+                              Error="@_errors.Has(nameof(CreateWebhook.Command.Name))"
+                              ErrorText="@_errors.Text(nameof(CreateWebhook.Command.Name))" />
+                <MudTextField @bind-Value="_url" Label="URL" Placeholder="https://n8n.example.com/webhook/…" Immediate="true"
+                              MaxLength="@WebhookSubscription.UrlMaxLength" InputType="InputType.Url"
+                              Error="@_errors.Has(nameof(CreateWebhook.Command.Url))"
+                              ErrorText="@_errors.Text(nameof(CreateWebhook.Command.Url))" />
+                <fieldset class="webhook-events" aria-describedby="webhook-events-error">
+                    <legend class="mud-typography mud-typography-body2">Ereignisse</legend>
+                    @foreach (var eventType in WebhookEvents.All)
+                    {
+                        <MudCheckBox T="bool" Value="@_events.Contains(eventType)" Dense="true" Size="Size.Small"
+                                     ValueChanged="@(on => Toggle(eventType, on))" Label="@Labels.ForWebhookEvent(eventType)" />
+                    }
+                    @if (_errors.Has(nameof(CreateWebhook.Command.Events)))
+                    {
+                        <MudText id="webhook-events-error" Typo="Typo.caption" Color="Color.Error">
+                            @_errors.Text(nameof(CreateWebhook.Command.Events))
+                        </MudText>
+                    }
+                </fieldset>
+                @if (Webhook is not null)
+                {
+                    <MudSwitch T="bool" @bind-Value="_isActive" Color="Color.Primary" Label="Aktiv" />
+                }
+                @if (_errors.General is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_errors.General</MudAlert>
+                }
+            </MudStack>
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="Cancel" Disabled="_saving">Abbrechen</MudButton>
+            <MudButton ButtonType="ButtonType.Submit" Color="Color.Primary" Variant="Variant.Filled" Disabled="_saving">
+                Speichern
+            </MudButton>
+        </DialogActions>
+    </MudDialog>
+</form>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    /// <summary>Edits this webhook; creates a new one when <c>null</c>.</summary>
+    [Parameter]
+    public GetWebhooks.Item? Webhook { get; set; }
+
+    private readonly FormErrors _errors = new();
+    private readonly SortedSet<string> _events = new(StringComparer.Ordinal);
+    private string? _name;
+    private string? _url;
+    private bool _isActive = true;
+    private bool _saving;
+
+    protected override void OnInitialized()
+    {
+        if (Webhook is not null)
+        {
+            (_name, _url, _isActive) = (Webhook.Name, Webhook.Url, Webhook.IsActive);
+            _events.UnionWith(Webhook.Events);
+        }
+    }
+
+    private void Toggle(string eventType, bool on)
+    {
+        if (on)
+        {
+            _events.Add(eventType);
+        }
+        else
+        {
+            _events.Remove(eventType);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        _errors.Clear();
+        try
+        {
+            IReadOnlyList<string> events = [.. _events];
+            if (Webhook is null)
+            {
+                var created = await CreateHandler.Handle(new CreateWebhook.Command(_name, _url, events), CancellationToken.None);
+                if (created.IsSuccess)
+                {
+                    MudDialog.Close(DialogResult.Ok(created.Value));
+                    return;
+                }
+
+                _errors.Show(created.Error);
+            }
+            else
+            {
+                var updated = await UpdateHandler.Handle(
+                    new UpdateWebhook.Command(Webhook.Id, _name, _url, events, _isActive), CancellationToken.None);
+                if (updated.IsSuccess)
+                {
+                    MudDialog.Close(DialogResult.Ok(updated.Value));
+                    return;
+                }
+
+                _errors.Show(updated.Error);
+            }
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+}

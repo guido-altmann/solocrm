@@ -1,0 +1,301 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Webhooks
+@inject IQueryHandler<GetWebhooks.Query, GetWebhooks.Result> GetWebhooksHandler
+@inject IQueryHandler<GetWebhookDeliveries.Query, GetWebhookDeliveries.Result> GetDeliveriesHandler
+@inject ICommandHandler<SendWebhookPing.Command, SendWebhookPing.Result> PingHandler
+@inject ICommandHandler<RegenerateWebhookSecret.Command, RegenerateWebhookSecret.Result> RegenerateHandler
+@inject ICommandHandler<DeleteWebhook.Command, DeleteWebhook.Result> DeleteHandler
+@inject AppClock Clock
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* Webhooks (US-18, SPEC 3.3 S6): targets, events, secret, test delivery and delivery log. *@
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="webhooks">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween">
+        <MudText Typo="Typo.h6">Webhooks</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add" Disabled="_busy"
+                   OnClick="CreateAsync">
+            Neuer Webhook
+        </MudButton>
+    </MudStack>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Ereignisse werden signiert (HMAC-SHA256, Header <code>X-SoloCrm-Signature</code>) an die URL gesendet und bei Fehlern
+        bis zu sechsmal mit wachsendem Abstand wiederholt. Ein Webhook erhält nur Ereignisse ab seiner Anlage.
+    </MudText>
+
+    @if (_webhooks is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (_webhooks.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">Noch keine Webhooks vorhanden.</MudText>
+    }
+    else
+    {
+        <MudStack Spacing="3">
+            @foreach (var webhook in _webhooks)
+            {
+                <div class="webhook-row" data-webhook="@webhook.Id">
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1" Wrap="Wrap.Wrap">
+                        <MudText Typo="Typo.subtitle1" Class="mr-1">@webhook.Name</MudText>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                 Color="@(webhook.IsActive ? Color.Success : Color.Default)">
+                            @(webhook.IsActive ? "Aktiv" : "Inaktiv")
+                        </MudChip>
+                        <MudSpacer />
+                        <MudTooltip Text="Test senden">
+                            <MudIconButton Icon="@Icons.Material.Filled.Send" Size="Size.Small" aria-label="@($"Test an {webhook.Name} senden")"
+                                           Disabled="_busy" OnClick="() => PingAsync(webhook)" />
+                        </MudTooltip>
+                        <MudTooltip Text="Versandprotokoll">
+                            <MudIconButton Icon="@Icons.Material.Filled.History" Size="Size.Small"
+                                           aria-label="@($"Versandprotokoll von {webhook.Name}")"
+                                           aria-expanded="@(_logFor == webhook.Id ? "true" : "false")"
+                                           OnClick="() => ToggleLogAsync(webhook)" />
+                        </MudTooltip>
+                        <MudTooltip Text="Bearbeiten">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small" aria-label="@($"{webhook.Name} bearbeiten")"
+                                           Disabled="_busy" OnClick="() => EditAsync(webhook)" />
+                        </MudTooltip>
+                        <MudTooltip Text="Secret neu erzeugen">
+                            <MudIconButton Icon="@Icons.Material.Filled.Key" Size="Size.Small"
+                                           aria-label="@($"Secret von {webhook.Name} neu erzeugen")"
+                                           Disabled="_busy" OnClick="() => RegenerateAsync(webhook)" />
+                        </MudTooltip>
+                        <MudTooltip Text="Löschen">
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" aria-label="@($"{webhook.Name} löschen")"
+                                           Disabled="_busy" OnClick="() => DeleteAsync(webhook)" />
+                        </MudTooltip>
+                    </MudStack>
+                    <MudText Typo="Typo.body2" Class="webhook-url font-monospace mud-text-secondary">@webhook.Url</MudText>
+                    <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap" Class="mt-1">
+                        @foreach (var eventType in webhook.Events)
+                        {
+                            <MudChip T="string" Size="Size.Small">@Labels.ForWebhookEvent(eventType)</MudChip>
+                        }
+                    </MudStack>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                        @if (webhook.LastAttemptAt is { } last)
+                        {
+                            @($"Letzter Versand: {Formats.DateTime(Clock.ToLocal(last))} · {(webhook.LastSucceeded == true ? "erfolgreich" : "fehlgeschlagen")}")
+                        }
+                        else
+                        {
+                            @("Noch nichts gesendet.")
+                        }
+                    </MudText>
+
+                    @if (_logFor == webhook.Id)
+                    {
+                        <div class="mt-2">
+                            @if (_deliveries is null)
+                            {
+                                <MudProgressLinear Indeterminate="true" />
+                            }
+                            else if (_deliveries.Count == 0)
+                            {
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">Das Protokoll ist leer.</MudText>
+                            }
+                            else
+                            {
+                                <MudSimpleTable Dense="true" Hover="true" Elevation="0" Class="webhook-log">
+                                    <thead>
+                                        <tr>
+                                            <th>Zeitpunkt</th>
+                                            <th>Ereignis</th>
+                                            <th>Versuch</th>
+                                            <th>Ergebnis</th>
+                                            <th>Dauer</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var delivery in _deliveries)
+                                        {
+                                            <tr>
+                                                <td>@Formats.DateTime(Clock.ToLocal(delivery.AttemptedAt))</td>
+                                                <td>@Labels.ForWebhookEvent(delivery.EventType)</td>
+                                                <td>@delivery.Attempt</td>
+                                                <td>
+                                                    @if (delivery.Succeeded)
+                                                    {
+                                                        <MudText Typo="Typo.body2" Color="Color.Success">@($"HTTP {delivery.StatusCode}")</MudText>
+                                                    }
+                                                    else
+                                                    {
+                                                        <MudText Typo="Typo.body2" Color="Color.Error">@delivery.Error</MudText>
+                                                    }
+                                                </td>
+                                                <td>@($"{delivery.DurationMs} ms")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </MudSimpleTable>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                    Die letzten @GetWebhookDeliveries.MaxLimit Versuche; Einträge werden nach 30 Tagen gelöscht.
+                                </MudText>
+                            }
+                        </div>
+                    }
+                </div>
+            }
+        </MudStack>
+    }
+</MudPaper>
+
+@code {
+    private List<GetWebhooks.Item>? _webhooks;
+    private List<GetWebhookDeliveries.Item>? _deliveries;
+    private Guid? _logFor;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await GetWebhooksHandler.Handle(new GetWebhooks.Query(), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        _webhooks = [.. result.Value.Items];
+        if (_logFor is { } id)
+        {
+            await LoadDeliveriesAsync(id);
+        }
+    }
+
+    private async Task LoadDeliveriesAsync(Guid webhookId)
+    {
+        var result = await GetDeliveriesHandler.Handle(
+            new GetWebhookDeliveries.Query(webhookId, GetWebhookDeliveries.MaxLimit), CancellationToken.None);
+        _deliveries = result.IsSuccess ? [.. result.Value.Items] : [];
+    }
+
+    private async Task ToggleLogAsync(GetWebhooks.Item webhook)
+    {
+        if (_logFor == webhook.Id)
+        {
+            _logFor = null;
+            return;
+        }
+
+        _logFor = webhook.Id;
+        _deliveries = null;
+        await LoadDeliveriesAsync(webhook.Id);
+    }
+
+    private async Task CreateAsync()
+    {
+        var dialog = await DialogService.ShowAsync<WebhookDialog>("Neuer Webhook", DialogDefaults.Small);
+        if (await dialog.Result is { Canceled: false, Data: CreateWebhook.Result created })
+        {
+            await ShowSecretAsync(created.Secret);
+            await LoadAsync();
+        }
+    }
+
+    private async Task EditAsync(GetWebhooks.Item webhook)
+    {
+        var parameters = new DialogParameters<WebhookDialog> { { d => d.Webhook, webhook } };
+        var dialog = await DialogService.ShowAsync<WebhookDialog>("Webhook bearbeiten", parameters, DialogDefaults.Small);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Webhook gespeichert.", Severity.Success);
+            await LoadAsync();
+        }
+    }
+
+    private async Task PingAsync(GetWebhooks.Item webhook)
+    {
+        await RunAsync(async () =>
+        {
+            var result = await PingHandler.Handle(new SendWebhookPing.Command(webhook.Id), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+            else if (result.Value.Succeeded)
+            {
+                Snackbar.Add($"Test erfolgreich (HTTP {result.Value.StatusCode}, {result.Value.DurationMs} ms).", Severity.Success);
+            }
+            else
+            {
+                Snackbar.Add($"Test fehlgeschlagen: {result.Value.Error}", Severity.Error);
+            }
+        });
+    }
+
+    private async Task RegenerateAsync(GetWebhooks.Item webhook)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Secret neu erzeugen",
+            $"Das bisherige Secret von „{webhook.Name}“ wird sofort ungültig. Der Empfänger muss das neue Secret erhalten.",
+            yesText: "Neu erzeugen", cancelText: "Abbrechen", options: DialogDefaults.ExtraSmall);
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        await RunAsync(async () =>
+        {
+            var result = await RegenerateHandler.Handle(new RegenerateWebhookSecret.Command(webhook.Id), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+                return;
+            }
+
+            await ShowSecretAsync(result.Value.Secret);
+        });
+    }
+
+    private async Task DeleteAsync(GetWebhooks.Item webhook)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Webhook löschen", $"Den Webhook „{webhook.Name}“ samt Versandprotokoll wirklich löschen?",
+            yesText: "Löschen", cancelText: "Abbrechen", options: DialogDefaults.ExtraSmall);
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        await RunAsync(async () =>
+        {
+            var result = await DeleteHandler.Handle(new DeleteWebhook.Command(webhook.Id), CancellationToken.None);
+            Snackbar.Add(result.IsSuccess ? "Webhook gelöscht." : result.Error.Message, result.IsSuccess ? Severity.Success : Severity.Error);
+            if (_logFor == webhook.Id)
+            {
+                _logFor = null;
+            }
+        });
+    }
+
+    private async Task ShowSecretAsync(string secret)
+    {
+        var parameters = new DialogParameters<SecretDialog>
+        {
+            { d => d.Secret, secret },
+            { d => d.Label, "Signing-Secret" },
+            { d => d.Hint, "Der Empfänger prüft damit die Signatur im Header X-SoloCrm-Signature." },
+        };
+        var dialog = await DialogService.ShowAsync<SecretDialog>("Secret des Webhooks", parameters, DialogDefaults.Small);
+        await dialog.Result;
+    }
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _busy = true;
+        try
+        {
+            await action();
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -200,8 +200,8 @@ n:m-Beziehungen zu Contact, Organization und Opportunity über drei typisierte J
 |---|---|---|
 | **AuditEntry** | Änderungshistorie → Timeline | EntityType, EntityId, Action (`Created`/`Updated`/`Deleted`/`Archived`), Changes (jsonb: `[{field, old, new}]`), OccurredAt |
 | **OutboxMessage** | Zuverlässiger Event-Versand (Webhooks) | Type, Payload (jsonb), OccurredAt, ProcessedAt?, Attempts, NextAttemptAt, LastError |
-| **WebhookSubscription** | Ziel-URLs für Events | Name, Url, Events (text[]), Secret, IsActive |
-| **WebhookDelivery** | Versandprotokoll | SubscriptionId, OutboxMessageId, StatusCode, DurationMs, Error, AttemptedAt |
+| **WebhookSubscription** | Ziel-URLs für Events | Name, Url, Events (text[]), ProtectedSecret (per Data Protection verschlüsselt), IsActive |
+| **WebhookDelivery** | Versandprotokoll (30 Tage) | SubscriptionId, EventId (= Outbox-Id bzw. Id des Test-Pings, kein FK), EventType, Attempt, StatusCode?, DurationMs, Error?, AttemptedAt, Succeeded |
 | **AppSetting** | Anwenderseitige Einstellungen (Key/Value, typisiert gelesen über `IAppSettings`) | Key, Value (jsonb), UpdatedAt – z. B. `HoursPerDay`, `RetainerValuationMonths`, `DefaultPricingModel`, `DefaultCurrency`, `StaleOpportunityDays` |
 | **ApiKey** | Zugriff auf die REST-API | Name, Prefix (erste 8 Zeichen), KeyHash (SHA-256), CreatedAt, LastUsedAt?, RevokedAt? |
 

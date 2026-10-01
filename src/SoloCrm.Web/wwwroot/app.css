@@ -322,3 +322,31 @@ kbd {
 .inline-field-display:focus-visible .inline-field-edit-icon {
     opacity: 1;
 }
+
+/* Integration settings: webhooks and API keys (US-17, US-18) */
+.webhook-row {
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.webhook-row:last-child {
+    border-bottom: none;
+}
+
+.webhook-url {
+    overflow-wrap: anywhere;
+}
+
+.webhook-events {
+    border: none;
+    margin: 0;
+    padding: 0;
+}
+
+.font-monospace {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.secret-value input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}

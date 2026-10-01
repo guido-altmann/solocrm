@@ -1,12 +1,16 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Webhooks;
 using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Persistence;
 using SoloCrm.Infrastructure.Persistence.Interceptors;
+using SoloCrm.Infrastructure.Persistence.Outbox;
 using SoloCrm.Infrastructure.Settings;
+using SoloCrm.Infrastructure.Webhooks;
 
 namespace SoloCrm.Infrastructure;
 
@@ -40,7 +44,42 @@ public static class DependencyInjection
         services.AddSingleton<ICrmDbContextFactory, CrmDbContextFactory>();
         services.AddSingleton<IAppSettings, AppSettings>();
 
+        services.AddWebhooks(configuration);
+
         return services;
+    }
+
+    /// <summary>
+    /// Starts the outbox processor (ADR-008) unless <c>Outbox:Enabled</c> is <c>false</c>.
+    /// Only the web host calls this; handler tests drive <see cref="OutboxProcessor"/> directly.
+    /// </summary>
+    public static IServiceCollection AddOutboxProcessing(this IServiceCollection services, IConfiguration configuration)
+    {
+        if (configuration.GetValue($"{OutboxOptions.SectionName}:{nameof(OutboxOptions.Enabled)}", true))
+        {
+            services.AddHostedService<OutboxBackgroundService>();
+        }
+
+        return services;
+    }
+
+    private static void AddWebhooks(this IServiceCollection services, IConfiguration configuration)
+    {
+        // Idempotent; the web host additionally sets the application name and the key directory (ADR-009).
+        services.AddDataProtection();
+        services.AddSingleton<ISecretProtector, DataProtectionSecretProtector>();
+
+        // Webhooks:AllowedHttpHosts as a comma-separated value (environment variable) or as an array.
+        var hostsSection = configuration.GetSection("Webhooks:AllowedHttpHosts");
+        var allowedHttpHosts = hostsSection.Value?.Split(',') ?? hostsSection.Get<string[]>() ?? [];
+        services.AddSingleton(new WebhookTargets(allowedHttpHosts));
+
+        services.AddHttpClient(HttpWebhookSender.ClientName, client => client.Timeout = HttpWebhookSender.Timeout)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+        services.AddSingleton<IWebhookSender, HttpWebhookSender>();
+
+        services.Configure<OutboxOptions>(configuration.GetSection(OutboxOptions.SectionName));
+        services.AddSingleton<OutboxProcessor>();
     }
 
     /// <summary>

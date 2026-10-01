@@ -20,29 +20,29 @@
 ---
 
 ## Schritt 1 – Outbox-Verarbeitung (ADR-008, ADR-010)
-- [ ] `BackgroundService` mit `PeriodicTimer` (Entscheidung 1): fällige Nachrichten (`ProcessedAt IS NULL AND NextAttemptAt <= now`) in Blöcken per `SELECT … FOR UPDATE SKIP LOCKED` holen (auch bei zwei parallel laufenden Containern während eines Rolling Updates korrekt, ADR-009)
-- [ ] Je Nachricht: an alle aktiven, passenden Subscriptions zustellen; Nachricht gilt als verarbeitet, wenn jede Zustellung erfolgreich war oder endgültig aufgegeben wurde
-- [ ] Retry mit exponentiellem Backoff, max. 6 Versuche (US-18 AK3); Zeitplan festlegen (z. B. 1 min, 5 min, 30 min, 2 h, 12 h)
-- [ ] `TimeProvider` für alle Zeitpunkte; Intervall konfigurierbar
-- [ ] Alt-Nachrichten und Nachrichten ohne passende Subscription als verarbeitet markieren (Entscheidung 3)
-- [ ] ADR-008 mit den Erfahrungen ergänzen
+- [x] `BackgroundService` mit `PeriodicTimer` (Entscheidung 1): fällige Nachrichten (`ProcessedAt IS NULL AND NextAttemptAt <= now`) in Blöcken per `SELECT … FOR UPDATE SKIP LOCKED` mit Lease beanspruchen (auch bei zwei parallel laufenden Containern während eines Rolling Updates korrekt, ADR-009)
+- [x] Je Nachricht: an alle aktiven, passenden Subscriptions zustellen; Nachricht gilt als verarbeitet, wenn jede Zustellung erfolgreich war oder endgültig aufgegeben wurde
+- [x] Retry mit exponentiellem Backoff, max. 6 Versuche (US-18 AK3); Zeitplan festlegen (1 min, 5 min, 30 min, 2 h, 12 h)
+- [x] `TimeProvider` für alle Zeitpunkte; Intervall konfigurierbar
+- [x] Alt-Nachrichten und Nachrichten ohne passende Subscription als verarbeitet markieren (Entscheidung 3)
+- [x] ADR-008 mit den Erfahrungen ergänzen
 
 ## Schritt 2 – Webhooks: Domäne und Verwaltung (US-18 AK1)
-- [ ] Entitäten `WebhookSubscription` (Name, Url, Events, Secret, IsActive) und `WebhookDelivery` (SubscriptionId, OutboxMessageId, Versuch, StatusCode, DurationMs, Error, AttemptedAt) (SPEC 2.4)
-- [ ] Secret wird generiert (kryptografisch zufällig), per Data Protection verschlüsselt gespeichert und einmalig im Klartext angezeigt; „Neu erzeugen“ möglich (ADR-010)
-- [ ] URL-Validierung: nur `https` (`http` nur für `Webhooks__AllowedHttpHosts`, Entscheidung 7)
-- [ ] Event-Auswahl aus den Typen in SPEC 2.6 (öffentliche Namen wie `opportunity.stage_changed`)
-- [ ] Use Cases `CreateWebhook`, `UpdateWebhook`, `RegenerateWebhookSecret`, `DeleteWebhook`, `GetWebhooks`, `GetWebhookDeliveries`
-- [ ] Abschnitt „Webhooks“ in `/settings` mit Versandprotokoll je Subscription (US-18 AK3)
-- [ ] Migration (additiv)
+- [x] Entitäten `WebhookSubscription` (Name, Url, Events, Secret, IsActive) und `WebhookDelivery` (SubscriptionId, EventId, EventType, Versuch, StatusCode, DurationMs, Error, AttemptedAt, Succeeded) (SPEC 2.4); `EventId` statt FK auf die Outbox, weil der Test-Ping keine Outbox-Nachricht hat
+- [x] Secret wird generiert (kryptografisch zufällig), per Data Protection verschlüsselt gespeichert und einmalig im Klartext angezeigt; „Neu erzeugen“ möglich (ADR-010)
+- [x] URL-Validierung: nur `https` (`http` nur für `Webhooks__AllowedHttpHosts`, Entscheidung 7)
+- [x] Event-Auswahl aus den Typen in SPEC 2.6 (öffentliche Namen wie `opportunity.stage_changed`)
+- [x] Use Cases `CreateWebhook`, `UpdateWebhook`, `RegenerateWebhookSecret`, `DeleteWebhook`, `GetWebhooks`, `GetWebhookDeliveries`
+- [x] Abschnitt „Webhooks“ in `/settings` mit Versandprotokoll je Subscription (US-18 AK3)
+- [x] Migration (additiv)
 
 ## Schritt 3 – Webhook-Versand (US-18 AK2/AK3)
-- [ ] `HttpClient` über `IHttpClientFactory` mit Timeout (z. B. 10 s), ohne automatische Redirects
-- [ ] Payload gemäß SPEC 5 (`id`, `type`, `occurredAt`, `data`) nur mit Ids und Status (Entscheidung 2)
-- [ ] Signatur `X-SoloCrm-Signature: sha256=<hex>` über den Body (HMAC-SHA256 mit dem Secret); mitsignierter Zeitstempel `X-SoloCrm-Timestamp` gegen Replay (Entscheidung 6)
-- [ ] Erfolg = HTTP 2xx; jeder Versuch landet im Protokoll; Logs ohne Bodies und Secrets (SPEC 6)
-- [ ] „Test senden“ (Event `webhook.ping`) aus den Einstellungen
-- [ ] Aufräumen nach 30 Tagen: Protokoll und verarbeitete Outbox-Nachrichten (Entscheidung 8)
+- [x] `HttpClient` über `IHttpClientFactory` mit Timeout (z. B. 10 s), ohne automatische Redirects
+- [x] Payload gemäß SPEC 5 (`id`, `type`, `occurredAt`, `data`) nur mit Ids und Status (Entscheidung 2)
+- [x] Signatur `X-SoloCrm-Signature: sha256=<hex>` über den Body (HMAC-SHA256 mit dem Secret); mitsignierter Zeitstempel `X-SoloCrm-Timestamp` gegen Replay (Entscheidung 6)
+- [x] Erfolg = HTTP 2xx; jeder Versuch landet im Protokoll; Logs ohne Bodies und Secrets (SPEC 6)
+- [x] „Test senden“ (Event `webhook.ping`) aus den Einstellungen
+- [x] Aufräumen nach 30 Tagen: Protokoll und verarbeitete Outbox-Nachrichten (Entscheidung 8)
 
 ## Schritt 4 – API-Keys (US-17 AK1)
 - [ ] Entität `ApiKey` (Name, Prefix, KeyHash SHA-256, CreatedAt, LastUsedAt, RevokedAt) (SPEC 2.4)
