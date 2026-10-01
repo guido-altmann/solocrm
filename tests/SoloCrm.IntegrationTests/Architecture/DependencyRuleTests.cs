@@ -76,6 +76,20 @@ public sealed class DependencyRuleTests
         result.IsSuccessful.Should().BeTrue(Describe(result));
     }
 
+    /// <summary>REST endpoints (iteration 5) call the same handlers as the UI, never the DbContext.</summary>
+    [Fact]
+    public void ApiEndpoints_Always_DoNotUseDbContext()
+    {
+        var result = Types.InAssembly(typeof(SoloCrm.Web.Endpoints.ApiEndpoints).Assembly)
+            .That()
+            .ResideInNamespace("SoloCrm.Web.Endpoints")
+            .ShouldNot()
+            .HaveDependencyOnAny("Microsoft.EntityFrameworkCore", "SoloCrm.Infrastructure", typeof(ICrmDbContext).FullName)
+            .GetResult();
+
+        result.IsSuccessful.Should().BeTrue(Describe(result));
+    }
+
     private static string Describe(NetArchTest.Rules.TestResult result) =>
         $"these types violate the dependency rule: {string.Join(", ", result.FailingTypeNames ?? [])}";
 }

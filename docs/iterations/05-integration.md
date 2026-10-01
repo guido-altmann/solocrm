@@ -52,14 +52,14 @@
 - [x] Migration (additiv)
 
 ## Schritt 5 – REST-API (US-17, SPEC 5)
-- [ ] Authentication-Handler für `X-Api-Key` (eigenes Schema, getrennt vom Cookie-Login); Vergleich in konstanter Zeit, `LastUsedAt` gedrosselt aktualisieren
-- [ ] Rate-Limit 60 Requests/Minute je Key (US-17 AK2), 429 mit `Retry-After`
-- [ ] Minimal-API-Endpoints unter `/api/v1` gemäß SPEC 5 in `Web/Endpoints/`; rufen dieselben Handler wie die UI
-- [ ] Fehler als RFC 9457 Problem Details; Validierungsfehler mit Feldnamen (camelCase)
-- [ ] `PATCH` als JSON Merge Patch (Entscheidung 4); `PATCH /opportunities/{id}` mit `stageId` löst den Stage-Wechsel aus
-- [ ] Listen mit `search`, `tag`, `page`, `pageSize` (dieselbe Suche wie die UI)
-- [ ] OpenAPI unter `/openapi/v1.json`, UI via Scalar (US-17 AK3), nur für den angemeldeten Nutzer (Entscheidung 5)
-- [ ] Architekturtest: Endpoints greifen nicht auf den DbContext zu
+- [x] Authentication-Handler für `X-Api-Key` (eigenes Schema, getrennt vom Cookie-Login); Vergleich in konstanter Zeit, `LastUsedAt` gedrosselt aktualisieren
+- [x] Rate-Limit 60 Requests/Minute je Key (US-17 AK2), 429 mit `Retry-After`; partitioniert nach Key-Prefix und vor der Authentifizierung, damit Anfragen über dem Limit keinen DB-Zugriff kosten
+- [x] Minimal-API-Endpoints unter `/api/v1` gemäß SPEC 5 in `Web/Endpoints/`; rufen dieselben Handler wie die UI
+- [x] Fehler als RFC 9457 Problem Details; Validierungsfehler mit Feldnamen (camelCase)
+- [x] `PATCH` als JSON Merge Patch (Entscheidung 4); `PATCH /opportunities/{id}` mit `stageId` löst den Stage-Wechsel aus
+- [x] Listen mit `search`, `tag` (Name oder Id, mehrfach = ODER), `page` (ab 1), `pageSize` (dieselbe Suche wie die UI); neu `GetOpportunities`, `GetTask`, `FindOrganizationByName` (`organizationName` beim Anlegen eines Kontakts nutzt eine bestehende Organisation)
+- [x] OpenAPI unter `/openapi/v1.json`, UI via Scalar (US-17 AK3), nur für den angemeldeten Nutzer (Entscheidung 5)
+- [x] Architekturtest: Endpoints greifen nicht auf den DbContext zu
 
 ## Schritt 6 – CSV-Import: Use Case (US-16)
 - [ ] Parsing mit CsvHelper: Trennzeichen (`,`/`;`) und Kodierung (UTF-8 mit/ohne BOM, Windows-1252) erkennen, Größenlimit (z. B. 5 MB / 10.000 Zeilen)

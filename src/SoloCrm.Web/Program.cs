@@ -11,6 +11,7 @@ using SoloCrm.Infrastructure.Persistence;
 using SoloCrm.Web.Components;
 using SoloCrm.Web.Components.Account;
 using SoloCrm.Web.Components.Shared;
+using SoloCrm.Web.Endpoints;
 using SoloCrm.Web.Hosting;
 
 Log.Logger = new LoggerConfiguration()
@@ -42,6 +43,7 @@ try
     builder.Services.AddPersistentDataProtection(builder.Configuration);
     builder.Services.AddCrmHealthChecks();
     builder.Services.AddLoginRateLimiting();
+    builder.Services.AddCrmApi();
 
     builder.Services.AddCascadingAuthenticationState();
     builder.Services.AddScoped<IdentityRedirectManager>();
@@ -52,11 +54,13 @@ try
             options.DefaultScheme = IdentityConstants.ApplicationScheme;
             options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
         })
+        .AddApiKey()
         .AddIdentityCookies();
 
     // Every endpoint requires a signed-in user unless it opts out with [AllowAnonymous].
     builder.Services.AddAuthorizationBuilder()
-        .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
+        .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
+        .AddApiKeyPolicy();
 
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -90,14 +94,21 @@ try
         app.UseHsts();
     }
 
+    // The API answers unhandled exceptions with Problem Details instead of the error page.
+    app.UseWhen(context => context.Request.Path.StartsWithSegments(ApiEndpoints.BasePath), api => api.UseExceptionHandler());
+
     app.UseSerilogRequestLogging();
     app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
     app.UseHttpsRedirection();
+    // The rate limiter runs before authentication, so that requests over the limit cost no key lookup.
     app.UseRateLimiter();
+    app.UseAuthentication();
+    app.UseAuthorization();
 
     app.UseAntiforgery();
 
     app.MapCrmHealthChecks();
+    app.MapCrmApi();
     app.MapStaticAssets().AllowAnonymous();
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();

@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +9,7 @@ namespace SoloCrm.IntegrationTests.Web;
 
 [Trait("Category", "Integration")]
 [Collection(WebHostTests.Name)]
-public sealed partial class AuthorizationTests(PostgresFixture postgres) : IClassFixture<PostgresFixture>, IAsyncLifetime
+public sealed class AuthorizationTests(PostgresFixture postgres) : IClassFixture<PostgresFixture>, IAsyncLifetime
 {
     private CrmWebApplicationFactory _factory = null!;
 
@@ -100,23 +99,8 @@ public sealed partial class AuthorizationTests(PostgresFixture postgres) : IClas
         (await client.GetAsync("/Account/Login", ct)).StatusCode.Should().Be(HttpStatusCode.OK, "rendering the form is not limited");
     }
 
-    private static async Task<HttpResponseMessage> PostLoginAsync(HttpClient client, string password, CancellationToken ct)
-    {
-        var loginPage = await client.GetStringAsync("/Account/Login", ct);
-        var token = AntiforgeryTokenRegex().Match(loginPage).Groups[1].Value;
-        token.Should().NotBeEmpty();
-
-        return await client.PostAsync("/Account/Login", new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["_handler"] = "login",
-            ["__RequestVerificationToken"] = token,
-            ["Input.Email"] = AdminEmail,
-            ["Input.Password"] = password,
-        }), ct);
-    }
+    private static Task<HttpResponseMessage> PostLoginAsync(HttpClient client, string password, CancellationToken ct) =>
+        WebLogin.PostAsync(client, AdminEmail, password, ct);
 
     private HttpClient CreateClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-
-    [GeneratedRegex(@"name=""__RequestVerificationToken""[^>]*value=""([^""]+)""")]
-    private static partial Regex AntiforgeryTokenRegex();
 }
