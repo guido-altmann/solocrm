@@ -67,7 +67,7 @@
 - [ ] Spalten-Mapping je Zielfeld (Zielfeld → Quellspalte, mit Ersatzspalte) inkl. Organisation (Name → bestehende Organisation oder neu anlegen); Spalten per Index, da Kopfzeilen nicht eindeutig sein müssen
 - [ ] Dubletten per E-Mail (case-insensitive), ohne E-Mail per `HubSpotRecordId`; Option überspringen/aktualisieren (AK2); Dubletten innerhalb der Datei
 - [ ] Ergebnisbericht: angelegt, aktualisiert, übersprungen, fehlerhaft mit Zeile und Grund (AK3)
-- [ ] Mapping-Vorlage für den HubSpot-Kontaktexport (AK4, Entscheidung 9)
+- [ ] Mapping-Vorlage für den HubSpot-Kontaktexport (AK4, Entscheidung 9) inkl. Werte-Mapping der Quelle und Zielfeld „Tag“ für `Lifecycle Stage`
 - [ ] Synchrone Ausführung in Blöcken zu 100 Zeilen mit Fortschritt (Entscheidung 10); Audit und `ContactCreated` je Kontakt wie bei manueller Anlage (Entscheidung 11)
 
 ## Schritt 7 – CSV-Import: Oberfläche (US-16)
@@ -110,16 +110,18 @@
    | LinkedInUrl | `LinkedIn URL` | `lh_linkedin_profile_url` |
    | Organisation (Name) | `Company Name` | – (bestehende per Name, sonst neu mit Typ `Other`) |
    | Website der *neu angelegten* Organisation | `Website URL` | – |
-   | Source | `Original Traffic Source` | Werte-Mapping, siehe Frage A |
+   | Source | `Original Traffic Source` | Werte-Mapping, siehe A |
+   | Tag | `Lifecycle Stage` | – (siehe B) |
    | ExtraFields `HubSpotRecordId` | `Record ID` | – |
 
-   Nicht übernommen: Adressen, Lifecycle-/Lead-Daten (siehe Frage B), Zeitstempel (`Create Date` usw.; `CreatedAt` setzt ausschließlich der Interceptor), Marketing-Kennzahlen, `Associated … IDs`.
+   Nicht übernommen: Adressen, übrige Lifecycle-/Lead-Daten, Zeitstempel (`Create Date` usw.; `CreatedAt` setzt ausschließlich der Interceptor), Marketing-Kennzahlen, `Associated … IDs`.
 
    **Technische Folgen:** Spaltennamen sind *nicht eindeutig* (`Billing Contact IDs` kommt dreimal vor) und enthalten maskierte Anführungszeichen (`Date entered ""Kunde …""`). Das Parsing arbeitet daher mit Spaltenindizes, nicht mit Namen; die Vorlage sucht die erste passende Spalte. Bei ~300 Spalten wird das Mapping je *Zielfeld* gewählt (Zielfeld → Quellspalte), nicht je Quellspalte, und die Vorschau zeigt nur die zugeordneten Spalten. Dubletten innerhalb von SoloCRM: zuerst per E-Mail (AK2), bei Kontakten ohne E-Mail per `HubSpotRecordId`, damit ein erneuter Import keine Dubletten erzeugt.
 
-   **Noch zu bestätigen:**
-   - **A – Quelle:** HubSpot-Werte → `LeadSource`: `Referrals` → Empfehlung; `Organic Search`, `Paid Search`, `Direct Traffic`, `AI Referrals` → Website; `Social Media`, `Paid Social` → LinkedIn; alles andere (`Offline Sources`, `Email Marketing`, `Other Campaigns`) → Sonstige. Interne Namen (`ORGANIC_SEARCH` …) werden ebenso erkannt.
-   - **B – Lifecycle Stage als Tag:** `Lifecycle Stage` optional als Tag übernehmen (z. B. „Kunde“, „Lead“)? Dafür bietet das Mapping allgemein das Zielfeld „Tag“ an.
+   **Bestätigt (2026-10-01):**
+   - **A – Quelle:** HubSpot-Werte → `LeadSource`: `Referrals` → Empfehlung; `Organic Search`, `Paid Search`, `Direct Traffic`, `AI Referrals` → Website; `Social Media` und `Paid Social` werden ignoriert (Quelle bleibt leer, da ungenutzt); alles andere (`Offline Sources`, `Email Marketing`, `Other Campaigns`) → Sonstige. Interne Namen (`ORGANIC_SEARCH` …) werden ebenso erkannt.
+   - **B – Lifecycle Stage als Tag:** Das Mapping bietet allgemein das Zielfeld „Tag“ an (Spaltenwert wird zum Tag, bestehende Tags werden case-insensitive wiederverwendet, neue reihum eingefärbt); die HubSpot-Vorlage ordnet `Lifecycle Stage` diesem Zielfeld zu.
+
 10. **Import:** synchron im Blazor-Circuit mit Fortschrittsanzeige, Transaktion je Block (100 Zeilen), kein Hintergrundjob.
 11. **Events beim Import:** jeder importierte Kontakt löst `ContactCreated` aus (konsistent mit der manuellen Anlage); die Outbox verarbeitet sie gestaffelt.
 12. **Fehlerhafte Zeilen:** Anzeige im Bericht genügt; Download erst bei Bedarf.
