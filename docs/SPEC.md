@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** Entwurf v0.13 · **Stand:** 2026-09-30 · **Owner:** Guido Altmann
+> **Status:** Entwurf v0.14 · **Stand:** 2026-10-01 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, konkrete Iterationsaufträge in `docs/iterations/`.
 
@@ -557,7 +557,12 @@ public static class CreateContact
 - E-Mail-Logging via Microsoft Graph/IMAP
 - Dashboard: Win-Rate, Ø Stunden-/Tagessatz (normalisiert auf €/h), Pipeline-Wert, MRR aus gewonnenen Retainern
 - KI-Features: Zusammenfassung von Notizen, semantische Suche via pgvector
-- ICS-Export der Tasks
+- ICS-Export der Tasks (abonnierbarer Feed, nur lesend; schnelle Vorstufe der Nextcloud-Synchronisation)
+- **Nextcloud-Synchronisation** über die Standardschnittstellen (nicht über die AppAPI, die für in Nextcloud eingebettete ExApps gedacht ist). Erster Entwurf:
+  - **Einweg SoloCRM → Nextcloud:** Kontakte per CardDAV in ein eigenes Adressbuch „SoloCRM“, Tasks per CalDAV (`VTODO`) in eine eigene Aufgabenliste; SoloCRM ist Master. Feldzuordnung vCard: Name, `EMAIL`, `TEL`, `ORG`, `TITLE`, `URL` (LinkedIn); `VTODO`: Titel, Fälligkeit, Status, Link zum Bezugsobjekt in der Beschreibung.
+  - **Rückkanal nur für Tasks:** in Nextcloud bzw. auf dem Handy (z. B. DAVx5) abgehakte oder wieder geöffnete Aufgaben werden in SoloCRM erledigt bzw. geöffnet (über `CompleteTask`/`ReopenTask`, also mit Audit und Events); andere Änderungen an synchronisierten Einträgen werden beim nächsten Abgleich überschrieben.
+  - **Technik:** Zuordnungstabelle (Datensatz-Id ↔ Remote-Href + ETag), Abgleich per Hintergrunddienst (ADR-008), Änderungserkennung über `UpdatedAt` bzw. `sync-token` (RFC 6578); Zugang per Nextcloud-App-Passwort, verschlüsselt per Data Protection; Pakete für vCard/iCalendar (z. B. `FolkerKinzel.VCards`, `Ical.Net`) vor der Umsetzung klären; Entscheidung als eigener ADR.
+  - **Bewusst nicht im ersten Entwurf:** Zwei-Wege-Sync von Kontakten, Notizen/Activities (passen schlecht zum Modell der Nextcloud-Notes-App).
 - Umrechnung zwischen Währungen (aktuell nur Anzeige in der erfassten Währung)
 
 ---
@@ -637,5 +642,6 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.8 | 2026-09-29 | Abschluss It. 2: mindestens eine offene Stage bleibt erhalten; Ziel-Stage beim Löschen mit gleichem Status (2.3); Umsetzungsentscheidungen in `docs/iterations/02-kerndomaene.md` |
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
+| 0.14 | 2026-10-01 | Backlog: Nextcloud-Synchronisation (Einweg für Kontakte und Tasks, Rückkanal für erledigte Tasks); ICS-Export als Vorstufe |
 | 0.13 | 2026-09-30 | Planung It. 5: Outbox per eigenem `BackgroundService` (ADR-008); schlanke Webhook-Payloads, Zeitstempel in der Signatur, Aufbewahrung 30 Tage (5, 7.4); PATCH als JSON Merge Patch; OpenAPI/Scalar nur angemeldet; Umsetzungsentscheidungen in `docs/iterations/05-integration.md` |
 | 0.12 | 2026-09-30 | Abschluss It. 4: Tag-Felder und -Regeln (2.3); Tastenkürzel präzisiert (3.2, u. a. `Enter`/`F2` für Inline-Edit, 1-s-Fenster für `G`); Suchfeld öffnet die Palette per Klick statt Fokus (3.4); Tags auf Pipeline-Karten, Archivieren der Anfrage im Detailkopf (S2/S5); Such-Mechanik (7.4, ADR-007) |
