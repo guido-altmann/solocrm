@@ -170,6 +170,24 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
     }
 
     [Fact]
+    public async Task Address_PostAndMergePatch_UsesFlatFieldsAndReportsCountryErrors()
+    {
+        var client = CreateClient();
+        var created = await ReadAsync(await client.PostAsJsonAsync("/api/v1/organizations",
+            new { name = "Contoso", street = "Hauptstr. 1", postalCode = "10115", city = "Berlin", countryCode = "DE" }, Ct));
+        var id = created.GetProperty("id").GetGuid();
+
+        var patched = await ReadAsync(await PatchAsync(client, $"/api/v1/organizations/{id}", """{ "city": "Potsdam", "postalCode": "14467" }"""));
+        var invalid = await PatchAsync(client, $"/api/v1/organizations/{id}", """{ "countryCode": "Deutschland" }""");
+
+        patched.GetProperty("street").GetString().Should().Be("Hauptstr. 1", "fields that are not sent stay unchanged");
+        patched.GetProperty("city").GetString().Should().Be("Potsdam");
+        patched.GetProperty("countryCode").GetString().Should().Be("DE");
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadAsync(invalid)).GetProperty("errors").EnumerateObject().Select(p => p.Name).Should().Equal("countryCode");
+    }
+
+    [Fact]
     public async Task GetContact_UnknownId_ReturnsNotFoundProblem()
     {
         var response = await CreateClient().GetAsync($"/api/v1/contacts/{Guid.NewGuid()}", Ct);

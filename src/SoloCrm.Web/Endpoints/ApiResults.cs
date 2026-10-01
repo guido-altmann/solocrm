@@ -53,6 +53,15 @@ internal static class ApiResults
     public static IResult NotFound(string detail) =>
         TypedResults.Problem(statusCode: StatusCodes.Status404NotFound, title: "Nicht gefunden", detail: detail);
 
-    private static string FieldName(string property) =>
-        FieldNames.TryGetValue(property, out var name) ? name : JsonNamingPolicy.CamelCase.ConvertName(property);
+    /// <summary>Address errors (<c>Address.City</c>) belong to the flat API fields (<c>city</c>).</summary>
+    private static string FieldName(string property)
+    {
+        const string addressPrefix = "Address.";
+        if (property.StartsWith(addressPrefix, StringComparison.Ordinal))
+        {
+            property = property[addressPrefix.Length..];
+        }
+
+        return FieldNames.TryGetValue(property, out var name) ? name : JsonNamingPolicy.CamelCase.ConvertName(property);
+    }
 }

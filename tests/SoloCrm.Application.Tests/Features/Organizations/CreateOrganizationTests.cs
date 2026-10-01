@@ -1,3 +1,5 @@
+using SoloCrm.Application.Features.Common;
+using SoloCrm.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using SoloCrm.Application.Abstractions;
@@ -42,11 +44,11 @@ public sealed class CreateOrganizationTests
         var ct = TestContext.Current.CancellationToken;
 
         var result = await _handler.Handle(
-            new CreateOrganization.Command(" ", (OrganizationType)42, "no url", new string('x', Organization.CityMaxLength + 1)),
+            new CreateOrganization.Command(" ", (OrganizationType)42, "no url", new AddressData(City: new string('x', Address.CityMaxLength + 1), CountryCode: "XX")),
             ct);
 
         result.Error.Should().BeOfType<ValidationError>()
-            .Which.Errors.Keys.Should().BeEquivalentTo("Name", "Type", "Website", "City");
+            .Which.Errors.Keys.Should().BeEquivalentTo("Name", "Type", "Website", "Address.City", "Address.CountryCode");
         await _dbFactory.DidNotReceiveWithAnyArgs().CreateDbContextAsync(ct);
     }
 

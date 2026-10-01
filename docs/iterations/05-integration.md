@@ -92,12 +92,12 @@
 - [x] SPEC nachziehen (Entscheidungen, Payload, API-Details) – v0.15
 
 ## Schritt 10 – Adressen für Kontakte und Organisationen (Entscheidung 14)
-- [ ] Value Object `Address` (Straße, Adresszusatz, PLZ, Ort, Region, Land) mit fester Länderliste (ISO 3166-1 Alpha-2, deutsche und englische Namen); Unit-Tests
-- [ ] `Contact.Address` und `Organization.Address` als nullable Complex Types; `Organization.City` geht in `Address.City` auf (Spalte `city` bleibt, Suche unverändert); Migration additiv
-- [ ] Use Cases (`Create…`, `Update…`, `Get…`) und Validierung um die Adresse erweitert
-- [ ] Oberfläche: Adresse als Gruppe im Inline-Editing der Detailansichten, Land als Auswahl; Organisationsdialog mit Adresse statt Ort
-- [ ] REST-API: flache Adressfelder (`street`, `street2`, `postalCode`, `city`, `region`, `countryCode`), wie beim Preis
-- [ ] Kontakt-Import: Adress-Zielfelder, HubSpot-Vorlage (`Street Address`, `Postal Code`, `City`, `State/Region`, `Country/Region Code` mit Ersatz `Country/Region`)
+- [x] Value Object `Address` (Straße, Adresszusatz, PLZ, Ort, Region, Land) mit fester Länderliste (ISO 3166-1 Alpha-2, deutsche und englische Namen); Unit-Tests
+- [x] `Contact.Address` und `Organization.Address` als Complex Types (Pflicht, leere Anschrift = `Address.Empty`, weil ein nullable Complex Type ohne Pflichtfeld „leer“ und „nicht vorhanden“ nicht unterscheiden kann); `Organization.City` geht in `Address.City` auf (Spalte `city` bleibt, Suche unverändert); Migration additiv
+- [x] Use Cases (`Create…`, `Update…`, `Get…`) und Validierung um die Adresse erweitert
+- [x] Oberfläche: Adresse als Gruppe im Inline-Editing der Detailansichten, Land als Auswahl; die Quick-Add-Dialoge bleiben schlank (Organisation: „Ort“ = `Address.City`, übrige Adressteile bleiben beim Bearbeiten erhalten)
+- [x] REST-API: flache Adressfelder (Validierungsfehler am jeweiligen Feld, z. B. `countryCode`) (`street`, `street2`, `postalCode`, `city`, `region`, `countryCode`), wie beim Preis
+- [x] Kontakt-Import: Adress-Zielfelder, HubSpot-Vorlage (`Street Address`, `Postal Code`, `City`, `State/Region`, `Country/Region Code` mit Ersatz `Country/Region`); unbekanntes Land = fehlerhafte Zeile; „aktualisieren“ überschreibt nur Adressteile mit Wert
 
 ## Schritt 11 – Organisationsimport (Entscheidung 15)
 - [ ] Import-Assistent mit Zieltyp (Kontakte / Organisationen); gemeinsamer Unterbau für Parsing, Mapping, Blöcke und Bericht

@@ -11,7 +11,7 @@ public sealed class CsvDocumentTests
         var document = CsvDocument.Parse(HubSpotSample.File(HubSpotSample.Row("4711", "Ada", "Lovelace"))).Value;
 
         document.Delimiter.Should().Be(',');
-        document.Headers.Should().HaveCount(20);
+        document.Headers.Should().HaveCount(26);
         document.Headers.Count(h => h == "Billing Contact IDs").Should().Be(3);
         document.Headers[17].Should().Be("Date entered \"Kunde (Lifecycle Stage Pipeline)\"");
         var row = document.Rows.Should().ContainSingle().Subject;

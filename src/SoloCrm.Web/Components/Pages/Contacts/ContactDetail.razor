@@ -82,6 +82,7 @@ else
                         <InlineSelect T="LeadSource?" Label="Quelle" Field="@nameof(IContactFields.Source)" Value="_contact.Source"
                                       Options="Sources" TextOf="s => Labels.For(s!.Value)" Clearable="true"
                                       Save="@(v => SaveAsync(c => c with { Source = v }))" />
+                        <InlineAddress Value="_contact.Address" Save="@(a => SaveAsync(c => c with { Address = a }))" />
                     </MudStack>
                 </MudPaper>
 
@@ -154,7 +155,7 @@ else
     {
         var c = _contact!;
         var command = change(new UpdateContact.Command(
-            c.Id, c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle, c.LinkedInUrl, c.OrganizationId, null, c.Source));
+            c.Id, c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle, c.LinkedInUrl, c.OrganizationId, null, c.Source, c.Address));
         var result = await UpdateContactHandler.Handle(command, CancellationToken.None);
         if (result.IsFailure)
         {

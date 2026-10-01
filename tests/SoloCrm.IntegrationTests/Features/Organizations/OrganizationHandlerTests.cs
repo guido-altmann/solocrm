@@ -1,3 +1,4 @@
+using SoloCrm.Application.Features.Common;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.Organizations;
@@ -18,7 +19,7 @@ public sealed class OrganizationHandlerTests(PostgresFixture postgres) : Handler
         stored.Name.Should().Be("Contoso GmbH");
         stored.Type.Should().Be(OrganizationType.Client);
         stored.Website.Should().Be("https://contoso.de");
-        stored.City.Should().Be("Berlin");
+        stored.Address.City.Should().Be("Berlin");
         stored.CreatedAt.Should().Be(Start);
         (await db.AuditEntries.SingleAsync(Ct)).Action.Should().Be(AuditAction.Created);
         (await db.OutboxMessages.SingleAsync(Ct)).Type.Should().Be("organization.created");
@@ -40,11 +41,11 @@ public sealed class OrganizationHandlerTests(PostgresFixture postgres) : Handler
         var id = await CreateAsync("Contoso", OrganizationType.Other);
 
         var result = await SendAsync<UpdateOrganization.Command, UpdateOrganization.Result>(
-            new UpdateOrganization.Command(id, "Contoso AG", OrganizationType.Agency, null, "Köln", "Stammkunde"));
+            new UpdateOrganization.Command(id, "Contoso AG", OrganizationType.Agency, null, new AddressData(City: "Köln"), "Stammkunde"));
 
         result.IsSuccess.Should().BeTrue();
         var loaded = await QueryAsync<GetOrganization.Query, GetOrganization.Result>(new GetOrganization.Query(id));
-        loaded.Value.Should().Be(new GetOrganization.Result(id, "Contoso AG", OrganizationType.Agency, null, "Köln", "Stammkunde", false));
+        loaded.Value.Should().Be(new GetOrganization.Result(id, "Contoso AG", OrganizationType.Agency, null, new AddressData(City: "Köln"), "Stammkunde", false));
         await using var db = OpenDb();
         var audit = await db.AuditEntries.SingleAsync(a => a.Action == AuditAction.Updated, Ct);
         audit.Changes.Should().Contain(new AuditChange("Type", "Other", "Agency"));
@@ -178,7 +179,7 @@ public sealed class OrganizationHandlerTests(PostgresFixture postgres) : Handler
         string? city = null)
     {
         var result = await SendAsync<CreateOrganization.Command, CreateOrganization.Result>(
-            new CreateOrganization.Command(name, type, website, city));
+            new CreateOrganization.Command(name, type, website, new AddressData(City: city)));
         result.IsSuccess.Should().BeTrue();
         return result.Value.Id;
     }

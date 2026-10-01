@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Options;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Application.Features.Organizations;
 using SoloCrm.Application.Features.Tags;
 using SoloCrm.Application.Features.Timeline;
@@ -12,7 +13,7 @@ namespace SoloCrm.Web.Endpoints;
 /// <summary><c>/api/v1/organizations</c> (SPEC 5).</summary>
 internal static class OrganizationEndpoints
 {
-    private static readonly string[] PatchFields = ["name", "type", "website", "city", "notes"];
+    private static readonly string[] PatchFields = ["name", "type", "website", "notes", .. ApiAddress.Fields];
 
     public static void MapOrganizationEndpoints(this RouteGroupBuilder api)
     {
@@ -88,7 +89,9 @@ internal static class OrganizationEndpoints
         CancellationToken cancellationToken)
     {
         var result = await createOrganization.Handle(
-            new CreateOrganization.Command(request.Name, request.Type ?? OrganizationType.Other, request.Website, request.City, request.Notes),
+            new CreateOrganization.Command(request.Name, request.Type ?? OrganizationType.Other, request.Website,
+                new AddressData(request.Street, request.Street2, request.PostalCode, request.City, request.Region, request.CountryCode),
+                request.Notes),
             cancellationToken);
 
         return result.IsSuccess
@@ -118,7 +121,7 @@ internal static class OrganizationEndpoints
             patch.Value("name", o.Name),
             patch.Value("type", o.Type),
             patch.Value("website", o.Website),
-            patch.Value("city", o.City),
+            ApiAddress.Patch(patch, o.Address),
             patch.Value("notes", o.Notes));
         if (!patch.IsValid)
         {
@@ -147,7 +150,8 @@ internal static class OrganizationEndpoints
         var tags = await getRecordTags.Handle(new GetRecordTags.Query(TimelineRecordType.Organization, id), cancellationToken);
         var o = organization.Value;
         var detail = new OrganizationDetail(
-            o.Id, o.Name, o.Type, o.Website, o.City, o.Notes, o.IsArchived, tags.IsSuccess ? TagResponse.From(tags.Value.Items) : []);
+            o.Id, o.Name, o.Type, o.Website, o.Address.Street, o.Address.Street2, o.Address.PostalCode, o.Address.City, o.Address.Region,
+            o.Address.CountryCode, o.Notes, o.IsArchived, tags.IsSuccess ? TagResponse.From(tags.Value.Items) : []);
 
         return created ? TypedResults.Created($"{ApiEndpoints.BasePath}/organizations/{id}", detail) : TypedResults.Ok(detail);
     }

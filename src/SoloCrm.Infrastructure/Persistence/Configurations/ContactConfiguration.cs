@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using SoloCrm.Application.Features.Search;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Organizations;
+using SoloCrm.Infrastructure.Persistence.Configurations.Shared;
 
 namespace SoloCrm.Infrastructure.Persistence.Configurations;
 
@@ -29,6 +30,7 @@ internal sealed class ContactConfiguration : IEntityTypeConfiguration<Contact>
         builder.Property(c => c.JobTitle).HasMaxLength(Contact.JobTitleMaxLength);
         builder.Property(c => c.LinkedInUrl).HasMaxLength(Contact.LinkedInUrlMaxLength);
         builder.Property(c => c.Source).HasConversion<string>().HasMaxLength(20);
+        builder.ComplexProperty(c => c.Address, address => address.ConfigureAddress());
 
         builder.HasOne(c => c.Organization)
             .WithMany()

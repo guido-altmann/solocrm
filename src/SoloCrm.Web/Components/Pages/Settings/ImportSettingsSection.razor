@@ -309,10 +309,17 @@
         ImportField.Phone => "Telefon",
         ImportField.JobTitle => "Rolle",
         ImportField.LinkedInUrl => "LinkedIn-URL",
+        ImportField.Street => "Straße und Hausnummer",
+        ImportField.Street2 => "Adresszusatz",
+        ImportField.PostalCode => "PLZ",
+        ImportField.City => "Ort",
+        ImportField.Region => "Bundesland / Region",
+        ImportField.Country => "Land",
         ImportField.Organization => "Organisation",
         ImportField.OrganizationWebsite => "Website (neue Organisation)",
         ImportField.Source => "Quelle",
         ImportField.Tag => "Tag",
-        _ => "HubSpot-ID",
+        ImportField.HubSpotRecordId => "HubSpot-ID",
+        _ => field.ToString(),
     };
 }

@@ -1,3 +1,4 @@
+@using SoloCrm.Application.Features.Common
 @using SoloCrm.Application.Abstractions
 @using SoloCrm.Application.Features.Contacts
 @using SoloCrm.Domain.Common
@@ -94,6 +95,9 @@
     private string? _linkedInUrl;
     private OrganizationOption? _organization;
     private LeadSource? _source;
+
+    // Not edited here (quick dialog); kept so that saving does not clear it.
+    private AddressData? _address;
     private bool _showDetails;
     private bool _loading;
     private bool _saving;
@@ -120,6 +124,7 @@
             (_firstName, _lastName, _email, _phone, _jobTitle, _linkedInUrl, _source) =
                 (c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle, c.LinkedInUrl, c.Source);
             _organization = OrganizationOption.Existing(c.OrganizationId, c.OrganizationName, c.OrganizationType);
+            _address = c.Address;
         }
         else
         {
@@ -140,7 +145,7 @@
             var result = ContactId is { } id
                 ? (await UpdateContactHandler.Handle(
                         new UpdateContact.Command(id, _firstName, _lastName, _email, _phone, _jobTitle, _linkedInUrl,
-                            organizationId, newOrganizationName, _source),
+                            organizationId, newOrganizationName, _source, _address),
                         CancellationToken.None))
                     .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure)
                 : (await CreateContactHandler.Handle(

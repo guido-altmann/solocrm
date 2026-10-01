@@ -51,8 +51,7 @@ else
                                 </span>
                             </DisplayTemplate>
                         </InlineText>
-                        <InlineText Label="Ort" Field="@nameof(IOrganizationFields.City)" Value="@_organization.City"
-                                    MaxLength="@Organization.CityMaxLength" Save="@(v => SaveAsync(o => o with { City = v }))" />
+                        <InlineAddress Value="_organization.Address" Save="@(a => SaveAsync(o => o with { Address = a }))" />
                         <InlineText Label="Notizen" Field="@nameof(IOrganizationFields.Notes)" Value="@_organization.Notes" Multiline="true"
                                     Save="@(v => SaveAsync(o => o with { Notes = v }))" />
                     </MudStack>
@@ -154,7 +153,7 @@ else
     private async Task<Error?> SaveAsync(Func<UpdateOrganization.Command, UpdateOrganization.Command> change)
     {
         var o = _organization!;
-        var command = change(new UpdateOrganization.Command(o.Id, o.Name, o.Type, o.Website, o.City, o.Notes));
+        var command = change(new UpdateOrganization.Command(o.Id, o.Name, o.Type, o.Website, o.Address, o.Notes));
         var result = await UpdateOrganizationHandler.Handle(command, CancellationToken.None);
         if (result.IsFailure)
         {

@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Application.Features.Organizations;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
@@ -30,6 +31,9 @@ public interface IContactFields
     string? NewOrganizationName { get; }
 
     LeadSource? Source { get; }
+
+    /// <summary><c>null</c> counts as an empty address.</summary>
+    AddressData? Address { get; }
 }
 
 public sealed class ContactFieldsValidator<T> : AbstractValidator<T>
@@ -87,6 +91,10 @@ public sealed class ContactFieldsValidator<T> : AbstractValidator<T>
         RuleFor(c => c.Source)
             .IsInEnum()
             .WithMessage("Bitte eine gültige Quelle wählen.");
+
+        RuleFor(c => c.Address!)
+            .SetValidator(new AddressDataValidator())
+            .When(c => c.Address is not null);
     }
 
     private static bool BeAbsoluteHttpUrl(string url) =>

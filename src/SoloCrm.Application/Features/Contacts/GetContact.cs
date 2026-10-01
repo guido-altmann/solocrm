@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Organizations;
 
@@ -24,7 +25,8 @@ public static class GetContact
         string? OrganizationName,
         OrganizationType? OrganizationType,
         LeadSource? Source,
-        bool IsArchived);
+        bool IsArchived,
+        AddressData Address);
 
     public sealed class Handler(ICrmDbContextFactory dbFactory) : IQueryHandler<Query, Result>
     {
@@ -46,7 +48,8 @@ public static class GetContact
                     c.Organization!.Name,
                     c.Organization!.Type,
                     c.Source,
-                    c.IsArchived))
+                    c.IsArchived,
+                    new AddressData(c.Address.Street, c.Address.Street2, c.Address.PostalCode, c.Address.City, c.Address.Region, c.Address.CountryCode)))
                 .SingleOrDefaultAsync(cancellationToken);
 
             return contact is null ? ContactErrors.NotFound : contact;

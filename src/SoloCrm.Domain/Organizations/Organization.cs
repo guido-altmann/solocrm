@@ -9,7 +9,6 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
 {
     public const int NameMaxLength = 200;
     public const int WebsiteMaxLength = 500;
-    public const int CityMaxLength = 100;
 
     // Required by EF Core.
     private Organization()
@@ -29,7 +28,8 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
     /// <summary>Normalized, see <see cref="Website.TryNormalize"/>.</summary>
     public string? Website { get; private set; }
 
-    public string? City { get; private set; }
+    /// <summary>Postal address (iteration 5 decision 14); <see cref="Address.City"/> replaces the former <c>City</c>.</summary>
+    public Address Address { get; private set; } = Address.Empty;
 
     /// <summary>Free-text master note; the history lives in activities.</summary>
     public string? Notes { get; private set; }
@@ -40,22 +40,22 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
         string name,
         OrganizationType type = OrganizationType.Other,
         string? website = null,
-        string? city = null,
+        Address? address = null,
         string? notes = null)
     {
         var organization = new Organization(RequireName(name));
-        organization.Apply(type, website, city, notes);
+        organization.Apply(type, website, address, notes);
         organization.AddDomainEvent(new OrganizationCreated(organization.Id));
         return organization;
     }
 
-    public void Update(string name, OrganizationType type, string? website, string? city, string? notes)
+    public void Update(string name, OrganizationType type, string? website, Address? address, string? notes)
     {
         Name = RequireName(name);
-        Apply(type, website, city, notes);
+        Apply(type, website, address, notes);
     }
 
-    private void Apply(OrganizationType type, string? website, string? city, string? notes)
+    private void Apply(OrganizationType type, string? website, Address? address, string? notes)
     {
         if (!Enum.IsDefined(type))
         {
@@ -64,7 +64,7 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
 
         Type = type;
         Website = NormalizeWebsite(website);
-        City = Normalize(city);
+        Address = address ?? Address.Empty;
         Notes = Normalize(notes);
     }
 

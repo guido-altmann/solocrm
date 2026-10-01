@@ -1,3 +1,4 @@
+using SoloCrm.Application.Features.Common;
 using Microsoft.EntityFrameworkCore;
 using NpgsqlTypes;
 using SoloCrm.Application.Features.Contacts;
@@ -38,7 +39,7 @@ public sealed class SearchColumnTests(PostgresFixture postgres) : HandlerTest(po
         var id = await CreateContactAsync("Ada", "Lovelace");
 
         await SendAsync<UpdateContact.Command, UpdateContact.Result>(
-            new UpdateContact.Command(id, null, "King", null, null, null, null, null, null, null));
+            new UpdateContact.Command(id, null, "King", null, null, null, null, null, null, null, null));
 
         await using var db = OpenDb();
         (await db.Contacts.Where(c => c.Id == id).Select(c => EF.Property<string>(c, SearchColumns.Name)).SingleAsync(Ct))
@@ -51,7 +52,7 @@ public sealed class SearchColumnTests(PostgresFixture postgres) : HandlerTest(po
     public async Task Create_Organization_SplitsWebsiteIntoWords()
     {
         var id = (await SendAsync<CreateOrganization.Command, CreateOrganization.Result>(
-            new CreateOrganization.Command("Contoso GmbH", Website: "https://www.contoso-labs.de/team", City: "Köln"))).Value.Id;
+            new CreateOrganization.Command("Contoso GmbH", Website: "https://www.contoso-labs.de/team", Address: new AddressData(City: "Köln")))).Value.Id;
 
         await using var db = OpenDb();
         var matches = await db.Organizations

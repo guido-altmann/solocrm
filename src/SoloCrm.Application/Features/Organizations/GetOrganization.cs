@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Application.Features.Organizations;
@@ -16,7 +17,7 @@ public static class GetOrganization
         string Name,
         OrganizationType Type,
         string? Website,
-        string? City,
+        AddressData Address,
         string? Notes,
         bool IsArchived);
 
@@ -28,7 +29,7 @@ public static class GetOrganization
             var organization = await db.Organizations
                 .AsNoTracking()
                 .Where(o => o.Id == query.Id)
-                .Select(o => new Result(o.Id, o.Name, o.Type, o.Website, o.City, o.Notes, o.IsArchived))
+                .Select(o => new Result(o.Id, o.Name, o.Type, o.Website, new AddressData(o.Address.Street, o.Address.Street2, o.Address.PostalCode, o.Address.City, o.Address.Region, o.Address.CountryCode), o.Notes, o.IsArchived))
                 .SingleOrDefaultAsync(cancellationToken);
 
             return organization is null ? OrganizationErrors.NotFound : organization;

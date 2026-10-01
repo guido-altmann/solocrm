@@ -42,6 +42,9 @@ public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
 
     public IReadOnlyDictionary<string, string> ExtraFields { get; private set; } = new Dictionary<string, string>();
 
+    /// <summary>Postal address (iteration 5 decision 14).</summary>
+    public Address Address { get; private set; } = Address.Empty;
+
     /// <summary>
     /// Creates a contact. At least a first or a last name is required; blank values are stored as <c>null</c>.
     /// </summary>
@@ -53,10 +56,12 @@ public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
         string? jobTitle = null,
         string? linkedInUrl = null,
         Guid? organizationId = null,
-        LeadSource? source = null)
+        LeadSource? source = null,
+        Address? address = null)
     {
         var contact = new Contact();
         contact.Update(firstName, lastName, email, phone, jobTitle, linkedInUrl, organizationId, source);
+        contact.ChangeAddress(address ?? Address.Empty);
         contact.AddDomainEvent(new ContactCreated(contact.Id));
         return contact;
     }
@@ -94,6 +99,12 @@ public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
         LinkedInUrl = Normalize(linkedInUrl);
         OrganizationId = organizationId;
         Source = source;
+    }
+
+    public void ChangeAddress(Address address)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        Address = address;
     }
 
     /// <summary>

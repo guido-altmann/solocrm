@@ -1,3 +1,4 @@
+using SoloCrm.Application.Features.Common;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
@@ -107,7 +108,7 @@ public sealed class ContactDialogTests : BunitContext
         var organizationId = Guid.CreateVersion7();
         _get.Handle(new GetContact.Query(id), Arg.Any<CancellationToken>())
             .Returns(Result<GetContact.Result>.Success(new GetContact.Result(
-                id, "Ada", "Lovelace", null, null, "CTO", null, organizationId, "Contoso", OrganizationType.Client, null, false)));
+                id, "Ada", "Lovelace", null, null, "CTO", null, organizationId, "Contoso", OrganizationType.Client, null, false, AddressData.Empty)));
         _update.Handle(Arg.Any<UpdateContact.Command>(), Arg.Any<CancellationToken>())
             .Returns(Result<UpdateContact.Result>.Success(new UpdateContact.Result(id, organizationId)));
         var (provider, dialog) = await OpenDialogAsync(id);
@@ -117,7 +118,7 @@ public sealed class ContactDialogTests : BunitContext
 
         (await dialog.Result)!.Data.Should().Be(id);
         await _update.Received(1).Handle(
-            new UpdateContact.Command(id, "Ada", "Lovelace", null, null, "CTO", null, organizationId, null, null),
+            new UpdateContact.Command(id, "Ada", "Lovelace", null, null, "CTO", null, organizationId, null, null, AddressData.Empty),
             Arg.Any<CancellationToken>());
     }
 

@@ -1,0 +1,78 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Common
+@using SoloCrm.Domain.Common
+
+@* Postal address as one inline group (iteration 5 decision 14). Saved with the button only: Enter picks a country
+   in the autocomplete and must not save the group at the same time. *@
+<InlineField Label="Anschrift" Field="Address" IsEmpty="@(Lines.Count == 0)" OnBeginEdit="BeginEdit" Save="SaveAsync"
+             SaveKey="InlineSaveKey.None" ShowActions="true">
+    <Display>
+        @for (var i = 0; i < Lines.Count; i++)
+        {
+            @if (i > 0)
+            {
+                <br />
+            }
+            @Lines[i]
+        }
+    </Display>
+    <Editor>
+        <MudStack Spacing="1" Class="inline-address">
+            <MudTextField @bind-Value="_street" Label="Straße und Hausnummer" Margin="Margin.Dense" Immediate="true" AutoFocus="true"
+                          MaxLength="@Address.StreetMaxLength" />
+            <MudTextField @bind-Value="_street2" Label="Adresszusatz" Margin="Margin.Dense" Immediate="true"
+                          MaxLength="@Address.StreetMaxLength" />
+            <MudStack Row="true" Spacing="2">
+                <MudTextField @bind-Value="_postalCode" Label="PLZ" Margin="Margin.Dense" Immediate="true" Style="max-width: 110px;"
+                              MaxLength="@Address.PostalCodeMaxLength" />
+                <MudTextField @bind-Value="_city" Label="Ort" Margin="Margin.Dense" Immediate="true" MaxLength="@Address.CityMaxLength" />
+            </MudStack>
+            <MudTextField @bind-Value="_region" Label="Bundesland / Region" Margin="Margin.Dense" Immediate="true"
+                          MaxLength="@Address.RegionMaxLength" />
+            <MudAutocomplete T="Country" @bind-Value="_country" Label="Land" Margin="Margin.Dense" Clearable="true"
+                             SearchFunc="SearchCountries" ToStringFunc="@(c => c?.GermanName)" ResetValueOnEmptyText="true"
+                             MaxItems="12" SelectValueOnTab="true" />
+        </MudStack>
+    </Editor>
+</InlineField>
+
+@code {
+    [Parameter, EditorRequired]
+    public AddressData Value { get; set; } = AddressData.Empty;
+
+    /// <summary>Saves the edited address; returns the error, or <c>null</c> on success.</summary>
+    [Parameter, EditorRequired]
+    public Func<AddressData, Task<Error?>> Save { get; set; } = default!;
+
+    private string? _street;
+    private string? _street2;
+    private string? _postalCode;
+    private string? _city;
+    private string? _region;
+    private Country? _country;
+
+    private IReadOnlyList<string> Lines => Address.Create(
+        Value.Street, Value.Street2, Value.PostalCode, Value.City, Value.Region,
+        Countries.IsValidCode(Value.CountryCode) ? Value.CountryCode : null).ToLines();
+
+    private void BeginEdit()
+    {
+        (_street, _street2, _postalCode, _city, _region) = (Value.Street, Value.Street2, Value.PostalCode, Value.City, Value.Region);
+        _country = Countries.ByIsoCode(Value.CountryCode);
+    }
+
+    private Task<Error?> SaveAsync() => Save(new AddressData(_street, _street2, _postalCode, _city, _region, _country?.Code));
+
+    private static Task<IEnumerable<Country>> SearchCountries(string? text, CancellationToken cancellationToken)
+    {
+        var term = text?.Trim() ?? "";
+        IEnumerable<Country> matches = term.Length == 0
+            ? Countries.All
+            : Countries.All
+                .Where(c => c.GermanName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || c.EnglishName.Contains(term, StringComparison.OrdinalIgnoreCase)
+                    || c.Code.Equals(term, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(c => !c.GermanName.StartsWith(term, StringComparison.OrdinalIgnoreCase));
+        return Task.FromResult(matches);
+    }
+}

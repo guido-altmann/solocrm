@@ -105,7 +105,7 @@ public static class GetOrganizations
                     o.Name,
                     o.Type,
                     o.Website,
-                    o.City,
+                    o.Address.City,
                     o.IsArchived,
                     o.CreatedAt,
                     db.OrganizationTags
@@ -122,7 +122,7 @@ public static class GetOrganizations
             field switch
             {
                 SortField.Type => descending ? source.OrderByDescending(o => o.Type) : source.OrderBy(o => o.Type),
-                SortField.City => descending ? source.OrderByDescending(o => o.City) : source.OrderBy(o => o.City),
+                SortField.City => descending ? source.OrderByDescending(o => o.Address.City) : source.OrderBy(o => o.Address.City),
                 SortField.CreatedAt => descending ? source.OrderByDescending(o => o.CreatedAt) : source.OrderBy(o => o.CreatedAt),
                 _ => descending ? source.OrderByDescending(o => o.Name) : source.OrderBy(o => o.Name),
             };

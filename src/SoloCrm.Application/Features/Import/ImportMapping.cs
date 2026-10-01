@@ -11,6 +11,14 @@ public enum ImportField
     Phone,
     JobTitle,
     LinkedInUrl,
+    Street,
+    Street2,
+    PostalCode,
+    City,
+    Region,
+
+    /// <summary>ISO code, German or English name (<see cref="Countries.Find"/>).</summary>
+    Country,
 
     /// <summary>Name of an existing organization (case-insensitive) or of a new one with type <c>Other</c>.</summary>
     Organization,

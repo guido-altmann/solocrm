@@ -1,5 +1,6 @@
 using FluentValidation;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Application.Features.Organizations;
@@ -13,7 +14,8 @@ public interface IOrganizationFields
 
     string? Website { get; }
 
-    string? City { get; }
+    /// <summary><c>null</c> counts as an empty address.</summary>
+    AddressData? Address { get; }
 
     string? Notes { get; }
 }
@@ -38,9 +40,9 @@ public sealed class OrganizationFieldsValidator<T> : AbstractValidator<T>
             .WithMessage("Bitte eine gültige Website angeben (z. B. example.com).")
             .When(c => !string.IsNullOrWhiteSpace(c.Website));
 
-        RuleFor(c => c.City)
-            .MaximumLength(Organization.CityMaxLength)
-            .WithMessage($"Der Ort darf höchstens {Organization.CityMaxLength} Zeichen lang sein.");
+        RuleFor(c => c.Address!)
+            .SetValidator(new AddressDataValidator())
+            .When(c => c.Address is not null);
     }
 
     private static bool BeValidWebsite(string? website) =>

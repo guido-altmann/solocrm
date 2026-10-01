@@ -205,7 +205,7 @@ public sealed class TimelineHandlerTests(PostgresFixture postgres) : HandlerTest
     private async Task UpdateContactAsync(Guid id, Guid organization, string? phone)
     {
         var result = await SendAsync<UpdateContact.Command, UpdateContact.Result>(new UpdateContact.Command(
-            id, "Max", "Mustermann", null, phone, null, null, organization, null, null));
+            id, "Max", "Mustermann", null, phone, null, null, organization, null, null, null));
         result.IsSuccess.Should().BeTrue(result.IsFailure ? result.Error.Message : null);
     }
 }

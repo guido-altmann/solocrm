@@ -1,5 +1,6 @@
 using FluentValidation;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
 
@@ -20,7 +21,8 @@ public static class CreateContact
         string? LinkedInUrl = null,
         Guid? OrganizationId = null,
         string? NewOrganizationName = null,
-        LeadSource? Source = null) : IContactFields;
+        LeadSource? Source = null,
+        AddressData? Address = null) : IContactFields;
 
     public sealed record Result(Guid Id);
 
@@ -64,7 +66,8 @@ public static class CreateContact
                 command.JobTitle,
                 command.LinkedInUrl,
                 organization.Value,
-                command.Source);
+                command.Source,
+                command.Address?.ToAddress());
 
             db.Contacts.Add(contact);
             await db.SaveChangesAsync(cancellationToken);

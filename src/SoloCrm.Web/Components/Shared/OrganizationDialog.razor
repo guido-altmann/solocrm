@@ -1,5 +1,7 @@
 @using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Common
 @using SoloCrm.Application.Features.Organizations
+@using SoloCrm.Domain.Common
 @using SoloCrm.Domain.Organizations
 @inject ICommandHandler<CreateOrganization.Command, CreateOrganization.Result> CreateHandler
 @inject ICommandHandler<UpdateOrganization.Command, UpdateOrganization.Result> UpdateHandler
@@ -34,9 +36,8 @@
                                       Error="@_errors.Has(nameof(IOrganizationFields.Website))"
                                       ErrorText="@_errors.Text(nameof(IOrganizationFields.Website))" />
                         <MudTextField @bind-Value="_city" Label="Ort" Immediate="true"
-                                      MaxLength="@Organization.CityMaxLength"
-                                      Error="@_errors.Has(nameof(IOrganizationFields.City))"
-                                      ErrorText="@_errors.Text(nameof(IOrganizationFields.City))" />
+                                      MaxLength="@Address.CityMaxLength"
+                                      Error="@_errors.Has("Address.City")" ErrorText="@_errors.Text("Address.City")" />
                         <MudTextField @bind-Value="_notes" Label="Notizen" Lines="4" Immediate="true" />
                     }
                     else
@@ -75,6 +76,9 @@
     private OrganizationType _type = OrganizationType.Other;
     private string? _website;
     private string? _city;
+
+    // The full address is edited in the detail view; the dialog only changes the city and keeps the rest.
+    private AddressData _address = AddressData.Empty;
     private string? _notes;
     private bool _showDetails;
     private bool _loading;
@@ -92,8 +96,9 @@
         var result = await GetHandler.Handle(new GetOrganization.Query(id), CancellationToken.None);
         if (result.IsSuccess)
         {
-            (_name, _type, _website, _city, _notes) =
-                (result.Value.Name, result.Value.Type, result.Value.Website, result.Value.City, result.Value.Notes);
+            (_name, _type, _website, _address, _notes) =
+                (result.Value.Name, result.Value.Type, result.Value.Website, result.Value.Address, result.Value.Notes);
+            _city = _address.City;
         }
         else
         {
@@ -111,9 +116,9 @@
         try
         {
             var result = OrganizationId is { } id
-                ? (await UpdateHandler.Handle(new UpdateOrganization.Command(id, _name, _type, _website, _city, _notes), CancellationToken.None))
+                ? (await UpdateHandler.Handle(new UpdateOrganization.Command(id, _name, _type, _website, _address with { City = _city }, _notes), CancellationToken.None))
                     .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure)
-                : (await CreateHandler.Handle(new CreateOrganization.Command(_name, _type, _website, _city, _notes), CancellationToken.None))
+                : (await CreateHandler.Handle(new CreateOrganization.Command(_name, _type, _website, _address with { City = _city }, _notes), CancellationToken.None))
                     .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure);
 
             if (result.IsSuccess)

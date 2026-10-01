@@ -1,3 +1,4 @@
+using SoloCrm.Application.Features.Common;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
@@ -64,7 +65,7 @@ public sealed class OrganizationDialogTests : BunitContext
         var id = Guid.CreateVersion7();
         _get.Handle(new GetOrganization.Query(id), Arg.Any<CancellationToken>())
             .Returns(Result<GetOrganization.Result>.Success(
-                new GetOrganization.Result(id, "Contoso", OrganizationType.Client, "https://contoso.de", "Berlin", null, false)));
+                new GetOrganization.Result(id, "Contoso", OrganizationType.Client, "https://contoso.de", new AddressData(City: "Berlin", CountryCode: "DE"), null, false)));
         _update.Handle(Arg.Any<UpdateOrganization.Command>(), Arg.Any<CancellationToken>())
             .Returns(Result<UpdateOrganization.Result>.Success(new UpdateOrganization.Result(id)));
         var (provider, dialog) = await OpenDialogAsync(id);
@@ -75,7 +76,7 @@ public sealed class OrganizationDialogTests : BunitContext
 
         (await dialog.Result)!.Data.Should().Be(id);
         await _update.Received(1).Handle(
-            new UpdateOrganization.Command(id, "Contoso AG", OrganizationType.Client, "https://contoso.de", "Berlin", null),
+            new UpdateOrganization.Command(id, "Contoso AG", OrganizationType.Client, "https://contoso.de", new AddressData(City: "Berlin", CountryCode: "DE"), null),
             Arg.Any<CancellationToken>());
         await _create.DidNotReceiveWithAnyArgs().Handle(default!, Xunit.TestContext.Current.CancellationToken);
     }

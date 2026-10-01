@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Domain.Common;
 
 namespace SoloCrm.Application.Features.Contacts;
@@ -20,7 +21,8 @@ public static class UpdateContact
         string? LinkedInUrl,
         Guid? OrganizationId,
         string? NewOrganizationName,
-        LeadSource? Source) : IContactFields;
+        LeadSource? Source,
+        AddressData? Address) : IContactFields;
 
     public sealed record Result(Guid Id, Guid? OrganizationId);
 
@@ -70,6 +72,7 @@ public static class UpdateContact
                 command.LinkedInUrl,
                 organization.Value,
                 command.Source);
+            contact.ChangeAddress(command.Address?.ToAddress() ?? Address.Empty);
 
             await db.SaveChangesAsync(cancellationToken);
 

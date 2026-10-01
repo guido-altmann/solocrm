@@ -6,7 +6,7 @@ using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Web.Endpoints;
 
-// The REST API contract (SPEC 5). Explicit records instead of the handler results, so that the OpenAPI schemas have
+// The REST API contract (SPEC 5). Addresses are flat fields (street … countryCode, ISO 3166-1 alpha-2) like the price. Explicit records instead of the handler results, so that the OpenAPI schemas have
 // unique names and the contract does not change with the UI's needs.
 
 public sealed record PageResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
@@ -42,6 +42,12 @@ public sealed record ContactDetail(
     string? OrganizationName,
     LeadSource? Source,
     bool IsArchived,
+    string? Street,
+    string? Street2,
+    string? PostalCode,
+    string? City,
+    string? Region,
+    string? CountryCode,
     IReadOnlyList<TagResponse> Tags);
 
 /// <param name="OrganizationName">Uses the organization with this name (case-insensitive) or creates it; ignored when
@@ -55,7 +61,13 @@ public sealed record CreateContactRequest(
     string? LinkedInUrl = null,
     Guid? OrganizationId = null,
     string? OrganizationName = null,
-    LeadSource? Source = null);
+    LeadSource? Source = null,
+    string? Street = null,
+    string? Street2 = null,
+    string? PostalCode = null,
+    string? City = null,
+    string? Region = null,
+    string? CountryCode = null);
 
 public sealed record OrganizationListItem(
     Guid Id,
@@ -72,7 +84,12 @@ public sealed record OrganizationDetail(
     string Name,
     OrganizationType Type,
     string? Website,
+    string? Street,
+    string? Street2,
+    string? PostalCode,
     string? City,
+    string? Region,
+    string? CountryCode,
     string? Notes,
     bool IsArchived,
     IReadOnlyList<TagResponse> Tags);
@@ -81,7 +98,12 @@ public sealed record CreateOrganizationRequest(
     string? Name,
     OrganizationType? Type = null,
     string? Website = null,
+    string? Street = null,
+    string? Street2 = null,
+    string? PostalCode = null,
     string? City = null,
+    string? Region = null,
+    string? CountryCode = null,
     string? Notes = null);
 
 public sealed record OpportunityListItem(

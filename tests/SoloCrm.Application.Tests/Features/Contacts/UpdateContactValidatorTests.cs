@@ -38,5 +38,5 @@ public sealed class UpdateContactValidatorTests
     }
 
     private static UpdateContact.Command Command() =>
-        new(Guid.CreateVersion7(), "Ada", "Lovelace", "ada@example.test", null, null, "https://linkedin.com/in/ada", null, null, null);
+        new(Guid.CreateVersion7(), "Ada", "Lovelace", "ada@example.test", null, null, "https://linkedin.com/in/ada", null, null, null, null);
 }

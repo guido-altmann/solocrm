@@ -1,7 +1,9 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Application.Features.Contacts;
+using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Tags;
@@ -170,6 +172,21 @@ public static class ImportContacts
             var source = mapping.SourceOf(Value(ImportField.Source));
             var linkedInUrl = WithScheme(Value(ImportField.LinkedInUrl));
 
+            var countryValue = Value(ImportField.Country);
+            var country = Countries.Find(countryValue);
+            if (countryValue is not null && country is null)
+            {
+                return new RowResult.Failed($"Unbekanntes Land „{countryValue}“.");
+            }
+
+            var address = new AddressData(
+                Value(ImportField.Street),
+                Value(ImportField.Street2),
+                Value(ImportField.PostalCode),
+                Value(ImportField.City),
+                Value(ImportField.Region),
+                country?.Code);
+
             var (existingId, matchedBy) = block.FindExisting(email, hubSpotId);
             Contact contact;
             RowResult result;
@@ -191,7 +208,8 @@ public static class ImportContacts
                     linkedInUrl ?? contact.LinkedInUrl,
                     null,
                     organizationName,
-                    source ?? contact.Source);
+                    source ?? contact.Source,
+                    Merge(address, AddressData.From(contact.Address)));
                 if (await ValidateAsync(merged, cancellationToken) is { } invalid)
                 {
                     return invalid;
@@ -201,6 +219,7 @@ public static class ImportContacts
                     ? contact.OrganizationId
                     : block.ResolveOrganization(organizationName, Value(ImportField.OrganizationWebsite));
                 contact.Update(merged.FirstName, merged.LastName, merged.Email, merged.Phone, merged.JobTitle, merged.LinkedInUrl, organizationId, merged.Source);
+                contact.ChangeAddress(merged.Address!.ToAddress());
                 result = new RowResult.Updated();
             }
             else
@@ -214,7 +233,8 @@ public static class ImportContacts
                     linkedInUrl,
                     null,
                     organizationName,
-                    source);
+                    source,
+                    address);
                 if (await ValidateAsync(create, cancellationToken) is { } invalid)
                 {
                     return invalid;
@@ -223,7 +243,9 @@ public static class ImportContacts
                 Guid? organizationId = organizationName is null
                     ? null
                     : block.ResolveOrganization(organizationName, Value(ImportField.OrganizationWebsite));
-                contact = Contact.Create(create.FirstName, create.LastName, create.Email, create.Phone, create.JobTitle, create.LinkedInUrl, organizationId, create.Source);
+                contact = Contact.Create(
+                    create.FirstName, create.LastName, create.Email, create.Phone, create.JobTitle, create.LinkedInUrl, organizationId, create.Source,
+                    address.ToAddress());
                 block.Db.Contacts.Add(contact);
                 result = new RowResult.Created();
             }
@@ -266,6 +288,15 @@ public static class ImportContacts
 
             return keys;
         }
+
+        /// <summary>Like the other fields on update: a value of the file wins, an empty cell keeps the existing value.</summary>
+        private static AddressData Merge(AddressData file, AddressData existing) => new(
+            file.Street ?? existing.Street,
+            file.Street2 ?? existing.Street2,
+            file.PostalCode ?? existing.PostalCode,
+            file.City ?? existing.City,
+            file.Region ?? existing.Region,
+            file.CountryCode ?? existing.CountryCode);
 
         /// <summary>HubSpot often exports LinkedIn profiles without scheme (<c>linkedin.com/in/…</c>).</summary>
         private static string? WithScheme(string? url) =>

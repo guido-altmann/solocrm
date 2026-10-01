@@ -90,6 +90,41 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
     }
 
     [Fact]
+    public async Task Import_AddressColumns_StoresAddressAndRecognizesCountryNames()
+    {
+        var file = Csv("Vorname;Nachname;Straße;PLZ;Ort;Bundesland;Land",
+        [
+            "Ada;Lovelace;Hauptstr. 1;10115;Berlin;Berlin;Deutschland",
+            "Grace;Hopper;Bahnhofstrasse 1;8001;Zürich;ZH;Switzerland",
+            "Alan;Turing;;;;;AT",
+            "Linus;Torvalds;;;Helsinki;;Atlantis",
+        ]);
+
+        var result = await ImportAsync(file, DuplicateHandling.Skip);
+
+        result.Value.Created.Should().Be(3);
+        result.Value.Errors.Should().Equal(new ImportContacts.RowIssue(5, "Unbekanntes Land „Atlantis“."));
+        await using var db = OpenDb();
+        var contacts = await db.Contacts.OrderBy(c => c.LastName).ToDictionaryAsync(c => c.LastName!, c => c.Address, Ct);
+        contacts["Lovelace"].Should().Be(Address.Create("Hauptstr. 1", null, "10115", "Berlin", "Berlin", "DE"));
+        contacts["Hopper"].CountryCode.Should().Be("CH");
+        contacts["Turing"].Should().Be(Address.Create(countryCode: "AT"));
+    }
+
+    [Fact]
+    public async Task Import_UpdateWithPartialAddress_KeepsExistingAddressParts()
+    {
+        await SendAsync<CreateContact.Command, CreateContact.Result>(new CreateContact.Command(
+            "Ada", "Lovelace", Email: "ada@example.test",
+            Address: new Application.Features.Common.AddressData("Hauptstr. 1", null, "10115", "Berlin", null, "DE")));
+
+        await ImportAsync(Csv("Nachname,E-Mail,PLZ,Ort", ["Lovelace,ada@example.test,80331,München"]), DuplicateHandling.Update);
+
+        await using var db = OpenDb();
+        (await db.Contacts.SingleAsync(Ct)).Address.Should().Be(Address.Create("Hauptstr. 1", null, "80331", "München", null, "DE"));
+    }
+
+    [Fact]
     public async Task Import_EveryContact_IsAuditedAndRaisesContactCreated()
     {
         var file = Csv("Vorname;Nachname", ["Ada;Lovelace", "Grace;Hopper"]);

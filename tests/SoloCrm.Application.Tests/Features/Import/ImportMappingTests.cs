@@ -32,6 +32,24 @@ public sealed class ImportMappingTests
         mapping.For(ImportField.Source)!.Column.Should().Be(14);
         mapping.For(ImportField.Tag)!.Column.Should().Be(15);
         mapping.For(ImportField.HubSpotRecordId)!.Column.Should().Be(0);
+        mapping.For(ImportField.Street)!.Column.Should().Be(20);
+        mapping.For(ImportField.PostalCode)!.Column.Should().Be(21);
+        mapping.For(ImportField.City)!.Column.Should().Be(22);
+        mapping.For(ImportField.Region)!.Column.Should().Be(23);
+        mapping.For(ImportField.Country).Should().Be(new FieldMapping(ImportField.Country, 25, 24), "the code first, the name as fallback");
+        mapping.For(ImportField.Street2).Should().BeNull("HubSpot contacts have no second address line");
+    }
+
+    [Fact]
+    public void Suggest_GenericGermanAddressHeaders_MapsAddressFields()
+    {
+        var mapping = ImportTemplates.Suggest(ImportTemplate.Generic, ["Nachname", "Straße", "Adresszusatz", "PLZ", "Ort", "Bundesland", "Land"]);
+
+        mapping.Fields.Where(f => f.Column is not null).Select(f => (f.Field, f.Column)).Should().BeEquivalentTo(new (ImportField, int?)[]
+        {
+            (ImportField.LastName, 0), (ImportField.Street, 1), (ImportField.Street2, 2), (ImportField.PostalCode, 3),
+            (ImportField.City, 4), (ImportField.Region, 5), (ImportField.Country, 6),
+        });
     }
 
     [Fact]

@@ -12,7 +12,8 @@ public static class HubSpotSample
         "\"Record ID\",\"First Name\",\"Last Name\",\"Email\",\"Work email\",\"Phone Number\",\"Mobile Phone Number\","
         + "\"Billing Contact IDs\",\"Job Title\",\"lh_current_position\",\"LinkedIn URL\",\"lh_linkedin_profile_url\","
         + "\"Company Name\",\"Website URL\",\"Original Traffic Source\",\"Lifecycle Stage\",\"Billing Contact IDs\","
-        + "\"Date entered \"\"Kunde (Lifecycle Stage Pipeline)\"\"\",\"Billing Contact IDs\",\"Create Date\"";
+        + "\"Date entered \"\"Kunde (Lifecycle Stage Pipeline)\"\"\",\"Billing Contact IDs\",\"Create Date\","
+        + "\"Street Address\",\"Postal Code\",\"City\",\"State/Region\",\"Country/Region\",\"Country/Region Code\"";
 
     public static string Row(
         string recordId,
@@ -29,11 +30,18 @@ public static class HubSpotSample
         string company = "",
         string website = "",
         string source = "",
-        string lifecycleStage = "") =>
+        string lifecycleStage = "",
+        string street = "",
+        string postalCode = "",
+        string city = "",
+        string region = "",
+        string country = "",
+        string countryCode = "") =>
         string.Join(',', new[]
         {
             recordId, firstName, lastName, email, workEmail, phone, mobile, "1;2", jobTitle, position, linkedIn, linkedInProfile,
             company, website, source, lifecycleStage, "", "2026-01-01", "", "2025-12-24 10:00",
+            street, postalCode, city, region, country, countryCode,
         }.Select(v => $"\"{v.Replace("\"", "\"\"", StringComparison.Ordinal)}\""));
 
     public static byte[] File(params string[] rows) => Encoding.UTF8.GetBytes(string.Join("\r\n", [Header, .. rows]) + "\r\n");

@@ -1,3 +1,4 @@
+using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Domain.Tests.Organizations;
@@ -19,11 +20,11 @@ public sealed class OrganizationTests
     [Fact]
     public void Create_AllValues_NormalizesWebsiteAndTrims()
     {
-        var organization = Organization.Create("Contoso", OrganizationType.Client, "Contoso.de/", " Berlin ", " ");
+        var organization = Organization.Create("Contoso", OrganizationType.Client, "Contoso.de/", Address.Create(city: " Berlin "), " ");
 
         organization.Type.Should().Be(OrganizationType.Client);
         organization.Website.Should().Be("https://contoso.de");
-        organization.City.Should().Be("Berlin");
+        organization.Address.City.Should().Be("Berlin");
         organization.Notes.Should().BeNull();
     }
 
@@ -51,11 +52,11 @@ public sealed class OrganizationTests
         var organization = Organization.Create("Contoso");
         organization.ClearDomainEvents();
 
-        organization.Update("Contoso AG", OrganizationType.Agency, null, "Köln", "Notiz");
+        organization.Update("Contoso AG", OrganizationType.Agency, null, Address.Create(city: "Köln"), "Notiz");
 
         organization.Name.Should().Be("Contoso AG");
         organization.Type.Should().Be(OrganizationType.Agency);
-        organization.City.Should().Be("Köln");
+        organization.Address.City.Should().Be("Köln");
         organization.Notes.Should().Be("Notiz");
         organization.DomainEvents.Should().BeEmpty();
     }

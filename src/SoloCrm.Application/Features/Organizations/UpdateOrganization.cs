@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.Application.Features.Organizations;
@@ -15,7 +16,7 @@ public static class UpdateOrganization
         string? Name,
         OrganizationType Type,
         string? Website,
-        string? City,
+        AddressData? Address,
         string? Notes) : IOrganizationFields;
 
     public sealed record Result(Guid Id);
@@ -46,7 +47,7 @@ public static class UpdateOrganization
                 return OrganizationErrors.NotFound;
             }
 
-            organization.Update(command.Name!, command.Type, command.Website, command.City, command.Notes);
+            organization.Update(command.Name!, command.Type, command.Website, command.Address?.ToAddress(), command.Notes);
             await db.SaveChangesAsync(cancellationToken);
 
             return new Result(organization.Id);

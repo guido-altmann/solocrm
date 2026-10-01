@@ -1,3 +1,4 @@
+using SoloCrm.Application.Features.Common;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.Contacts;
@@ -45,13 +46,13 @@ public sealed class ContactHandlerTests(PostgresFixture postgres) : HandlerTest(
         var id = await CreateContactAsync("Ada", "Lovelace", "ada@example.test");
 
         var result = await SendAsync<UpdateContact.Command, UpdateContact.Result>(new UpdateContact.Command(
-            id, "Ada", "King", "ada@example.test", "+49 30 1234", "CTO", "https://linkedin.com/in/ada", organizationId, null, LeadSource.LinkedIn));
+            id, "Ada", "King", "ada@example.test", "+49 30 1234", "CTO", "https://linkedin.com/in/ada", organizationId, null, LeadSource.LinkedIn, null));
 
         result.Value.Should().Be(new UpdateContact.Result(id, organizationId));
         var loaded = await QueryAsync<GetContact.Query, GetContact.Result>(new GetContact.Query(id));
         loaded.Value.Should().Be(new GetContact.Result(
             id, "Ada", "King", "ada@example.test", "+49 30 1234", "CTO", "https://linkedin.com/in/ada",
-            organizationId, "Contoso", OrganizationType.Other, LeadSource.LinkedIn, false));
+            organizationId, "Contoso", OrganizationType.Other, LeadSource.LinkedIn, false, AddressData.Empty));
         await using var db = OpenDb();
         var audit = await db.AuditEntries.SingleAsync(a => a.Action == AuditAction.Updated, Ct);
         audit.Changes.Should().Contain(
@@ -67,7 +68,7 @@ public sealed class ContactHandlerTests(PostgresFixture postgres) : HandlerTest(
         var id = await CreateContactAsync("Ada", null, "ada@example.test");
 
         var result = await SendAsync<UpdateContact.Command, UpdateContact.Result>(
-            new UpdateContact.Command(id, "Ada", null, "ADA@example.test", null, null, null, null, null, null));
+            new UpdateContact.Command(id, "Ada", null, "ADA@example.test", null, null, null, null, null, null, null));
 
         result.IsSuccess.Should().BeTrue();
     }
@@ -79,7 +80,7 @@ public sealed class ContactHandlerTests(PostgresFixture postgres) : HandlerTest(
         var id = await CreateContactAsync("Ada", null, "ada@example.test");
 
         var result = await SendAsync<UpdateContact.Command, UpdateContact.Result>(
-            new UpdateContact.Command(id, "Ada", null, "Grace@example.test", null, null, null, null, null, null));
+            new UpdateContact.Command(id, "Ada", null, "Grace@example.test", null, null, null, null, null, null, null));
 
         result.Error.Should().Be(ContactErrors.DuplicateEmail);
     }
@@ -88,7 +89,7 @@ public sealed class ContactHandlerTests(PostgresFixture postgres) : HandlerTest(
     public async Task Update_UnknownId_ReturnsNotFound()
     {
         var result = await SendAsync<UpdateContact.Command, UpdateContact.Result>(
-            new UpdateContact.Command(Guid.CreateVersion7(), "Ada", null, null, null, null, null, null, null, null));
+            new UpdateContact.Command(Guid.CreateVersion7(), "Ada", null, null, null, null, null, null, null, null, null));
 
         result.Error.Should().Be(ContactErrors.NotFound);
     }
@@ -99,7 +100,7 @@ public sealed class ContactHandlerTests(PostgresFixture postgres) : HandlerTest(
         var id = await CreateContactAsync("Ada", null);
 
         var result = await SendAsync<UpdateContact.Command, UpdateContact.Result>(
-            new UpdateContact.Command(id, " ", null, null, null, null, null, null, null, null));
+            new UpdateContact.Command(id, " ", null, null, null, null, null, null, null, null, null));
 
         result.Error.Should().BeOfType<ValidationError>();
     }

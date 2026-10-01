@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Extensions.Options;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 using SoloCrm.Application.Features.Contacts;
 using SoloCrm.Application.Features.Organizations;
 using SoloCrm.Application.Features.Tags;
@@ -14,7 +15,7 @@ namespace SoloCrm.Web.Endpoints;
 internal static class ContactEndpoints
 {
     private static readonly string[] PatchFields =
-        ["firstName", "lastName", "email", "phone", "jobTitle", "linkedInUrl", "organizationId", "source"];
+        ["firstName", "lastName", "email", "phone", "jobTitle", "linkedInUrl", "organizationId", "source", .. ApiAddress.Fields];
 
     public static void MapContactEndpoints(this RouteGroupBuilder api)
     {
@@ -118,7 +119,8 @@ internal static class ContactEndpoints
                 request.LinkedInUrl,
                 organizationId,
                 newOrganizationName,
-                request.Source),
+                request.Source,
+                new AddressData(request.Street, request.Street2, request.PostalCode, request.City, request.Region, request.CountryCode)),
             cancellationToken);
 
         return result.IsSuccess
@@ -153,7 +155,8 @@ internal static class ContactEndpoints
             patch.Value("linkedInUrl", c.LinkedInUrl),
             patch.Value("organizationId", c.OrganizationId),
             null,
-            patch.Value<LeadSource?>("source", c.Source));
+            patch.Value<LeadSource?>("source", c.Source),
+            ApiAddress.Patch(patch, c.Address));
         if (!patch.IsValid)
         {
             return patch.ValidationProblem();
@@ -182,7 +185,8 @@ internal static class ContactEndpoints
         var c = contact.Value;
         var detail = new ContactDetail(
             c.Id, c.FirstName, c.LastName, c.Email, c.Phone, c.JobTitle, c.LinkedInUrl, c.OrganizationId, c.OrganizationName,
-            c.Source, c.IsArchived, tags.IsSuccess ? TagResponse.From(tags.Value.Items) : []);
+            c.Source, c.IsArchived, c.Address.Street, c.Address.Street2, c.Address.PostalCode, c.Address.City, c.Address.Region,
+            c.Address.CountryCode, tags.IsSuccess ? TagResponse.From(tags.Value.Items) : []);
 
         return created ? TypedResults.Created($"{ApiEndpoints.BasePath}/contacts/{id}", detail) : TypedResults.Ok(detail);
     }
