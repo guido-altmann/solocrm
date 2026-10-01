@@ -62,13 +62,13 @@
 - [x] Architekturtest: Endpoints greifen nicht auf den DbContext zu
 
 ## Schritt 6 – CSV-Import: Use Case (US-16)
-- [ ] Parsing mit CsvHelper: Trennzeichen (`,`/`;`) und Kodierung (UTF-8 mit/ohne BOM, Windows-1252) erkennen, Größenlimit (z. B. 5 MB / 10.000 Zeilen)
-- [ ] Vorschau der ersten 10 Zeilen (AK1)
-- [ ] Spalten-Mapping je Zielfeld (Zielfeld → Quellspalte, mit Ersatzspalte) inkl. Organisation (Name → bestehende Organisation oder neu anlegen); Spalten per Index, da Kopfzeilen nicht eindeutig sein müssen
-- [ ] Dubletten per E-Mail (case-insensitive), ohne E-Mail per `HubSpotRecordId`; Option überspringen/aktualisieren (AK2); Dubletten innerhalb der Datei
-- [ ] Ergebnisbericht: angelegt, aktualisiert, übersprungen, fehlerhaft mit Zeile und Grund (AK3)
-- [ ] Mapping-Vorlage für den HubSpot-Kontaktexport (AK4, Entscheidung 9) inkl. Werte-Mapping der Quelle und Zielfeld „Tag“ für `Lifecycle Stage`
-- [ ] Synchrone Ausführung in Blöcken zu 100 Zeilen mit Fortschritt (Entscheidung 10); Audit und `ContactCreated` je Kontakt wie bei manueller Anlage (Entscheidung 11)
+- [x] Parsing mit CsvHelper: Trennzeichen (`,`/`;`) und Kodierung (UTF-8 mit/ohne BOM, Windows-1252) erkennen, Größenlimit 5 MB / 10.000 Zeilen; Zeilennummern wie in der Tabellenkalkulation (Kopfzeile = 1)
+- [x] Vorschau der ersten 10 Zeilen (AK1)
+- [x] Spalten-Mapping je Zielfeld (Zielfeld → Quellspalte, mit Ersatzspalte) inkl. Organisation (Name → bestehende Organisation oder neu anlegen); Spalten per Index, da Kopfzeilen nicht eindeutig sein müssen
+- [x] Dubletten per E-Mail (case-insensitive), ohne E-Mail per `HubSpotRecordId`; Option überspringen/aktualisieren (AK2); Dubletten innerhalb der Datei (spätere Zeile wird übersprungen); „aktualisieren“ überschreibt nur mit nicht leeren Werten
+- [x] Ergebnisbericht: angelegt, aktualisiert, übersprungen, fehlerhaft mit Zeile und Grund (AK3)
+- [x] Mapping-Vorlage für den HubSpot-Kontaktexport (AK4, Entscheidung 9) inkl. Werte-Mapping der Quelle und Zielfeld „Tag“ für `Lifecycle Stage`
+- [x] Synchrone Ausführung in Blöcken zu 100 Zeilen mit Fortschritt (Entscheidung 10); Audit und `ContactCreated` je Kontakt wie bei manueller Anlage (Entscheidung 11)
 
 ## Schritt 7 – CSV-Import: Oberfläche (US-16)
 - [ ] Seite bzw. Abschnitt „Import“ in `/settings`: Upload → Vorschau → Mapping (Vorlage wählbar) → Import → Bericht

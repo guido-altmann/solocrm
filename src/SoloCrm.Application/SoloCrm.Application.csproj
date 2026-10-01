@@ -10,6 +10,8 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <!-- CSV import (US-16); parsing is part of the use case, not of a technical adapter. -->
+    <PackageReference Include="CsvHelper" />
   </ItemGroup>
 
 </Project>

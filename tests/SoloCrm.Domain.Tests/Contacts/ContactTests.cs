@@ -87,4 +87,20 @@ public sealed class ContactTests
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
+
+    [Fact]
+    public void SetExtraField_ValueAndBlank_SetsTrimmedValueAndRemovesIt()
+    {
+        var contact = Contact.Create("Ada", "Lovelace");
+        var before = contact.ExtraFields;
+
+        contact.SetExtraField("HubSpotRecordId", " 4711 ");
+
+        contact.ExtraFields.Should().Equal(new Dictionary<string, string> { ["HubSpotRecordId"] = "4711" });
+        contact.ExtraFields.Should().NotBeSameAs(before);
+
+        contact.SetExtraField("HubSpotRecordId", " ");
+
+        contact.ExtraFields.Should().BeEmpty();
+    }
 }

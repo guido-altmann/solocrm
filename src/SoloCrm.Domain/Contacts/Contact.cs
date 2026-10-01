@@ -96,6 +96,27 @@ public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
         Source = source;
     }
 
+    /// <summary>
+    /// Sets or removes (blank value) an additional field, e.g. <c>HubSpotRecordId</c> from the CSV import (SPEC 2.2).
+    /// A new dictionary is assigned, so the change tracker sees the jsonb value as modified.
+    /// </summary>
+    public void SetExtraField(string key, string? value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        var fields = new Dictionary<string, string>(ExtraFields, StringComparer.Ordinal);
+        if (Normalize(value) is { } normalized)
+        {
+            fields[key] = normalized;
+        }
+        else
+        {
+            fields.Remove(key);
+        }
+
+        ExtraFields = fields;
+    }
+
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
