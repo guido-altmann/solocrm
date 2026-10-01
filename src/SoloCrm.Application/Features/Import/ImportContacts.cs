@@ -11,45 +11,34 @@ using SoloCrm.Domain.Tags;
 namespace SoloCrm.Application.Features.Import;
 
 /// <summary>
-/// Imports contacts from a CSV file (US-16). Runs synchronously in blocks of <see cref="BlockSize"/> rows, one
-/// transaction per block, and reports progress after each block (iteration 5 decision 10). Every contact goes through
-/// the same validation, audit and <c>ContactCreated</c> event as a manual one (decision 11).
+/// Imports contacts from a CSV file (US-16) in blocks with progress (<see cref="ImportRun"/>, iteration 5 decision 10).
+/// Every contact goes through the same validation, audit and <c>ContactCreated</c> event as a manual one (decision 11).
 /// <para>Duplicates (AK2): first by email (case-insensitive), otherwise by <c>HubSpotRecordId</c>, both against the
 /// database and against earlier rows of the same file.</para>
+/// <para>Employer (decision 16): the HubSpot company id links to the organization imported with that id; otherwise the
+/// organization name is used (existing one regardless of case, or a new one).</para>
 /// </summary>
 public static class ImportContacts
 {
-    public const int BlockSize = 100;
-
     public sealed record Command(
         ReadOnlyMemory<byte> Content,
         ImportMapping Mapping,
         DuplicateHandling Duplicates,
-        IProgress<Progress>? Progress = null);
+        IProgress<ImportProgress>? Progress = null);
 
-    public sealed record Progress(int Processed, int Total);
-
-    /// <param name="Row">Row number in the file (header = 1).</param>
-    public sealed record RowIssue(int Row, string Reason);
-
-    public sealed record Result(int Created, int Updated, int Skipped, int Failed, IReadOnlyList<RowIssue> Skips, IReadOnlyList<RowIssue> Errors);
+    public sealed record Result(ImportReport Report);
 
     public sealed class Validator : AbstractValidator<Command>
     {
         public Validator()
         {
             RuleFor(c => c.Duplicates).IsInEnum().WithMessage("Bitte wählen, wie Dubletten behandelt werden.");
-            RuleFor(c => c.Mapping).NotNull().WithMessage("Bitte die Spalten zuordnen.");
-            RuleFor(c => c.Mapping.Template).IsInEnum().WithMessage("Unbekannte Vorlage.").When(c => c.Mapping is not null);
-            RuleFor(c => c.Mapping.Fields)
-                .Must(fields => fields.Any(f => f.Column is not null && f.Field is ImportField.FirstName or ImportField.LastName))
-                .WithMessage("Bitte mindestens Vor- oder Nachname einer Spalte zuordnen.")
-                .Must(fields => fields.GroupBy(f => f.Field).All(g => g.Count() == 1))
-                .WithMessage("Jedes Zielfeld darf nur einmal zugeordnet werden.")
-                .Must(fields => fields.All(f => f.Column is null or >= 0 && f.FallbackColumn is null or >= 0))
-                .WithMessage("Ungültige Spalte.")
-                .OverridePropertyName(nameof(Command.Mapping))
-                .When(c => c.Mapping is not null);
+            this.AddMappingRules(
+                c => c.Mapping,
+                ImportTarget.Contacts,
+                "Bitte mindestens Vor- oder Nachname einer Spalte zuordnen.",
+                ImportField.FirstName,
+                ImportField.LastName);
         }
     }
 
@@ -66,271 +55,31 @@ public static class ImportContacts
                 return validation.ToValidationError();
             }
 
-            var parsed = CsvDocument.Parse(command.Content);
-            if (parsed.IsFailure)
+            var prepared = ImportRun.Prepare(command.Content, command.Mapping);
+            if (prepared.IsFailure)
             {
-                return parsed.Error;
-            }
-
-            var document = parsed.Value;
-            var columnCount = document.Headers.Count;
-            if (command.Mapping.Fields.Any(f => f.Column >= columnCount || f.FallbackColumn >= columnCount))
-            {
-                return new ValidationError(new Dictionary<string, string[]>
-                {
-                    [nameof(Command.Mapping)] = ["Eine zugeordnete Spalte existiert in der Datei nicht."],
-                });
+                return prepared.Error;
             }
 
             var state = await ImportState.LoadAsync(dbFactory, cancellationToken);
-            var outcome = new Outcome();
-            var processed = 0;
-            foreach (var block in document.Rows.Chunk(BlockSize))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                await ImportBlockAsync(block, command, state, outcome, cancellationToken);
-                processed += block.Length;
-                command.Progress?.Report(new Progress(processed, document.Rows.Count));
-            }
-
-            return new Result(
-                outcome.Created,
-                outcome.Updated,
-                outcome.Skips.Count,
-                outcome.Errors.Count,
-                [.. outcome.Skips.OrderBy(i => i.Row)],
-                [.. outcome.Errors.OrderBy(i => i.Row)]);
+            var report = await ImportRun.RunAsync(
+                prepared.Value,
+                dbFactory,
+                db => new Block(db, state, command, contactValidator),
+                command.Progress,
+                cancellationToken);
+            return new Result(report);
         }
-
-        private async Task ImportBlockAsync(CsvRow[] rows, Command command, ImportState state, Outcome outcome, CancellationToken cancellationToken)
-        {
-            await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var block = new Block(db, state);
-            var created = new List<int>();
-            var updated = new List<int>();
-            var skips = new List<RowIssue>();
-
-            foreach (var row in rows)
-            {
-                var result = await ImportRowAsync(row, command, block, cancellationToken);
-                switch (result)
-                {
-                    case RowResult.Created:
-                        created.Add(row.Number);
-                        break;
-                    case RowResult.Updated:
-                        updated.Add(row.Number);
-                        break;
-                    case RowResult.Skipped skipped:
-                        skips.Add(new RowIssue(row.Number, skipped.Reason));
-                        break;
-                    case RowResult.Failed failed:
-                        outcome.Errors.Add(new RowIssue(row.Number, failed.Reason));
-                        break;
-                }
-            }
-
-            try
-            {
-                await db.SaveChangesAsync(cancellationToken);
-            }
-            catch (DbUpdateException)
-            {
-                // E.g. a contact with the same email was created in the UI meanwhile; the unique index protects the data.
-                var reason = $"Speichern fehlgeschlagen; die Zeilen {rows[0].Number}–{rows[^1].Number} wurden nicht übernommen.";
-                outcome.Errors.AddRange(created.Concat(updated).Select(number => new RowIssue(number, reason)));
-                outcome.Skips.AddRange(skips);
-                return;
-            }
-
-            block.Commit();
-            outcome.Created += created.Count;
-            outcome.Updated += updated.Count;
-            outcome.Skips.AddRange(skips);
-        }
-
-        private async Task<RowResult> ImportRowAsync(CsvRow row, Command command, Block block, CancellationToken cancellationToken)
-        {
-            var mapping = command.Mapping;
-            string? Value(ImportField field) => mapping.Value(row, field);
-
-            var email = Value(ImportField.Email);
-            var hubSpotId = Value(ImportField.HubSpotRecordId);
-            var keys = DuplicateKeys(email, hubSpotId);
-            if (keys.Select(block.SeenInFile).FirstOrDefault(r => r is not null) is { } firstRow)
-            {
-                return new RowResult.Skipped($"Doppelt in der Datei (wie Zeile {firstRow}).");
-            }
-
-            var tagName = Value(ImportField.Tag);
-            if (tagName is not null && tagName.Length > Tag.NameMaxLength)
-            {
-                return new RowResult.Failed($"Der Tag darf höchstens {Tag.NameMaxLength} Zeichen lang sein.");
-            }
-
-            var organizationName = Value(ImportField.Organization);
-            var source = mapping.SourceOf(Value(ImportField.Source));
-            var linkedInUrl = WithScheme(Value(ImportField.LinkedInUrl));
-
-            var countryValue = Value(ImportField.Country);
-            var country = Countries.Find(countryValue);
-            if (countryValue is not null && country is null)
-            {
-                return new RowResult.Failed($"Unbekanntes Land „{countryValue}“.");
-            }
-
-            var address = new AddressData(
-                Value(ImportField.Street),
-                Value(ImportField.Street2),
-                Value(ImportField.PostalCode),
-                Value(ImportField.City),
-                Value(ImportField.Region),
-                country?.Code);
-
-            var (existingId, matchedBy) = block.FindExisting(email, hubSpotId);
-            Contact contact;
-            RowResult result;
-            if (existingId is { } id)
-            {
-                if (command.Duplicates == DuplicateHandling.Skip)
-                {
-                    block.MarkSeen(keys, row.Number);
-                    return new RowResult.Skipped($"Kontakt existiert bereits ({matchedBy}).");
-                }
-
-                contact = (await block.Db.Contacts.FindAsync([id], cancellationToken))!;
-                var merged = new CreateContact.Command(
-                    Value(ImportField.FirstName) ?? contact.FirstName,
-                    Value(ImportField.LastName) ?? contact.LastName,
-                    contact.Email ?? email,
-                    Value(ImportField.Phone) ?? contact.Phone,
-                    Value(ImportField.JobTitle) ?? contact.JobTitle,
-                    linkedInUrl ?? contact.LinkedInUrl,
-                    null,
-                    organizationName,
-                    source ?? contact.Source,
-                    Merge(address, AddressData.From(contact.Address)));
-                if (await ValidateAsync(merged, cancellationToken) is { } invalid)
-                {
-                    return invalid;
-                }
-
-                var organizationId = organizationName is null
-                    ? contact.OrganizationId
-                    : block.ResolveOrganization(organizationName, Value(ImportField.OrganizationWebsite));
-                contact.Update(merged.FirstName, merged.LastName, merged.Email, merged.Phone, merged.JobTitle, merged.LinkedInUrl, organizationId, merged.Source);
-                contact.ChangeAddress(merged.Address!.ToAddress());
-                result = new RowResult.Updated();
-            }
-            else
-            {
-                var create = new CreateContact.Command(
-                    Value(ImportField.FirstName),
-                    Value(ImportField.LastName),
-                    email,
-                    Value(ImportField.Phone),
-                    Value(ImportField.JobTitle),
-                    linkedInUrl,
-                    null,
-                    organizationName,
-                    source,
-                    address);
-                if (await ValidateAsync(create, cancellationToken) is { } invalid)
-                {
-                    return invalid;
-                }
-
-                Guid? organizationId = organizationName is null
-                    ? null
-                    : block.ResolveOrganization(organizationName, Value(ImportField.OrganizationWebsite));
-                contact = Contact.Create(
-                    create.FirstName, create.LastName, create.Email, create.Phone, create.JobTitle, create.LinkedInUrl, organizationId, create.Source,
-                    address.ToAddress());
-                block.Db.Contacts.Add(contact);
-                result = new RowResult.Created();
-            }
-
-            if (hubSpotId is not null)
-            {
-                contact.SetExtraField(ImportMapping.HubSpotRecordIdKey, hubSpotId);
-            }
-
-            if (tagName is not null)
-            {
-                await block.AssignTagAsync(contact.Id, tagName, isNew: result is RowResult.Created, cancellationToken);
-            }
-
-            block.Register(contact.Id, contact.Email, hubSpotId);
-            block.MarkSeen(keys, row.Number);
-            return result;
-        }
-
-        private async Task<RowResult.Failed?> ValidateAsync(CreateContact.Command contact, CancellationToken cancellationToken)
-        {
-            var validation = await contactValidator.ValidateAsync(contact, cancellationToken);
-            return validation.IsValid
-                ? null
-                : new RowResult.Failed(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage).Distinct()));
-        }
-
-        private static List<string> DuplicateKeys(string? email, string? hubSpotId)
-        {
-            var keys = new List<string>(2);
-            if (email is not null)
-            {
-                keys.Add(ImportState.EmailKey(email));
-            }
-
-            if (hubSpotId is not null)
-            {
-                keys.Add(ImportState.HubSpotKey(hubSpotId));
-            }
-
-            return keys;
-        }
-
-        /// <summary>Like the other fields on update: a value of the file wins, an empty cell keeps the existing value.</summary>
-        private static AddressData Merge(AddressData file, AddressData existing) => new(
-            file.Street ?? existing.Street,
-            file.Street2 ?? existing.Street2,
-            file.PostalCode ?? existing.PostalCode,
-            file.City ?? existing.City,
-            file.Region ?? existing.Region,
-            file.CountryCode ?? existing.CountryCode);
-
-        /// <summary>HubSpot often exports LinkedIn profiles without scheme (<c>linkedin.com/in/…</c>).</summary>
-        private static string? WithScheme(string? url) =>
-            url is null || url.Contains("://", StringComparison.Ordinal) ? url : "https://" + url;
     }
 
-    private abstract record RowResult
-    {
-        public sealed record Created : RowResult;
-
-        public sealed record Updated : RowResult;
-
-        public sealed record Skipped(string Reason) : RowResult;
-
-        public sealed record Failed(string Reason) : RowResult;
-    }
-
-    private sealed class Outcome
-    {
-        public int Created { get; set; }
-
-        public int Updated { get; set; }
-
-        public List<RowIssue> Skips { get; } = [];
-
-        public List<RowIssue> Errors { get; } = [];
-    }
-
-    /// <summary>What the import knows across blocks: existing contacts, organizations and rows already seen.</summary>
+    /// <summary>What the import knows across blocks: existing contacts and organizations, rows already seen.</summary>
     private sealed class ImportState
     {
         public Dictionary<string, Guid> Contacts { get; } = new(StringComparer.Ordinal);
 
-        public Dictionary<string, Guid> Organizations { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, Guid> OrganizationsByName { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public Dictionary<string, Guid> OrganizationsByHubSpotId { get; } = new(StringComparer.Ordinal);
 
         public Dictionary<string, int> SeenInFile { get; } = new(StringComparer.Ordinal);
 
@@ -369,39 +118,156 @@ public static class ImportContacts
             var organizations = await db.Organizations.AsNoTracking()
                 .OrderBy(o => o.IsArchived)
                 .ThenBy(o => o.CreatedAt)
-                .Select(o => new { o.Id, o.Name })
+                .Select(o => new { o.Id, o.Name, o.ExtraFields })
                 .ToListAsync(cancellationToken);
             foreach (var organization in organizations)
             {
-                state.Organizations.TryAdd(organization.Name.Trim(), organization.Id);
+                state.OrganizationsByName.TryAdd(organization.Name.Trim(), organization.Id);
+                if (organization.ExtraFields.TryGetValue(ImportMapping.HubSpotRecordIdKey, out var hubSpotId))
+                {
+                    state.OrganizationsByHubSpotId.TryAdd(hubSpotId.Trim(), organization.Id);
+                }
             }
 
-            state.LastTagColor = await db.Tags
-                .OrderByDescending(t => t.CreatedAt)
-                .ThenByDescending(t => t.Id)
-                .Select(t => t.Color)
-                .FirstOrDefaultAsync(cancellationToken);
+            state.LastTagColor = await ImportRun.LastTagColorAsync(db, cancellationToken);
             return state;
         }
     }
 
-    /// <summary>
-    /// Changes of one block. Lookup entries become visible to later blocks only after the block was saved
-    /// (<see cref="Commit"/>), so that a failed block leaves no dangling references.
-    /// </summary>
-    private sealed class Block(ICrmDbContext db, ImportState state)
+    private sealed class Block(ICrmDbContext db, ImportState state, Command command, IValidator<CreateContact.Command> contactValidator)
+        : IImportBlock
     {
         private readonly Dictionary<string, Guid> _contacts = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Guid> _organizations = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> _seen = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Tag> _tags = new(StringComparer.OrdinalIgnoreCase);
 
-        public ICrmDbContext Db { get; } = db;
+        public async Task<RowResult> ImportAsync(CsvRow row, CancellationToken cancellationToken)
+        {
+            var mapping = command.Mapping;
+            string? Value(ImportField field) => mapping.Value(row, field);
 
-        public int? SeenInFile(string key) =>
+            var email = Value(ImportField.Email);
+            var hubSpotId = Value(ImportField.HubSpotRecordId);
+            var keys = DuplicateKeys(email, hubSpotId);
+            if (keys.Select(SeenInFile).FirstOrDefault(r => r is not null) is { } firstRow)
+            {
+                return new RowResult.Skipped($"Doppelt in der Datei (wie Zeile {firstRow}).");
+            }
+
+            var tagName = Value(ImportField.Tag);
+            if (tagName is not null && tagName.Length > Tag.NameMaxLength)
+            {
+                return new RowResult.Failed($"Der Tag darf höchstens {Tag.NameMaxLength} Zeichen lang sein.");
+            }
+
+            if (!ImportAddress.TryRead(mapping, row, out var address, out var addressError))
+            {
+                return addressError;
+            }
+
+            var organizationName = Value(ImportField.Organization);
+            var companyId = FirstId(Value(ImportField.HubSpotCompanyId));
+            var source = mapping.SourceOf(Value(ImportField.Source));
+            var linkedInUrl = WithScheme(Value(ImportField.LinkedInUrl));
+
+            var (existingId, matchedBy) = FindExisting(email, hubSpotId);
+            Contact contact;
+            RowResult result;
+            if (existingId is { } id)
+            {
+                if (command.Duplicates == DuplicateHandling.Skip)
+                {
+                    MarkSeen(keys, row.Number);
+                    return new RowResult.Skipped($"Kontakt existiert bereits ({matchedBy}).");
+                }
+
+                contact = (await db.Contacts.FindAsync([id], cancellationToken))!;
+                var merged = new CreateContact.Command(
+                    Value(ImportField.FirstName) ?? contact.FirstName,
+                    Value(ImportField.LastName) ?? contact.LastName,
+                    contact.Email ?? email,
+                    Value(ImportField.Phone) ?? contact.Phone,
+                    Value(ImportField.JobTitle) ?? contact.JobTitle,
+                    linkedInUrl ?? contact.LinkedInUrl,
+                    null,
+                    organizationName,
+                    source ?? contact.Source,
+                    ImportAddress.Merge(address, AddressData.From(contact.Address)));
+                if (await ValidateAsync(merged, cancellationToken) is { } invalid)
+                {
+                    return invalid;
+                }
+
+                var organizationId = ResolveOrganization(companyId, organizationName, Value(ImportField.OrganizationWebsite))
+                    ?? contact.OrganizationId;
+                contact.Update(merged.FirstName, merged.LastName, merged.Email, merged.Phone, merged.JobTitle, merged.LinkedInUrl, organizationId, merged.Source);
+                contact.ChangeAddress(merged.Address!.ToAddress());
+                result = new RowResult.Updated();
+            }
+            else
+            {
+                var create = new CreateContact.Command(
+                    Value(ImportField.FirstName),
+                    Value(ImportField.LastName),
+                    email,
+                    Value(ImportField.Phone),
+                    Value(ImportField.JobTitle),
+                    linkedInUrl,
+                    null,
+                    organizationName,
+                    source,
+                    address);
+                if (await ValidateAsync(create, cancellationToken) is { } invalid)
+                {
+                    return invalid;
+                }
+
+                var organizationId = ResolveOrganization(companyId, organizationName, Value(ImportField.OrganizationWebsite));
+                contact = Contact.Create(
+                    create.FirstName, create.LastName, create.Email, create.Phone, create.JobTitle, create.LinkedInUrl, organizationId, create.Source,
+                    address.ToAddress());
+                db.Contacts.Add(contact);
+                result = new RowResult.Created();
+            }
+
+            if (hubSpotId is not null)
+            {
+                contact.SetExtraField(ImportMapping.HubSpotRecordIdKey, hubSpotId);
+            }
+
+            if (tagName is not null)
+            {
+                await AssignTagAsync(contact.Id, tagName, isNew: result is RowResult.Created, cancellationToken);
+            }
+
+            Register(contact.Id, contact.Email, hubSpotId);
+            MarkSeen(keys, row.Number);
+            return result;
+        }
+
+        public void Commit()
+        {
+            foreach (var (key, id) in _contacts)
+            {
+                state.Contacts.TryAdd(key, id);
+            }
+
+            foreach (var (key, id) in _organizations)
+            {
+                state.OrganizationsByName.TryAdd(key, id);
+            }
+
+            foreach (var (key, row) in _seen)
+            {
+                state.SeenInFile.TryAdd(key, row);
+            }
+        }
+
+        private int? SeenInFile(string key) =>
             state.SeenInFile.TryGetValue(key, out var row) || _seen.TryGetValue(key, out row) ? row : null;
 
-        public void MarkSeen(IEnumerable<string> keys, int row)
+        private void MarkSeen(IEnumerable<string> keys, int row)
         {
             foreach (var key in keys)
             {
@@ -409,7 +275,7 @@ public static class ImportContacts
             }
         }
 
-        public (Guid? Id, string MatchedBy) FindExisting(string? email, string? hubSpotId)
+        private (Guid? Id, string MatchedBy) FindExisting(string? email, string? hubSpotId)
         {
             if (email is not null && Find(ImportState.EmailKey(email)) is { } byEmail)
             {
@@ -421,7 +287,10 @@ public static class ImportContacts
                 : (null, "");
         }
 
-        public void Register(Guid contactId, string? email, string? hubSpotId)
+        private Guid? Find(string key) =>
+            state.Contacts.TryGetValue(key, out var id) || _contacts.TryGetValue(key, out id) ? id : null;
+
+        private void Register(Guid contactId, string? email, string? hubSpotId)
         {
             if (email is not null)
             {
@@ -434,11 +303,24 @@ public static class ImportContacts
             }
         }
 
-        /// <summary>An existing organization with this name (case-insensitive) or a new one of type <c>Other</c>.</summary>
-        public Guid ResolveOrganization(string name, string? website)
+        /// <summary>
+        /// The organization with the HubSpot company id; otherwise an existing one with this name (case-insensitive) or a
+        /// new one of type <c>Other</c>; <c>null</c> when the row names no organization (or only an unknown company id).
+        /// </summary>
+        private Guid? ResolveOrganization(string? companyId, string? name, string? website)
         {
+            if (companyId is not null && state.OrganizationsByHubSpotId.TryGetValue(companyId, out var linked))
+            {
+                return linked;
+            }
+
+            if (name is null)
+            {
+                return null;
+            }
+
             var key = name.Trim();
-            if (state.Organizations.TryGetValue(key, out var id) || _organizations.TryGetValue(key, out id))
+            if (state.OrganizationsByName.TryGetValue(key, out var id) || _organizations.TryGetValue(key, out id))
             {
                 return id;
             }
@@ -447,54 +329,79 @@ public static class ImportContacts
                 ? website
                 : null;
             var organization = Organization.Create(key, OrganizationType.Other, validWebsite);
-            Db.Organizations.Add(organization);
+            db.Organizations.Add(organization);
             _organizations[key] = organization.Id;
             return organization.Id;
         }
 
-        public async Task AssignTagAsync(Guid contactId, string name, bool isNew, CancellationToken cancellationToken)
+        private async Task AssignTagAsync(Guid contactId, string name, bool isNew, CancellationToken cancellationToken)
         {
-            var normalized = Tag.NormalizeName(name);
-            if (!_tags.TryGetValue(normalized, out var tag))
+            var tag = await ImportRun.ResolveTagAsync(db, _tags, name, () => state.LastTagColor, c => state.LastTagColor = c, cancellationToken);
+            if (isNew || !await db.ContactTags.AnyAsync(t => t.ContactId == contactId && t.TagId == tag.Id, cancellationToken))
             {
-                // The name column is citext, so this lookup ignores case.
-                tag = await Db.Tags.FirstOrDefaultAsync(t => t.Name == normalized, cancellationToken);
-                if (tag is null)
-                {
-                    var color = TagPalette.Next(state.LastTagColor);
-                    tag = Tag.Create(normalized, color);
-                    Db.Tags.Add(tag);
-                    state.LastTagColor = color;
-                }
-
-                _tags[normalized] = tag;
-            }
-
-            if (isNew || !await Db.ContactTags.AnyAsync(t => t.ContactId == contactId && t.TagId == tag.Id, cancellationToken))
-            {
-                Db.ContactTags.Add(new ContactTag(contactId, tag));
+                db.ContactTags.Add(new ContactTag(contactId, tag));
             }
         }
 
-        public void Commit()
+        private async Task<RowResult.Failed?> ValidateAsync(CreateContact.Command contact, CancellationToken cancellationToken)
         {
-            foreach (var (key, id) in _contacts)
-            {
-                state.Contacts.TryAdd(key, id);
-            }
-
-            foreach (var (key, id) in _organizations)
-            {
-                state.Organizations.TryAdd(key, id);
-            }
-
-            foreach (var (key, row) in _seen)
-            {
-                state.SeenInFile.TryAdd(key, row);
-            }
+            var validation = await contactValidator.ValidateAsync(contact, cancellationToken);
+            return validation.IsValid
+                ? null
+                : new RowResult.Failed(string.Join(" ", validation.Errors.Select(e => e.ErrorMessage).Distinct()));
         }
 
-        private Guid? Find(string key) =>
-            state.Contacts.TryGetValue(key, out var id) || _contacts.TryGetValue(key, out id) ? id : null;
+        private static List<string> DuplicateKeys(string? email, string? hubSpotId)
+        {
+            var keys = new List<string>(2);
+            if (email is not null)
+            {
+                keys.Add(ImportState.EmailKey(email));
+            }
+
+            if (hubSpotId is not null)
+            {
+                keys.Add(ImportState.HubSpotKey(hubSpotId));
+            }
+
+            return keys;
+        }
+
+        /// <summary>HubSpot lists several associated companies separated by <c>;</c>; the first one is the primary.</summary>
+        private static string? FirstId(string? ids) =>
+            ids?.Split([';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+
+        /// <summary>HubSpot often exports LinkedIn profiles without scheme (<c>linkedin.com/in/…</c>).</summary>
+        private static string? WithScheme(string? url) =>
+            url is null || url.Contains("://", StringComparison.Ordinal) ? url : "https://" + url;
     }
+}
+
+/// <summary>Reading and merging the address columns, shared by both imports (decision 14).</summary>
+internal static class ImportAddress
+{
+    /// <summary>Recognizes the country by code, German or English name; an unknown country fails the row.</summary>
+    public static bool TryRead(ImportMapping mapping, CsvRow row, out AddressData address, out RowResult.Failed error)
+    {
+        var countryValue = mapping.Value(row, ImportField.Country);
+        var country = Countries.Find(countryValue);
+        address = new AddressData(
+            mapping.Value(row, ImportField.Street),
+            mapping.Value(row, ImportField.Street2),
+            mapping.Value(row, ImportField.PostalCode),
+            mapping.Value(row, ImportField.City),
+            mapping.Value(row, ImportField.Region),
+            country?.Code);
+        error = new RowResult.Failed($"Unbekanntes Land „{countryValue}“.");
+        return countryValue is null || country is not null;
+    }
+
+    /// <summary>Like the other fields on update: a value of the file wins, an empty cell keeps the existing value.</summary>
+    public static AddressData Merge(AddressData file, AddressData existing) => new(
+        file.Street ?? existing.Street,
+        file.Street2 ?? existing.Street2,
+        file.PostalCode ?? existing.PostalCode,
+        file.City ?? existing.City,
+        file.Region ?? existing.Region,
+        file.CountryCode ?? existing.CountryCode);
 }

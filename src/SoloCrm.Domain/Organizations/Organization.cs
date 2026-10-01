@@ -55,6 +55,9 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
         Apply(type, website, address, notes);
     }
 
+    /// <summary>Sets or removes (blank value) an additional field, e.g. <c>HubSpotRecordId</c> from the CSV import.</summary>
+    public void SetExtraField(string key, string? value) => ExtraFields = ExtraFieldValues.With(ExtraFields, key, value);
+
     private void Apply(OrganizationType type, string? website, Address? address, string? notes)
     {
         if (!Enum.IsDefined(type))

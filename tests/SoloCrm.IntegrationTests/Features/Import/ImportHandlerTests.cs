@@ -28,7 +28,7 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
         var result = await PreviewAsync(Csv(HubSpotHeader, rows));
 
         result.Value.Columns.Should().HaveCount(13);
-        result.Value.Rows.Should().HaveCount(PreviewContactImport.PreviewRows);
+        result.Value.Rows.Should().HaveCount(PreviewImport.PreviewRows);
         result.Value.Rows[0].Number.Should().Be(2);
         result.Value.RowCount.Should().Be(12);
         result.Value.SuggestedMapping.Template.Should().Be(ImportTemplate.HubSpot);
@@ -67,8 +67,8 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
 
         var result = await ImportAsync(file, DuplicateHandling.Skip);
 
-        result.Value.Created.Should().Be(3);
-        result.Value.Errors.Should().BeEmpty();
+        result.Value.Report.Created.Should().Be(3);
+        result.Value.Report.Errors.Should().BeEmpty();
         await using var db = OpenDb();
         var contacts = await db.Contacts.Include(c => c.Organization).OrderBy(c => c.LastName).ToListAsync(Ct);
         var hopper = contacts[0];
@@ -102,8 +102,8 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
 
         var result = await ImportAsync(file, DuplicateHandling.Skip);
 
-        result.Value.Created.Should().Be(3);
-        result.Value.Errors.Should().Equal(new ImportContacts.RowIssue(5, "Unbekanntes Land „Atlantis“."));
+        result.Value.Report.Created.Should().Be(3);
+        result.Value.Report.Errors.Should().Equal(new ImportRowIssue(5, "Unbekanntes Land „Atlantis“."));
         await using var db = OpenDb();
         var contacts = await db.Contacts.OrderBy(c => c.LastName).ToDictionaryAsync(c => c.LastName!, c => c.Address, Ct);
         contacts["Lovelace"].Should().Be(Address.Create("Hauptstr. 1", null, "10115", "Berlin", "Berlin", "DE"));
@@ -145,8 +145,8 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
 
         var result = await ImportAsync(file, DuplicateHandling.Skip);
 
-        result.Value.Created.Should().Be(1);
-        result.Value.Skips.Should().Equal(new ImportContacts.RowIssue(2, "Kontakt existiert bereits (E-Mail)."));
+        result.Value.Report.Created.Should().Be(1);
+        result.Value.Report.Skips.Should().Equal(new ImportRowIssue(2, "Kontakt existiert bereits (E-Mail)."));
         await using var db = OpenDb();
         (await db.Contacts.SingleAsync(c => c.Email == "ada@example.test", Ct)).LastName.Should().Be("Lovelace");
     }
@@ -160,8 +160,8 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
 
         var result = await ImportAsync(file, DuplicateHandling.Update);
 
-        result.Value.Updated.Should().Be(1);
-        result.Value.Created.Should().Be(0);
+        result.Value.Report.Updated.Should().Be(1);
+        result.Value.Report.Created.Should().Be(0);
         await using var db = OpenDb();
         var contact = await db.Contacts.Include(c => c.Organization).SingleAsync(Ct);
         contact.LastName.Should().Be("King");
@@ -180,8 +180,8 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
 
         var second = await ImportAsync(file, DuplicateHandling.Skip);
 
-        second.Value.Created.Should().Be(0);
-        second.Value.Skips.Select(s => s.Reason).Should().Equal("Kontakt existiert bereits (HubSpot-ID).", "Kontakt existiert bereits (E-Mail).");
+        second.Value.Report.Created.Should().Be(0);
+        second.Value.Report.Skips.Select(s => s.Reason).Should().Equal("Kontakt existiert bereits (HubSpot-ID).", "Kontakt existiert bereits (E-Mail).");
         await using var db = OpenDb();
         (await db.Contacts.CountAsync(Ct)).Should().Be(2);
     }
@@ -193,8 +193,8 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
 
         var result = await ImportAsync(file, DuplicateHandling.Update);
 
-        result.Value.Created.Should().Be(2);
-        result.Value.Skips.Should().Equal(new ImportContacts.RowIssue(3, "Doppelt in der Datei (wie Zeile 2)."));
+        result.Value.Report.Created.Should().Be(2);
+        result.Value.Report.Skips.Should().Equal(new ImportRowIssue(3, "Doppelt in der Datei (wie Zeile 2)."));
     }
 
     [Fact]
@@ -212,26 +212,26 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
 
         var result = await ImportAsync(file, DuplicateHandling.Skip);
 
-        result.Value.Created.Should().Be(1);
-        result.Value.Failed.Should().Be(4);
-        result.Value.Errors.Should().Equal(
-            new ImportContacts.RowIssue(2, "Bitte eine gültige E-Mail-Adresse angeben."),
-            new ImportContacts.RowIssue(4, "Bitte Vor- oder Nachnamen angeben."),
-            new ImportContacts.RowIssue(5, "Bitte eine gültige URL (http/https) angeben."),
-            new ImportContacts.RowIssue(6, "Der Tag darf höchstens 50 Zeichen lang sein."));
+        result.Value.Report.Created.Should().Be(1);
+        result.Value.Report.Failed.Should().Be(4);
+        result.Value.Report.Errors.Should().Equal(
+            new ImportRowIssue(2, "Bitte eine gültige E-Mail-Adresse angeben."),
+            new ImportRowIssue(4, "Bitte Vor- oder Nachnamen angeben."),
+            new ImportRowIssue(5, "Bitte eine gültige URL (http/https) angeben."),
+            new ImportRowIssue(6, "Der Tag darf höchstens 50 Zeichen lang sein."));
     }
 
     [Fact]
     public async Task Import_MoreThanOneBlock_ReportsProgressPerBlock()
     {
         var rows = Enumerable.Range(1, 250).Select(i => $"Kontakt,Nummer {i},kontakt{i}@example.test");
-        var progress = new List<ImportContacts.Progress>();
+        var progress = new List<ImportProgress>();
 
         var result = await ImportAsync(Csv("Vorname,Nachname,E-Mail", rows), DuplicateHandling.Skip, new SyncProgress(progress));
 
-        result.Value.Created.Should().Be(250);
+        result.Value.Report.Created.Should().Be(250);
         progress.Should().Equal(
-            new ImportContacts.Progress(100, 250), new ImportContacts.Progress(200, 250), new ImportContacts.Progress(250, 250));
+            new ImportProgress(100, 250), new ImportProgress(200, 250), new ImportProgress(250, 250));
     }
 
     [Fact]
@@ -271,8 +271,8 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
 
         var result = await ImportAsync(Csv("Nachname,E-Mail", ["King,ada@example.test"]), DuplicateHandling.Skip);
 
-        result.Value.Skipped.Should().Be(1);
-        result.Value.Errors.Should().BeEmpty();
+        result.Value.Report.Skipped.Should().Be(1);
+        result.Value.Report.Errors.Should().BeEmpty();
     }
 
     [Fact]
@@ -283,17 +283,17 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
 
         var result = await ImportAsync(Csv("Nachname,E-Mail,Tag", ["Lovelace,ada@example.test,KUNDE"]), DuplicateHandling.Update);
 
-        result.Value.Updated.Should().Be(1);
+        result.Value.Report.Updated.Should().Be(1);
         await using var db = OpenDb();
         (await db.ContactTags.CountAsync(Ct)).Should().Be(1);
     }
 
-    private Task<Result<PreviewContactImport.Result>> PreviewAsync(byte[] content, ImportTemplate? template = null) =>
-        QueryAsync<PreviewContactImport.Query, PreviewContactImport.Result>(new PreviewContactImport.Query(content, template));
+    private Task<Result<PreviewImport.Result>> PreviewAsync(byte[] content, ImportTemplate? template = null) =>
+        QueryAsync<PreviewImport.Query, PreviewImport.Result>(new PreviewImport.Query(content, Template: template));
 
     /// <summary>Imports with the suggested mapping, as the wizard does by default.</summary>
     private async Task<Result<ImportContacts.Result>> ImportAsync(
-        byte[] content, DuplicateHandling duplicates, IProgress<ImportContacts.Progress>? progress = null)
+        byte[] content, DuplicateHandling duplicates, IProgress<ImportProgress>? progress = null)
     {
         var preview = await PreviewAsync(content);
         return await SendAsync<ImportContacts.Command, ImportContacts.Result>(
@@ -319,8 +319,8 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
             .Select(v => $"\"{v}\""));
 
     /// <summary><see cref="Progress{T}"/> posts asynchronously; this one records synchronously.</summary>
-    private sealed class SyncProgress(List<ImportContacts.Progress> reports) : IProgress<ImportContacts.Progress>
+    private sealed class SyncProgress(List<ImportProgress> reports) : IProgress<ImportProgress>
     {
-        public void Report(ImportContacts.Progress value) => reports.Add(value);
+        public void Report(ImportProgress value) => reports.Add(value);
     }
 }

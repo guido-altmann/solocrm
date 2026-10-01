@@ -21,13 +21,17 @@ public sealed class ImportSettingsSectionTests : BunitContext
     private readonly ICommandHandler<ImportContacts.Command, ImportContacts.Result> _import =
         Substitute.For<ICommandHandler<ImportContacts.Command, ImportContacts.Result>>();
 
+    private readonly ICommandHandler<ImportOrganizations.Command, ImportOrganizations.Result> _importOrganizations =
+        Substitute.For<ICommandHandler<ImportOrganizations.Command, ImportOrganizations.Result>>();
+
     public ImportSettingsSectionTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
-        Services.AddSingleton<IQueryHandler<PreviewContactImport.Query, PreviewContactImport.Result>>(
-            new PreviewContactImport.Handler(new PreviewContactImport.Validator()));
+        Services.AddSingleton<IQueryHandler<PreviewImport.Query, PreviewImport.Result>>(
+            new PreviewImport.Handler(new PreviewImport.Validator()));
         Services.AddSingleton(_import);
+        Services.AddSingleton(_importOrganizations);
     }
 
     [Fact]
@@ -49,10 +53,10 @@ public sealed class ImportSettingsSectionTests : BunitContext
     public async Task Import_Report_ShowsCountsAndRowsWithReasons()
     {
         _import.Handle(Arg.Any<ImportContacts.Command>(), Arg.Any<CancellationToken>())
-            .Returns(Result<ImportContacts.Result>.Success(new ImportContacts.Result(
+            .Returns(Result<ImportContacts.Result>.Success(new ImportContacts.Result(new ImportReport(
                 1, 0, 1, 1,
-                [new ImportContacts.RowIssue(3, "Kontakt existiert bereits (E-Mail).")],
-                [new ImportContacts.RowIssue(2, "Bitte eine gültige E-Mail-Adresse angeben.")])));
+                [new ImportRowIssue(3, "Kontakt existiert bereits (E-Mail).")],
+                [new ImportRowIssue(2, "Bitte eine gültige E-Mail-Adresse angeben.")]))));
         var section = RenderSection();
         Upload(section, HubSpotCsv);
         section.WaitForAssertion(() => section.FindAll("button").Should().Contain(b => b.TextContent.Contains("importieren", StringComparison.Ordinal)));
@@ -92,6 +96,32 @@ public sealed class ImportSettingsSectionTests : BunitContext
 
         section.Markup.Should().Contain("Allgemein");
         section.Find("[data-test=file-info]").TextContent.Should().Contain("„;“");
+    }
+
+    [Fact]
+    public async Task Upload_HubSpotCompanyExport_ImportsOrganizationsWithOrganizationFields()
+    {
+        const string companies =
+            "\"Record ID\",\"Company name\",\"Company Domain Name\",\"Type\",\"City\",\"Country/Region Code\"\n"
+            + "\"9001\",\"Contoso GmbH\",\"contoso.de\",\"Prospect\",\"Berlin\",\"DE\"\n";
+        _importOrganizations.Handle(Arg.Any<ImportOrganizations.Command>(), Arg.Any<CancellationToken>())
+            .Returns(Result<ImportOrganizations.Result>.Success(new ImportOrganizations.Result(new ImportReport(1, 0, 0, 0, [], []))));
+        var section = RenderSection();
+
+        Upload(section, companies);
+
+        section.WaitForAssertion(() => section.Markup.Should().Contain("HubSpot-Firmenexport"));
+        section.FindAll("[data-field]").Select(r => r.GetAttribute("data-field")).Should().Contain(["Organization", "OrganizationType"])
+            .And.NotContain(["FirstName", "HubSpotCompanyId"]);
+        section.Find(".import-preview").TextContent.Should().Contain("Contoso GmbH").And.Contain("contoso.de");
+
+        await section.FindAll("button").Single(b => b.TextContent.Contains("1 Zeile importieren", StringComparison.Ordinal)).ClickAsync(new());
+
+        section.WaitForAssertion(() => section.Find("[data-test=import-report]").TextContent.Should().Contain("1 angelegt"));
+        await _importOrganizations.Received(1).Handle(
+            Arg.Is<ImportOrganizations.Command>(c => c.Mapping.Target == ImportTarget.Organizations && c.Mapping.Template == ImportTemplate.HubSpot),
+            Arg.Any<CancellationToken>());
+        await _import.DidNotReceiveWithAnyArgs().Handle(default!, Xunit.TestContext.Current.CancellationToken);
     }
 
     private IRenderedComponent<ImportSettingsSection> RenderSection()

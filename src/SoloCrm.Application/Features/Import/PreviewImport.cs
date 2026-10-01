@@ -4,14 +4,14 @@ using SoloCrm.Application.Abstractions;
 namespace SoloCrm.Application.Features.Import;
 
 /// <summary>
-/// Reads an uploaded CSV file and returns its columns, the first rows and a suggested mapping (US-16 AK1, AK4).
-/// Without an explicit template the HubSpot export is recognized by its columns.
+/// Reads an uploaded CSV file and returns its columns, the first rows and a suggested mapping (US-16 AK1, AK4, AK5).
+/// Without explicit values, target (contacts or organizations) and template (HubSpot export) are recognized by the columns.
 /// </summary>
-public static class PreviewContactImport
+public static class PreviewImport
 {
     public const int PreviewRows = 10;
 
-    public sealed record Query(ReadOnlyMemory<byte> Content, ImportTemplate? Template = null);
+    public sealed record Query(ReadOnlyMemory<byte> Content, ImportTarget? Target = null, ImportTemplate? Template = null);
 
     public sealed record Column(int Index, string Header);
 
@@ -28,6 +28,7 @@ public static class PreviewContactImport
         public Validator()
         {
             RuleFor(q => q.Template).IsInEnum().WithMessage("Unbekannte Vorlage.");
+            RuleFor(q => q.Target).IsInEnum().WithMessage("Unbekannter Zieltyp.");
         }
     }
 
@@ -48,14 +49,16 @@ public static class PreviewContactImport
             }
 
             var document = parsed.Value;
-            var template = query.Template ?? ImportTemplates.Detect(document.Headers);
+            var detected = ImportTemplates.Detect(document.Headers);
+            var target = query.Target ?? detected.Target;
+            var template = query.Template ?? detected.Template;
             return new Result(
                 [.. document.Headers.Select((header, index) => new Column(index, header))],
                 [.. document.Rows.Take(PreviewRows)],
                 document.Rows.Count,
                 document.Delimiter,
                 document.EncodingName,
-                ImportTemplates.Suggest(template, document.Headers));
+                ImportTemplates.Suggest(target, template, document.Headers));
         }
     }
 }

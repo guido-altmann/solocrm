@@ -11,8 +11,8 @@ public sealed class ImportMappingTests
     {
         var document = CsvDocument.Parse(HubSpotSample.File()).Value;
 
-        ImportTemplates.Detect(document.Headers).Should().Be(ImportTemplate.HubSpot);
-        ImportTemplates.Detect(["Vorname", "Nachname"]).Should().Be(ImportTemplate.Generic);
+        ImportTemplates.Detect(document.Headers).Should().Be((ImportTarget.Contacts, ImportTemplate.HubSpot));
+        ImportTemplates.Detect(["Vorname", "Nachname"]).Should().Be((ImportTarget.Contacts, ImportTemplate.Generic));
     }
 
     [Fact]
@@ -20,7 +20,7 @@ public sealed class ImportMappingTests
     {
         var headers = CsvDocument.Parse(HubSpotSample.File()).Value.Headers;
 
-        var mapping = ImportTemplates.Suggest(ImportTemplate.HubSpot, headers);
+        var mapping = ImportTemplates.Suggest(ImportTarget.Contacts, ImportTemplate.HubSpot, headers);
 
         mapping.Template.Should().Be(ImportTemplate.HubSpot);
         mapping.For(ImportField.Email).Should().Be(new FieldMapping(ImportField.Email, 3, 4));
@@ -43,7 +43,7 @@ public sealed class ImportMappingTests
     [Fact]
     public void Suggest_GenericGermanAddressHeaders_MapsAddressFields()
     {
-        var mapping = ImportTemplates.Suggest(ImportTemplate.Generic, ["Nachname", "Straße", "Adresszusatz", "PLZ", "Ort", "Bundesland", "Land"]);
+        var mapping = ImportTemplates.Suggest(ImportTarget.Contacts, ImportTemplate.Generic, ["Nachname", "Straße", "Adresszusatz", "PLZ", "Ort", "Bundesland", "Land"]);
 
         mapping.Fields.Where(f => f.Column is not null).Select(f => (f.Field, f.Column)).Should().BeEquivalentTo(new (ImportField, int?)[]
         {
@@ -55,7 +55,7 @@ public sealed class ImportMappingTests
     [Fact]
     public void Suggest_GenericGermanHeaders_MapsByCommonNames()
     {
-        var mapping = ImportTemplates.Suggest(ImportTemplate.Generic, ["Vorname", "Nachname", "E-Mail", "Firma", "Quelle", "Notiz"]);
+        var mapping = ImportTemplates.Suggest(ImportTarget.Contacts, ImportTemplate.Generic, ["Vorname", "Nachname", "E-Mail", "Firma", "Quelle", "Notiz"]);
 
         mapping.For(ImportField.FirstName)!.Column.Should().Be(0);
         mapping.For(ImportField.LastName)!.Column.Should().Be(1);
@@ -71,7 +71,7 @@ public sealed class ImportMappingTests
         var document = CsvDocument.Parse(HubSpotSample.File(
             HubSpotSample.Row("1", email: "", workEmail: "ada@work.test"),
             HubSpotSample.Row("2", email: "grace@example.test", workEmail: "grace@work.test"))).Value;
-        var mapping = ImportTemplates.Suggest(ImportTemplate.HubSpot, document.Headers);
+        var mapping = ImportTemplates.Suggest(ImportTarget.Contacts, ImportTemplate.HubSpot, document.Headers);
 
         mapping.Value(document.Rows[0], ImportField.Email).Should().Be("ada@work.test");
         mapping.Value(document.Rows[1], ImportField.Email).Should().Be("grace@example.test");
@@ -122,7 +122,7 @@ public sealed class ImportMappingTests
         var content = Encoding.UTF8.GetBytes("Vorname;Nachname;E-Mail\nAda;Lovelace;ada@example.test\n");
         var document = CsvDocument.Parse(content).Value;
 
-        var mapping = ImportTemplates.Suggest(ImportTemplates.Detect(document.Headers), document.Headers);
+        var mapping = ImportTemplates.Suggest(ImportTarget.Contacts, ImportTemplates.Detect(document.Headers).Template, document.Headers);
 
         mapping.Value(document.Rows[0], ImportField.LastName).Should().Be("Lovelace");
     }

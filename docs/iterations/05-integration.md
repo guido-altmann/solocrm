@@ -100,16 +100,19 @@
 - [x] Kontakt-Import: Adress-Zielfelder, HubSpot-Vorlage (`Street Address`, `Postal Code`, `City`, `State/Region`, `Country/Region Code` mit Ersatz `Country/Region`); unbekanntes Land = fehlerhafte Zeile; „aktualisieren“ überschreibt nur Adressteile mit Wert
 
 ## Schritt 11 – Organisationsimport (Entscheidung 15)
-- [ ] Import-Assistent mit Zieltyp (Kontakte / Organisationen); gemeinsamer Unterbau für Parsing, Mapping, Blöcke und Bericht
-- [ ] Zielfelder: Name, Typ, Website, Telefon, LinkedIn-Seite, Adresse, Tag, HubSpot-ID; Dubletten per `HubSpotRecordId`, sonst Name (case-insensitive); überspringen/aktualisieren
-- [ ] HubSpot-Firmenvorlage inkl. Typ-Mapping; Kopfzeile eines echten Firmenexports abgleichen (steht aus)
-- [ ] Audit und `OrganizationCreated` je Organisation wie bei manueller Anlage
+- [x] Import-Assistent mit Zieltyp (Kontakte / Organisationen, aus den Spalten erkannt und umschaltbar); gemeinsamer Unterbau `ImportRun` für Parsing, Spaltenprüfung, Blöcke, Bericht und Tags
+- [x] Zielfelder: Name, Typ, Website, Anschrift, Tag, HubSpot-ID (Telefon und LinkedIn-Seite hat das Organisationsmodell nicht, sie werden daher nicht übernommen); Dubletten per `HubSpotRecordId`, sonst Name (case-insensitive); überspringen/aktualisieren
+- [x] HubSpot-Firmenvorlage inkl. Typ-Mapping; Spaltennamen aus den Eigenschaftsdefinitionen des HubSpot-Kontos (`Company name`, `Website URL` mit Ersatz `Company Domain Name`, `Type`, Adresse, `Country/Region Code` mit Ersatz `Country/Region`, `Lifecycle Stage` → Tag, `Record ID`)
+- [ ] Kopfzeile eines echten Firmenexports abgleichen (steht aus)
+- [x] Audit und `OrganizationCreated` je Organisation wie bei manueller Anlage
+- [x] Fehlt die Hauptspalte einer Vorlage, wird die Ersatzspalte zur Hauptspalte (z. B. nur `Company Domain Name`)
 
 ## Schritt 12 – Verknüpfung Kontakt ↔ Organisation (Entscheidung 16)
-- [ ] Zielfeld „HubSpot-Firmen-ID“ im Kontakt-Import: verknüpft mit der Organisation gleicher `HubSpotRecordId`, sonst per Firmenname wie bisher; bei mehreren IDs zählt die erste (primäre)
-- [ ] Spaltenname der Zuordnung im echten Kontaktexport bestätigen (steht aus)
-- [ ] Tests: Firmen → Kontakte importieren, Verknüpfung per ID vor Name, nachträgliche Verknüpfung per „aktualisieren“
-- [ ] SPEC, README und n8n-/Import-Doku nachziehen; Ende-zu-Ende mit echtem HubSpot-Export (Firmen und Kontakte)
+- [x] Zielfeld „HubSpot-Firmen-ID“ im Kontakt-Import: verknüpft mit der Organisation gleicher `HubSpotRecordId`, sonst per Firmenname wie bisher; bei mehreren IDs (`;`-getrennt) zählt die erste; eine unbekannte ID ohne Namen verknüpft nichts
+- [ ] Spaltenname der Zuordnung im echten Kontaktexport bestätigen (steht aus; die Vorlage sucht nacheinander `Associated Company IDs (Primary)`, `Primary Associated Company ID`, `Associated Company IDs`, `Associated Company ID`)
+- [x] Tests: Firmen → Kontakte importieren, Verknüpfung per ID vor Name, nachträgliche Verknüpfung per „aktualisieren“, bestehende Verknüpfung bleibt ohne Firmenangabe erhalten; Browser-Smoke-Test des Ablaufs
+- [x] SPEC und README nachziehen
+- [ ] Ende-zu-Ende mit echtem HubSpot-Export (Firmen und Kontakte)
 
 ## Entscheidungen (2026-09-30)
 1. **Hintergrundprozess:** eigener `BackgroundService` mit `PeriodicTimer` für die Outbox (ADR-008 Option B); Retry und Backoff über `Attempts`/`NextAttemptAt` der Outbox. Hangfire erst, wenn weitere Jobarten hinzukommen.

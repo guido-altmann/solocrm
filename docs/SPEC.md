@@ -407,6 +407,8 @@ Basis: `/api/v1` · Auth: `X-Api-Key` · Format: JSON (camelCase, Enums als Name
 | GET/POST/PATCH | `/tasks` (`GET`/`PATCH` mit `/{id}`) | Tasks; `PATCH` mit `completed: true/false` erledigt bzw. öffnet wieder |
 | GET | `/stages` | Stages lesen |
 
+**Anschrift:** Kontakte und Organisationen tragen die Adresse als flache Felder `street`, `street2`, `postalCode`, `city`, `region`, `countryCode` (ISO 3166-1 Alpha-2); im `PATCH` gilt Merge-Patch je Feld.
+
 **Listen:** `page` beginnt bei 1, `pageSize` 1–200 (Default 50); Antwort `{ items, page, pageSize, totalCount }`. `search` ist dieselbe tippfehlertolerante Suche wie in der UI. `tag` (Name oder Id, mehrfach angebbar) filtert ODER-verknüpft; existiert keiner der Tags, ist die Liste leer. Archivierte Datensätze erscheinen nicht.
 
 **Statuscodes:** `200`/`201` (mit `Location` und dem angelegten Datensatz), `400` Validierung (`errors` je Feld in camelCase; unbekannte Felder im `PATCH` sind ein Fehler), `401` ohne, mit ungültigem oder widerrufenem Key, `404` unbekannte Id oder unbekannter Endpunkt, `409` Konflikt (z. B. `Contact.DuplicateEmail`, `Opportunity.LostReasonRequired`), `422` übrige fachliche Fehler, `429` über 60 Anfragen pro Minute und Key (mit `Retry-After`). Fachliche Fehler tragen ihren Code in `code`.

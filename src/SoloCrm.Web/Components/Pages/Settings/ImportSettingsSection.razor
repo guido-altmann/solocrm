@@ -1,15 +1,16 @@
 @using SoloCrm.Application.Abstractions
 @using SoloCrm.Application.Features.Import
-@inject IQueryHandler<PreviewContactImport.Query, PreviewContactImport.Result> PreviewHandler
-@inject ICommandHandler<ImportContacts.Command, ImportContacts.Result> ImportHandler
+@inject IQueryHandler<PreviewImport.Query, PreviewImport.Result> PreviewHandler
+@inject ICommandHandler<ImportContacts.Command, ImportContacts.Result> ImportContactsHandler
+@inject ICommandHandler<ImportOrganizations.Command, ImportOrganizations.Result> ImportOrganizationsHandler
 
-@* Contact import (US-16, SPEC 3.3 S6): upload → preview → mapping (template) → import → report. Runs synchronously in
-   the circuit with progress (iteration 5 decision 10). *@
+@* Import of contacts or organizations (US-16, SPEC 3.3 S6): upload → preview → mapping (target, template) → import →
+   report. Runs synchronously in the circuit with progress (iteration 5 decisions 10, 15). *@
 <MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="import">
     <MudText Typo="Typo.h6">Import</MudText>
     <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
-        Kontakte aus einer CSV-Datei übernehmen, z. B. aus einem HubSpot-Export. Dubletten werden per E-Mail erkannt,
-        ohne E-Mail per HubSpot-ID.
+        Kontakte oder Organisationen aus einer CSV-Datei übernehmen, z. B. aus einem HubSpot-Export. Bei HubSpot zuerst die
+        Firmen, dann die Kontakte importieren: Kontakte werden dann über die HubSpot-Firmen-ID mit ihrer Organisation verknüpft.
     </MudText>
 
     @switch (_step)
@@ -36,11 +37,20 @@
                     <strong>@_fileName</strong> · @Rows(_preview.RowCount) · Trennzeichen „@Delimiter(_preview.Delimiter)“ · @_preview.EncodingName
                 </MudText>
 
-                <MudSelect T="ImportTemplate" Value="_template" ValueChanged="ChangeTemplateAsync" Label="Vorlage" Dense="true"
-                           Style="max-width: 300px;">
-                    <MudSelectItem T="ImportTemplate" Value="ImportTemplate.Generic">Allgemein</MudSelectItem>
-                    <MudSelectItem T="ImportTemplate" Value="ImportTemplate.HubSpot">HubSpot-Kontaktexport</MudSelectItem>
-                </MudSelect>
+                <MudStack Row="true" Spacing="3">
+                    <MudSelect T="ImportTarget" Value="_target" ValueChanged="ChangeTargetAsync" Label="Importieren als" Dense="true"
+                               Style="max-width: 220px;">
+                        <MudSelectItem T="ImportTarget" Value="ImportTarget.Contacts">Kontakte</MudSelectItem>
+                        <MudSelectItem T="ImportTarget" Value="ImportTarget.Organizations">Organisationen</MudSelectItem>
+                    </MudSelect>
+                    <MudSelect T="ImportTemplate" Value="_template" ValueChanged="ChangeTemplateAsync" Label="Vorlage" Dense="true"
+                               Style="max-width: 260px;">
+                        <MudSelectItem T="ImportTemplate" Value="ImportTemplate.Generic">Allgemein</MudSelectItem>
+                        <MudSelectItem T="ImportTemplate" Value="ImportTemplate.HubSpot">
+                            @(_target == ImportTarget.Organizations ? "HubSpot-Firmenexport" : "HubSpot-Kontaktexport")
+                        </MudSelectItem>
+                    </MudSelect>
+                </MudStack>
 
                 <MudSimpleTable Dense="true" Elevation="0" Class="import-mapping">
                     <thead>
@@ -51,7 +61,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var field in Enum.GetValues<ImportField>())
+                        @foreach (var field in ImportFields.For(_target))
                         {
                             var current = _mapping[field];
                             <tr data-field="@field">
@@ -114,7 +124,11 @@
                 }
 
                 <MudRadioGroup T="DuplicateHandling" @bind-Value="_duplicates">
-                    <MudText Typo="Typo.body2">Bestehende Kontakte (gleiche E-Mail bzw. HubSpot-ID):</MudText>
+                    <MudText Typo="Typo.body2">
+                        @(_target == ImportTarget.Organizations
+                            ? "Bestehende Organisationen (gleiche HubSpot-ID bzw. gleicher Name):"
+                            : "Bestehende Kontakte (gleiche E-Mail bzw. HubSpot-ID):")
+                    </MudText>
                     <MudRadio T="DuplicateHandling" Value="DuplicateHandling.Skip" Dense="true">überspringen</MudRadio>
                     <MudRadio T="DuplicateHandling" Value="DuplicateHandling.Update" Dense="true">mit den Werten der Datei aktualisieren</MudRadio>
                 </MudRadioGroup>
@@ -186,19 +200,20 @@
     private Step _step = Step.Upload;
     private byte[] _content = [];
     private string? _fileName;
-    private PreviewContactImport.Result? _preview;
+    private PreviewImport.Result? _preview;
+    private ImportTarget _target;
     private ImportTemplate _template;
     private readonly Dictionary<ImportField, (int? Column, int? Fallback)> _mapping = [];
     private DuplicateHandling _duplicates = DuplicateHandling.Skip;
-    private ImportContacts.Progress? _progress;
-    private ImportContacts.Result? _report;
+    private ImportProgress? _progress;
+    private ImportReport? _report;
     private string? _error;
     private bool _busy;
 
     private ImportMapping CurrentMapping => new(
-        [.. _mapping.Select(m => new FieldMapping(m.Key, m.Value.Column, m.Value.Fallback))], _template);
+        [.. ImportFields.For(_target).Select(f => new FieldMapping(f, _mapping[f].Column, _mapping[f].Fallback))], _template, _target);
 
-    private List<ImportField> MappedFields => [.. Enum.GetValues<ImportField>().Where(f => _mapping[f].Column is not null)];
+    private List<ImportField> MappedFields => [.. ImportFields.For(_target).Where(f => _mapping[f].Column is not null)];
 
     private double ProgressPercent => _progress is { Total: > 0 } p ? 100.0 * p.Processed / p.Total : 0;
 
@@ -224,7 +239,7 @@
             await stream.CopyToAsync(buffer);
             _content = buffer.ToArray();
             _fileName = file.Name;
-            await LoadPreviewAsync(null);
+            await LoadPreviewAsync(null, null);
         }
         finally
         {
@@ -232,11 +247,13 @@
         }
     }
 
-    private Task ChangeTemplateAsync(ImportTemplate template) => LoadPreviewAsync(template);
+    private Task ChangeTemplateAsync(ImportTemplate template) => LoadPreviewAsync(_target, template);
 
-    private async Task LoadPreviewAsync(ImportTemplate? template)
+    private Task ChangeTargetAsync(ImportTarget target) => LoadPreviewAsync(target, _template);
+
+    private async Task LoadPreviewAsync(ImportTarget? target, ImportTemplate? template)
     {
-        var result = await PreviewHandler.Handle(new PreviewContactImport.Query(_content, template), CancellationToken.None);
+        var result = await PreviewHandler.Handle(new PreviewImport.Query(_content, target, template), CancellationToken.None);
         if (result.IsFailure)
         {
             _error = Message(result.Error);
@@ -246,6 +263,7 @@
 
         _preview = result.Value;
         _template = result.Value.SuggestedMapping.Template;
+        _target = result.Value.SuggestedMapping.Target;
         _mapping.Clear();
         foreach (var field in Enum.GetValues<ImportField>())
         {
@@ -261,14 +279,19 @@
         _error = null;
         _progress = null;
         _step = Step.Running;
-        var progress = new Progress<ImportContacts.Progress>(p =>
+        var progress = new Progress<ImportProgress>(p =>
         {
             _progress = p;
             _ = InvokeAsync(StateHasChanged);
         });
 
-        var result = await ImportHandler.Handle(
-            new ImportContacts.Command(_content, CurrentMapping, _duplicates, progress), CancellationToken.None);
+        var result = _target == ImportTarget.Organizations
+            ? (await ImportOrganizationsHandler.Handle(
+                    new ImportOrganizations.Command(_content, CurrentMapping, _duplicates, progress), CancellationToken.None))
+                .Match(r => Result<ImportReport>.Success(r.Report), Result<ImportReport>.Failure)
+            : (await ImportContactsHandler.Handle(
+                    new ImportContacts.Command(_content, CurrentMapping, _duplicates, progress), CancellationToken.None))
+                .Match(r => Result<ImportReport>.Success(r.Report), Result<ImportReport>.Failure);
         if (result.IsFailure)
         {
             _error = Message(result.Error);
@@ -299,10 +322,14 @@
 
     private static string Delimiter(char delimiter) => delimiter == '\t' ? "Tab" : delimiter.ToString();
 
-    private static string ColumnLabel(PreviewContactImport.Column column) => $"{column.Index + 1}: {column.Header}";
+    private static string ColumnLabel(PreviewImport.Column column) => $"{column.Index + 1}: {column.Header}";
 
-    private static string FieldLabel(ImportField field) => field switch
+    private string FieldLabel(ImportField field) => field switch
     {
+        ImportField.Organization when _target == ImportTarget.Organizations => "Name",
+        ImportField.OrganizationWebsite when _target == ImportTarget.Organizations => "Website",
+        ImportField.OrganizationType => "Typ",
+        ImportField.HubSpotCompanyId => "HubSpot-Firmen-ID",
         ImportField.FirstName => "Vorname",
         ImportField.LastName => "Nachname",
         ImportField.Email => "E-Mail",
