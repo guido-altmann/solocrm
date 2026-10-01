@@ -71,16 +71,18 @@
 - [x] Synchrone Ausführung in Blöcken zu 100 Zeilen mit Fortschritt (Entscheidung 10); Audit und `ContactCreated` je Kontakt wie bei manueller Anlage (Entscheidung 11)
 
 ## Schritt 7 – CSV-Import: Oberfläche (US-16)
-- [ ] Seite bzw. Abschnitt „Import“ in `/settings`: Upload → Vorschau → Mapping (Vorlage wählbar) → Import → Bericht
+- [x] Seite bzw. Abschnitt „Import“ in `/settings`: Upload → Vorschau → Mapping (Vorlage wählbar) → Import → Bericht
 
 ## Schritt 8 – Tests
-- [ ] Unit-Tests: Signatur, Backoff-Zeitplan, Key-Erzeugung und -Prüfung, CSV-Mapping
-- [ ] Handler-Tests (Happy Path + Validierungsfehler) für alle neuen Use Cases
-- [ ] Integrationstests: Outbox mit `SKIP LOCKED` (zwei parallele Verarbeiter, keine Doppelzustellung), Retry bis Aufgabe, Versand gegen einen lokalen Test-Empfänger inkl. Signaturprüfung
-- [ ] API-Tests mit `WebApplicationFactory`: ohne/mit falschem/widerrufenem Key, Rate-Limit, Problem Details, CRUD und Stage-Wechsel per `PATCH`, OpenAPI-Dokument abrufbar
-- [ ] Import: Vorschau, Mapping, Dubletten (überspringen/aktualisieren), Bericht mit Zeilennummern, HubSpot-Vorlage
-- [ ] bUnit: Secret/Key einmalig anzeigen, Import-Assistent
+- [x] Unit-Tests: Signatur, Backoff-Zeitplan, Key-Erzeugung und -Prüfung, CSV-Mapping
+- [x] Handler-Tests (Happy Path + Validierungsfehler) für alle neuen Use Cases
+- [x] Integrationstests: Outbox mit `SKIP LOCKED` (zwei parallele Verarbeiter, keine Doppelzustellung), Retry bis Aufgabe, Versand gegen einen lokalen Test-Empfänger inkl. Signaturprüfung
+- [x] API-Tests mit `WebApplicationFactory`: ohne/mit falschem/widerrufenem Key, Rate-Limit, Problem Details, CRUD und Stage-Wechsel per `PATCH`, OpenAPI-Dokument abrufbar
+- [x] Import: Vorschau, Mapping, Dubletten (überspringen/aktualisieren), Bericht mit Zeilennummern, HubSpot-Vorlage
+- [x] bUnit: Secret/Key einmalig anzeigen, Import-Assistent
 - [ ] Ende-zu-Ende mit n8n (manuell): Webhook empfangen und Signatur prüfen, Kontakt per API anlegen
+- [x] Browser-Smoke-Test (Playwright, Wegwerf-DB) mit lokalem Empfänger, der die Signatur wie im n8n-Beispiel prüft: API-Key und Secret nur einmal sichtbar, Ping, `contact.created` und `opportunity.stage_changed` signiert zugestellt, Versandprotokoll, HubSpot-Import mit Bericht; Logs ohne Keys, Secrets und E-Mails; Scalar ohne externe Anfragen
+- [x] Zeitbudget-Tests laufen in einer eigenen, nicht parallelen Collection (sonst misst der Test die Last der übrigen Testcontainer)
 
 ## Schritt 9 – Abschluss
 - [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009)

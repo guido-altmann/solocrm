@@ -363,3 +363,21 @@ kbd {
     clip: rect(0 0 0 0);
     white-space: nowrap;
 }
+
+/* CSV import (US-16): wide previews scroll inside the section */
+.import-preview,
+.import-issues {
+    max-height: 360px;
+    overflow: auto;
+}
+
+.import-preview td {
+    white-space: nowrap;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.import-mapping td:first-child {
+    white-space: nowrap;
+}

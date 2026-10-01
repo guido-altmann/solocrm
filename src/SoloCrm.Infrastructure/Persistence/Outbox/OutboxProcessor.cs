@@ -171,8 +171,8 @@ public sealed partial class OutboxProcessor(
     [LoggerMessage(Level = LogLevel.Error, Message = "Outbox message {MessageId} could not be processed; retrying after the lease")]
     private static partial void LogProcessingFailed(ILogger logger, Exception exception, Guid messageId);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Webhook {EventType} {EventId} given up for subscription {SubscriptionId} after {Attempts} attempts")]
-    private static partial void LogGivenUp(ILogger logger, string eventType, Guid eventId, Guid subscriptionId, int attempts);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Webhook {EventType} {WebhookEventId} given up for subscription {SubscriptionId} after {Attempts} attempts")]
+    private static partial void LogGivenUp(ILogger logger, string eventType, Guid webhookEventId, Guid subscriptionId, int attempts);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Outbox cleanup: deleted {Messages} message(s) and {Deliveries} delivery log entries")]
     private static partial void LogCleanedUp(ILogger logger, int messages, int deliveries);

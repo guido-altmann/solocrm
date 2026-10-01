@@ -13,6 +13,7 @@ namespace SoloCrm.IntegrationTests.Performance;
 /// NFR (SPEC 6): timeline, „Heute“ and search below 200 ms with 10k contacts and 50k activities. Measured as the median
 /// of several warm runs, so a single slow run on a busy CI machine does not fail the build.
 /// </summary>
+[Collection(PerformanceRuns.Name)]
 public sealed class PerformanceTests(PostgresFixture postgres) : HandlerTest(postgres)
 {
     private static readonly TimeSpan Budget = TimeSpan.FromMilliseconds(200);

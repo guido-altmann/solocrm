@@ -84,9 +84,9 @@ internal sealed partial class HttpWebhookSender(IHttpClientFactory httpClientFac
 
     private int ElapsedMs(long started) => (int)Math.Round(timeProvider.GetElapsedTime(started).TotalMilliseconds);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Webhook {EventType} {EventId} delivered: HTTP {StatusCode} in {DurationMs} ms")]
-    private static partial void LogSent(ILogger logger, string eventType, Guid eventId, int? statusCode, int durationMs);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Webhook {EventType} {WebhookEventId} delivered: HTTP {StatusCode} in {DurationMs} ms")]
+    private static partial void LogSent(ILogger logger, string eventType, Guid webhookEventId, int? statusCode, int durationMs);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Webhook {EventType} {EventId} failed: {StatusCode} in {DurationMs} ms ({Error})")]
-    private static partial void LogFailed(ILogger logger, string eventType, Guid eventId, int? statusCode, int durationMs, string? error);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Webhook {EventType} {WebhookEventId} failed: {StatusCode} in {DurationMs} ms ({Error})")]
+    private static partial void LogFailed(ILogger logger, string eventType, Guid webhookEventId, int? statusCode, int durationMs, string? error);
 }

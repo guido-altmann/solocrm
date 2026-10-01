@@ -1,0 +1,27 @@
+@using SoloCrm.Application.Features.Import
+
+@* Rows of the import report with their reason (US-16 AK3). *@
+<div class="import-issues">
+    <MudSimpleTable Dense="true" Elevation="0">
+        <thead>
+            <tr>
+                <th>Zeile</th>
+                <th>Grund</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var issue in Issues)
+            {
+                <tr>
+                    <td>@issue.Row</td>
+                    <td>@issue.Reason</td>
+                </tr>
+            }
+        </tbody>
+    </MudSimpleTable>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ImportContacts.RowIssue> Issues { get; set; } = [];
+}

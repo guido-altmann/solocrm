@@ -1,0 +1,318 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Import
+@inject IQueryHandler<PreviewContactImport.Query, PreviewContactImport.Result> PreviewHandler
+@inject ICommandHandler<ImportContacts.Command, ImportContacts.Result> ImportHandler
+
+@* Contact import (US-16, SPEC 3.3 S6): upload → preview → mapping (template) → import → report. Runs synchronously in
+   the circuit with progress (iteration 5 decision 10). *@
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="import">
+    <MudText Typo="Typo.h6">Import</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Kontakte aus einer CSV-Datei übernehmen, z. B. aus einem HubSpot-Export. Dubletten werden per E-Mail erkannt,
+        ohne E-Mail per HubSpot-ID.
+    </MudText>
+
+    @switch (_step)
+    {
+        case Step.Upload:
+            <MudFileUpload T="IBrowserFile" FilesChanged="UploadAsync" Accept=".csv,text/csv" Class="mt-0">
+                <CustomContent>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.UploadFile" Disabled="_busy"
+                               OnClick="@context.OpenFilePickerAsync">
+                        CSV-Datei wählen
+                    </MudButton>
+                </CustomContent>
+                <SelectedTemplate />
+            </MudFileUpload>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                Höchstens @(CsvDocument.MaxBytes / 1024 / 1024) MB und @Formats.Number(CsvDocument.MaxRows) Zeilen;
+                Trennzeichen Komma oder Semikolon, Kodierung UTF-8 oder Windows-1252.
+            </MudText>
+            break;
+
+        case Step.Mapping when _preview is not null:
+            <MudStack Spacing="3">
+                <MudText Typo="Typo.body2" data-test="file-info">
+                    <strong>@_fileName</strong> · @Rows(_preview.RowCount) · Trennzeichen „@Delimiter(_preview.Delimiter)“ · @_preview.EncodingName
+                </MudText>
+
+                <MudSelect T="ImportTemplate" Value="_template" ValueChanged="ChangeTemplateAsync" Label="Vorlage" Dense="true"
+                           Style="max-width: 300px;">
+                    <MudSelectItem T="ImportTemplate" Value="ImportTemplate.Generic">Allgemein</MudSelectItem>
+                    <MudSelectItem T="ImportTemplate" Value="ImportTemplate.HubSpot">HubSpot-Kontaktexport</MudSelectItem>
+                </MudSelect>
+
+                <MudSimpleTable Dense="true" Elevation="0" Class="import-mapping">
+                    <thead>
+                        <tr>
+                            <th>Zielfeld</th>
+                            <th>Spalte</th>
+                            <th>Ersatz, wenn leer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var field in Enum.GetValues<ImportField>())
+                        {
+                            var current = _mapping[field];
+                            <tr data-field="@field">
+                                <td>@FieldLabel(field)</td>
+                                <td>
+                                    <MudSelect T="int?" Value="current.Column" Dense="true" Margin="Margin.Dense"
+                                               ValueChanged="@(c => _mapping[field] = (c, c is null ? null : current.Fallback))"
+                                               aria-label="@($"Spalte für {FieldLabel(field)}")">
+                                        <MudSelectItem T="int?" Value="null">– nicht übernehmen –</MudSelectItem>
+                                        @foreach (var column in _preview.Columns)
+                                        {
+                                            <MudSelectItem T="int?" Value="column.Index">@ColumnLabel(column)</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </td>
+                                <td>
+                                    <MudSelect T="int?" Value="current.Fallback" Dense="true" Margin="Margin.Dense" Disabled="current.Column is null"
+                                               ValueChanged="@(f => _mapping[field] = (current.Column, f))"
+                                               aria-label="@($"Ersatzspalte für {FieldLabel(field)}")">
+                                        <MudSelectItem T="int?" Value="null">–</MudSelectItem>
+                                        @foreach (var column in _preview.Columns)
+                                        {
+                                            <MudSelectItem T="int?" Value="column.Index">@ColumnLabel(column)</MudSelectItem>
+                                        }
+                                    </MudSelect>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </MudSimpleTable>
+
+                @if (MappedFields.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2">Vorschau der ersten @_preview.Rows.Count Zeilen</MudText>
+                    <div class="import-preview">
+                        <MudSimpleTable Dense="true" Elevation="0" Striped="true">
+                            <thead>
+                                <tr>
+                                    <th>Zeile</th>
+                                    @foreach (var field in MappedFields)
+                                    {
+                                        <th>@FieldLabel(field)</th>
+                                    }
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in _preview.Rows)
+                                {
+                                    <tr>
+                                        <td>@row.Number</td>
+                                        @foreach (var field in MappedFields)
+                                        {
+                                            <td>@CurrentMapping.Value(row, field)</td>
+                                        }
+                                    </tr>
+                                }
+                            </tbody>
+                        </MudSimpleTable>
+                    </div>
+                }
+
+                <MudRadioGroup T="DuplicateHandling" @bind-Value="_duplicates">
+                    <MudText Typo="Typo.body2">Bestehende Kontakte (gleiche E-Mail bzw. HubSpot-ID):</MudText>
+                    <MudRadio T="DuplicateHandling" Value="DuplicateHandling.Skip" Dense="true">überspringen</MudRadio>
+                    <MudRadio T="DuplicateHandling" Value="DuplicateHandling.Update" Dense="true">mit den Werten der Datei aktualisieren</MudRadio>
+                </MudRadioGroup>
+
+                @if (_error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true">@_error</MudAlert>
+                }
+
+                <MudStack Row="true" Spacing="2">
+                    <MudButton Variant="Variant.Text" OnClick="Reset">Abbrechen</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PlayArrow"
+                               OnClick="ImportAsync">
+                        @($"{Rows(_preview.RowCount)} importieren")
+                    </MudButton>
+                </MudStack>
+            </MudStack>
+            break;
+
+        case Step.Running:
+            <MudText Typo="Typo.body2" Class="mb-2">
+                @($"Importiere … {_progress?.Processed ?? 0} von {_progress?.Total ?? _preview?.RowCount ?? 0} Zeilen")
+            </MudText>
+            <MudProgressLinear Color="Color.Primary" Value="@ProgressPercent" Size="Size.Medium" aria-label="Fortschritt des Imports" />
+            break;
+
+        case Step.Report when _report is not null:
+            <MudStack Spacing="2" data-test="import-report">
+                <MudStack Row="true" Spacing="1" Wrap="Wrap.Wrap">
+                    <MudChip T="string" Color="Color.Success" Variant="Variant.Outlined">@($"{_report.Created} angelegt")</MudChip>
+                    <MudChip T="string" Color="Color.Info" Variant="Variant.Outlined">@($"{_report.Updated} aktualisiert")</MudChip>
+                    <MudChip T="string" Variant="Variant.Outlined">@($"{_report.Skipped} übersprungen")</MudChip>
+                    <MudChip T="string" Color="@(_report.Failed > 0 ? Color.Error : Color.Default)" Variant="Variant.Outlined">
+                        @($"{_report.Failed} fehlerhaft")
+                    </MudChip>
+                </MudStack>
+                @if (_report.Errors.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2">Fehlerhafte Zeilen</MudText>
+                    <IssueTable Issues="_report.Errors" />
+                }
+                @if (_report.Skips.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2">Übersprungene Zeilen</MudText>
+                    <IssueTable Issues="_report.Skips" />
+                }
+                <div>
+                    <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="Reset">Weitere Datei importieren</MudButton>
+                </div>
+            </MudStack>
+            break;
+    }
+
+    @if (_step == Step.Upload && _error is not null)
+    {
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_error</MudAlert>
+    }
+</MudPaper>
+
+@code {
+    private enum Step
+    {
+        Upload,
+        Mapping,
+        Running,
+        Report,
+    }
+
+    private Step _step = Step.Upload;
+    private byte[] _content = [];
+    private string? _fileName;
+    private PreviewContactImport.Result? _preview;
+    private ImportTemplate _template;
+    private readonly Dictionary<ImportField, (int? Column, int? Fallback)> _mapping = [];
+    private DuplicateHandling _duplicates = DuplicateHandling.Skip;
+    private ImportContacts.Progress? _progress;
+    private ImportContacts.Result? _report;
+    private string? _error;
+    private bool _busy;
+
+    private ImportMapping CurrentMapping => new(
+        [.. _mapping.Select(m => new FieldMapping(m.Key, m.Value.Column, m.Value.Fallback))], _template);
+
+    private List<ImportField> MappedFields => [.. Enum.GetValues<ImportField>().Where(f => _mapping[f].Column is not null)];
+
+    private double ProgressPercent => _progress is { Total: > 0 } p ? 100.0 * p.Processed / p.Total : 0;
+
+    private async Task UploadAsync(IBrowserFile? file)
+    {
+        if (file is null)
+        {
+            return;
+        }
+
+        _error = null;
+        if (file.Size > CsvDocument.MaxBytes)
+        {
+            _error = ImportErrors.FileTooLarge.Message;
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            await using var stream = file.OpenReadStream(CsvDocument.MaxBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            _content = buffer.ToArray();
+            _fileName = file.Name;
+            await LoadPreviewAsync(null);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private Task ChangeTemplateAsync(ImportTemplate template) => LoadPreviewAsync(template);
+
+    private async Task LoadPreviewAsync(ImportTemplate? template)
+    {
+        var result = await PreviewHandler.Handle(new PreviewContactImport.Query(_content, template), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            _error = Message(result.Error);
+            _step = Step.Upload;
+            return;
+        }
+
+        _preview = result.Value;
+        _template = result.Value.SuggestedMapping.Template;
+        _mapping.Clear();
+        foreach (var field in Enum.GetValues<ImportField>())
+        {
+            var suggested = result.Value.SuggestedMapping.For(field);
+            _mapping[field] = (suggested?.Column, suggested?.FallbackColumn);
+        }
+
+        _step = Step.Mapping;
+    }
+
+    private async Task ImportAsync()
+    {
+        _error = null;
+        _progress = null;
+        _step = Step.Running;
+        var progress = new Progress<ImportContacts.Progress>(p =>
+        {
+            _progress = p;
+            _ = InvokeAsync(StateHasChanged);
+        });
+
+        var result = await ImportHandler.Handle(
+            new ImportContacts.Command(_content, CurrentMapping, _duplicates, progress), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            _error = Message(result.Error);
+            _step = Step.Mapping;
+            return;
+        }
+
+        _report = result.Value;
+        _content = [];
+        _step = Step.Report;
+    }
+
+    private void Reset()
+    {
+        _step = Step.Upload;
+        _content = [];
+        _preview = null;
+        _report = null;
+        _error = null;
+        _fileName = null;
+    }
+
+    private static string Message(Error error) => error is ValidationError validation
+        ? string.Join(" ", validation.Errors.Values.SelectMany(m => m))
+        : error.Message;
+
+    private static string Rows(int count) => count == 1 ? "1 Zeile" : $"{Formats.Number(count)} Zeilen";
+
+    private static string Delimiter(char delimiter) => delimiter == '\t' ? "Tab" : delimiter.ToString();
+
+    private static string ColumnLabel(PreviewContactImport.Column column) => $"{column.Index + 1}: {column.Header}";
+
+    private static string FieldLabel(ImportField field) => field switch
+    {
+        ImportField.FirstName => "Vorname",
+        ImportField.LastName => "Nachname",
+        ImportField.Email => "E-Mail",
+        ImportField.Phone => "Telefon",
+        ImportField.JobTitle => "Rolle",
+        ImportField.LinkedInUrl => "LinkedIn-URL",
+        ImportField.Organization => "Organisation",
+        ImportField.OrganizationWebsite => "Website (neue Organisation)",
+        ImportField.Source => "Quelle",
+        ImportField.Tag => "Tag",
+        _ => "HubSpot-ID",
+    };
+}

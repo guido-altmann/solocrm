@@ -67,10 +67,16 @@ public static class ApiEndpoints
         api.MapFallback(() => ApiResults.NotFound("Unbekannter Endpunkt.")).ExcludeFromDescription();
 
         // Without explicit authorization metadata, the fallback policy (cookie login) protects both (decision 5).
+        // Scalar runs without its cloud features: no telemetry, CDN fonts, AI agent or MCP (SPEC 6: no external trackers).
         app.MapOpenApi();
         app.MapScalarApiReference(options => options
             .WithTitle("SoloCRM API")
-            .AddPreferredSecuritySchemes(ApiKeyAuthentication.Scheme));
+            .AddPreferredSecuritySchemes(ApiKeyAuthentication.Scheme)
+            .DisableTelemetry()
+            .DisableDefaultFonts()
+            .DisableAgent()
+            .DisableMcp()
+            .HideDeveloperTools());
 
         return app;
     }

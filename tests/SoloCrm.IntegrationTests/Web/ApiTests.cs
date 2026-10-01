@@ -296,6 +296,8 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
         document.GetProperty("components").GetProperty("securitySchemes").GetProperty("ApiKey").GetProperty("name").GetString()
             .Should().Be("X-Api-Key");
         scalar.StatusCode.Should().Be(HttpStatusCode.OK);
+        var configuration = await scalar.Content.ReadAsStringAsync(Ct);
+        configuration.Should().Contain("\"telemetry\":false").And.Contain("\"withDefaultFonts\":false");
     }
 
     private HttpClient CreateClient(string? key = "")

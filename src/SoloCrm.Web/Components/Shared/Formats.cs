@@ -11,6 +11,9 @@ public static class Formats
 
     public static string Date(DateOnly date) => date.ToString("dd.MM.yyyy", German);
 
+    /// <summary>Whole number with thousands separator, e.g. „10.000“.</summary>
+    public static string Number(int value) => value.ToString("N0", German);
+
     public static string Date(DateTimeOffset localTime) => localTime.ToString("dd.MM.yyyy", German);
 
     public static string DateTime(DateTimeOffset localTime) => localTime.ToString("dd.MM.yyyy, HH:mm", German);
