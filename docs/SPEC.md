@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** Entwurf v0.14 · **Stand:** 2026-10-01 · **Owner:** Guido Altmann
+> **Status:** Entwurf v0.15 · **Stand:** 2026-10-01 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, konkrete Iterationsaufträge in `docs/iterations/`.
 
@@ -379,21 +379,27 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 
 ---
 
-## 5. REST-API (Entwurf)
+## 5. REST-API
 
-Basis: `/api/v1` · Auth: `X-Api-Key` · Format: JSON (camelCase) · Fehler: RFC 9457 Problem Details
+Basis: `/api/v1` · Auth: `X-Api-Key` · Format: JSON (camelCase, Enums als Namen wie `LinkedIn`, `Won`) · Fehler: RFC 9457 Problem Details · Referenz: OpenAPI unter `/openapi/v1.json`, Scalar unter `/scalar/v1` (beides nur mit Login)
 
 | Methode | Pfad | Zweck |
 |---|---|---|
 | GET | `/contacts?search=&tag=&page=&pageSize=` | Liste |
-| GET | `/contacts/{id}` | Detail |
-| POST | `/contacts` | Anlegen (typischer n8n-Lead-Eingang) |
+| GET | `/contacts/{id}` | Detail (inkl. Tags) |
+| POST | `/contacts` | Anlegen (typischer n8n-Lead-Eingang); `organizationName` nutzt eine bestehende Organisation gleichen Namens (case-insensitive) oder legt sie an |
 | PATCH | `/contacts/{id}` | Teil-Update (JSON Merge Patch, RFC 7396: fehlendes Feld = unverändert, `null` = leeren) |
 | GET/POST/PATCH | `/organizations…` | analog |
-| GET/POST/PATCH | `/opportunities…` | analog; `PATCH` mit `stageId` löst Stage-Wechsel aus |
-| POST | `/activities` | Activity erfassen |
-| POST | `/tasks` · PATCH `/tasks/{id}` | Tasks |
+| GET/POST/PATCH | `/opportunities…` | analog, Liste zusätzlich mit `stageId`; `PATCH` mit `stageId` löst den Stage-Wechsel aus (Wechsel auf `Lost` verlangt `lostReason`) |
+| POST | `/activities` | Activity erfassen (`type` Default `Note`, mindestens ein Bezug) |
+| GET/POST/PATCH | `/tasks` (`GET`/`PATCH` mit `/{id}`) | Tasks; `PATCH` mit `completed: true/false` erledigt bzw. öffnet wieder |
 | GET | `/stages` | Stages lesen |
+
+**Listen:** `page` beginnt bei 1, `pageSize` 1–200 (Default 50); Antwort `{ items, page, pageSize, totalCount }`. `search` ist dieselbe tippfehlertolerante Suche wie in der UI. `tag` (Name oder Id, mehrfach angebbar) filtert ODER-verknüpft; existiert keiner der Tags, ist die Liste leer. Archivierte Datensätze erscheinen nicht.
+
+**Statuscodes:** `200`/`201` (mit `Location` und dem angelegten Datensatz), `400` Validierung (`errors` je Feld in camelCase; unbekannte Felder im `PATCH` sind ein Fehler), `401` ohne, mit ungültigem oder widerrufenem Key, `404` unbekannte Id oder unbekannter Endpunkt, `409` Konflikt (z. B. `Contact.DuplicateEmail`, `Opportunity.LostReasonRequired`), `422` übrige fachliche Fehler, `429` über 60 Anfragen pro Minute und Key (mit `Retry-After`). Fachliche Fehler tragen ihren Code in `code`.
+
+Die Endpoints rufen dieselben Handler wie die UI; Validierung, Audit und Domain Events sind identisch. Beispiel-Workflows für n8n: `docs/n8n-integration.md`.
 
 **Webhook-Payload (Beispiel):**
 ```json
@@ -405,7 +411,7 @@ Basis: `/api/v1` · Auth: `X-Api-Key` · Format: JSON (camelCase) · Fehler: RFC
 }
 ```
 
-`data` enthält nur Ids und Status wie das Domain Event, keine personenbezogenen Inhalte; Details holt der Empfänger per REST-API. Header: `X-SoloCrm-Timestamp` (Unix-Sekunden) und `X-SoloCrm-Signature: sha256=<hex>` = HMAC-SHA256 mit dem Subscription-Secret über `<timestamp>.<body>`. Empfänger prüfen Signatur und Alter (< 5 min) und deduplizieren über `id` (at-least-once). Eine Subscription erhält nur Events, die nach ihrer Anlage aufgetreten sind. `http`-Ziele nur für konfigurierte Hosts (`Webhooks__AllowedHttpHosts`), sonst `https`. OpenAPI-Dokument und Scalar-UI sind nur für den angemeldeten Nutzer erreichbar.
+`data` enthält nur Ids und Status wie das Domain Event, keine personenbezogenen Inhalte; Details holt der Empfänger per REST-API. „Test senden“ schickt `webhook.ping` mit `data.subscriptionId`. Header: `X-SoloCrm-Event` (Typ), `X-SoloCrm-Timestamp` (Unix-Sekunden) und `X-SoloCrm-Signature: sha256=<hex>` = HMAC-SHA256 mit dem Subscription-Secret über `<timestamp>.<body>`. Empfänger prüfen Signatur und Alter (< 5 min) und deduplizieren über `id` (at-least-once). Eine Subscription erhält nur Events, die nach ihrer Anlage aufgetreten sind. `http`-Ziele nur für konfigurierte Hosts (`Webhooks__AllowedHttpHosts`), sonst `https`. OpenAPI-Dokument und Scalar-UI sind nur für den angemeldeten Nutzer erreichbar.
 
 ---
 
@@ -516,7 +522,7 @@ public static class CreateContact
 | Timestamps | `SaveChangesInterceptor` setzt `CreatedAt`/`UpdatedAt` |
 | Audit | `AuditInterceptor` liest den ChangeTracker vor dem Speichern und schreibt `AuditEntry` (Feld-Diffs) in derselben Transaktion |
 | Domain Events → Outbox | `OutboxInterceptor` sammelt Events aus Entitäten und serialisiert sie als `OutboxMessage` in derselben Transaktion |
-| Outbox-Verarbeitung | `BackgroundService` mit `PeriodicTimer` (alle 10 s); `SELECT … FOR UPDATE SKIP LOCKED`; Versand an Subscriptions; Backoff über `Attempts`/`NextAttemptAt`, max. 6 Versuche; verarbeitete Nachrichten und Versandprotokoll 30 Tage aufbewahrt |
+| Outbox-Verarbeitung | `BackgroundService` mit `PeriodicTimer` (alle 10 s, `Outbox__PollingInterval`); Blöcke per `FOR UPDATE SKIP LOCKED` mit Lease (5 min) beansprucht, keine offene Transaktion während HTTP; Versand an alle aktiven Subscriptions mit passendem Event, die bei Auftreten schon existierten; Wiederholung nur an fehlgeschlagene Ziele, Backoff 1 min/5 min/30 min/2 h/12 h, max. 6 Versuche; verarbeitete Nachrichten und Versandprotokoll 30 Tage aufbewahrt (ADR-008, ADR-010) |
 | Suche | generierte `tsvector`-Spalte (Konfiguration `simple`, Shadow Property) + GIN-Index; zusätzlich `pg_trgm` GIN-Index auf Namen/Titel; Treffer bei Präfix-Volltext **oder** Wortähnlichkeit ≥ 0,6 (`<%`); Ranking = Wortähnlichkeit + `ts_rank`; Command Palette, Listen und Autocompletes nutzen dieselbe Suche ab 2 Zeichen (Palette) bzw. 1 Zeichen (Listen); Details siehe ADR-007 |
 | JSONB | `ExtraFields` als `Dictionary<string,string>` → jsonb (Npgsql) |
 | Value Objects | `Pricing` und `Duration` als unveränderliche Records, gemappt als EF Core **Complex Types** (`ComplexProperty`, nullable) – Spalten direkt in `opportunities` (ADR-011) |
@@ -642,6 +648,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.8 | 2026-09-29 | Abschluss It. 2: mindestens eine offene Stage bleibt erhalten; Ziel-Stage beim Löschen mit gleichem Status (2.3); Umsetzungsentscheidungen in `docs/iterations/02-kerndomaene.md` |
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
+| 0.15 | 2026-10-01 | Umsetzung It. 5: REST-API final (5: Listenparameter, Statuscodes, `organizationName`, Tasks per `PATCH` erledigen); Webhook-Header `X-SoloCrm-Event` und `webhook.ping`; `WebhookDelivery` mit `EventId`/`EventType` statt FK, `ProtectedSecret`, Key-Format `scrm_<prefix>_<secret>` (2.4); Outbox mit Lease (7.4) |
 | 0.14 | 2026-10-01 | Backlog: Nextcloud-Synchronisation (Einweg für Kontakte und Tasks, Rückkanal für erledigte Tasks); ICS-Export als Vorstufe |
 | 0.13 | 2026-09-30 | Planung It. 5: Outbox per eigenem `BackgroundService` (ADR-008); schlanke Webhook-Payloads, Zeitstempel in der Signatur, Aufbewahrung 30 Tage (5, 7.4); PATCH als JSON Merge Patch; OpenAPI/Scalar nur angemeldet; Umsetzungsentscheidungen in `docs/iterations/05-integration.md` |
 | 0.12 | 2026-09-30 | Abschluss It. 4: Tag-Felder und -Regeln (2.3); Tastenkürzel präzisiert (3.2, u. a. `Enter`/`F2` für Inline-Edit, 1-s-Fenster für `G`); Suchfeld öffnet die Palette per Klick statt Fokus (3.4); Tags auf Pipeline-Karten, Archivieren der Anfrage im Detailkopf (S2/S5); Such-Mechanik (7.4, ADR-007) |

@@ -16,7 +16,11 @@ Schlankes, selbst gehostetes CRM für Freelancer und Einzelunternehmer: Kontakte
 
 - **Iteration 4 (Suche & Komfort):** Command Palette (`Ctrl/Cmd + K`) mit tippfehlertoleranter Suche über Kontakte (inkl. E-Mail und Firma), Organisationen und Anfragen – PostgreSQL-Volltext plus `pg_trgm`, „Schmitt“ findet „Schmidt“ – sowie Aktionen wie „Neuer Kontakt“ oder „Gehe zu Pipeline“. Dieselbe Suche steckt in Listen und Autocompletes. Tastenkürzel `G` + `H/P/K/O` und eine Übersicht per `?`. Stammdaten werden direkt in der Detailansicht bearbeitet (Enter/Blur speichert, Esc bricht ab, Fehler am Feld). Farbige Tags für Kontakte, Organisationen und Anfragen, inline anlegbar, filterbar und in den Einstellungen verwaltbar.
 
-Weitere Funktionen (CSV-Import, REST-API, Webhooks) folgen gemäß [Iterationsplan](docs/SPEC.md#8-iterationsplan).
+- **Iteration 5 (Integration):** Domain Events gehen über die Outbox als signierte Webhooks raus (HMAC-SHA256 mit Zeitstempel, Retry mit Backoff bis zu sechsmal, Versandprotokoll in den Einstellungen). Den Hintergrunddienst können zwei Container gleichzeitig betreiben, ohne doppelt zuzustellen (`FOR UPDATE SKIP LOCKED`). Dazu kommt eine REST-API unter `/api/v1` mit API-Keys (nur gehasht gespeichert, 60 Anfragen pro Minute), Problem Details, JSON Merge Patch und OpenAPI/Scalar. Kontakte lassen sich per CSV importieren, mit Vorschau, Spalten-Mapping, Vorlage für den HubSpot-Export, Dublettenprüfung und Bericht je Zeile. Beispiel-Workflows für n8n: [docs/n8n-integration.md](docs/n8n-integration.md).
+
+Als Nächstes folgen DSGVO-Export und -Löschung sowie 2FA gemäß [Iterationsplan](docs/SPEC.md#8-iterationsplan).
+
+![Webhooks in den Einstellungen: Ereignisse, Test senden und Versandprotokoll mit Fehlversuch](docs/images/webhooks.png)
 
 ![Command Palette: „schmitt“ findet Schmitz, Schmidt und Schmid samt Firma, Organisation und Anfrage](docs/images/command-palette.png)
 
@@ -70,4 +74,5 @@ Das Image führt beim Start zuerst die Migrationen aus (`efbundle`) und startet 
 - [Architekturentscheidungen (ADRs)](docs/adr/README.md)
 - [Iterationen](docs/iterations/)
 - [Deployment auf Coolify](deploy/coolify.md)
+- [n8n-Integration (Webhooks, REST-API)](docs/n8n-integration.md)
 - [Hinweise für Claude Code](CLAUDE.md)

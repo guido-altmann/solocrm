@@ -85,11 +85,11 @@
 - [x] Zeitbudget-Tests laufen in einer eigenen, nicht parallelen Collection (sonst misst der Test die Last der übrigen Testcontainer)
 
 ## Schritt 9 – Abschluss
-- [ ] Migrationen erzeugt und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009)
-- [ ] ADR-008 und ADR-010 mit den Erfahrungen ergänzen; ggf. neuer ADR für API-Authentifizierung
-- [ ] `deploy/coolify.md`: neue Konfiguration, Hinweis auf das Volume `/app/keys` (Webhook-Secrets)
-- [ ] README-Stand, Beispiel-Workflow für n8n (Signaturprüfung) und Screenshot
-- [ ] SPEC nachziehen (Entscheidungen, Payload, API-Details)
+- [ ] Migrationen erzeugt (`AddWebhooks`, `AddApiKeys`, beide additiv) und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – Rollout steht aus
+- [x] ADR-008 und ADR-010 mit den Erfahrungen ergänzen; API-Authentifizierung als Umsetzungsabschnitt in ADR-004 statt eines neuen ADR (die Entscheidung selbst stand dort schon)
+- [x] `deploy/coolify.md`: neue Konfiguration, Hinweis auf das Volume `/app/keys` (Webhook-Secrets)
+- [x] README-Stand, Beispiel-Workflow für n8n (Signaturprüfung, `docs/n8n-integration.md`) und Screenshot
+- [x] SPEC nachziehen (Entscheidungen, Payload, API-Details) – v0.15
 
 ## Entscheidungen (2026-09-30)
 1. **Hintergrundprozess:** eigener `BackgroundService` mit `PeriodicTimer` für die Outbox (ADR-008 Option B); Retry und Backoff über `Attempts`/`NextAttemptAt` der Outbox. Hangfire erst, wenn weitere Jobarten hinzukommen.

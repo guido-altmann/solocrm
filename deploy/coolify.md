@@ -77,7 +77,7 @@ Anschließend **Backup Now** auslösen und prüfen, dass die Datei im Bucket ank
    - Name: `solocrm-keys`
    - Destination Path: `/app/keys`
 
-   Hier liegen die Data-Protection-Keys. Ohne dieses Volume ist man nach jedem Deploy ausgeloggt und Antiforgery-Tokens werden ungültig.
+   Hier liegen die Data-Protection-Keys. Ohne dieses Volume ist man nach jedem Deploy ausgeloggt und Antiforgery-Tokens werden ungültig. Seit Iteration 5 sind damit auch die **Webhook-Secrets** verschlüsselt: Geht das Volume verloren, schlägt jede Zustellung mit „Secret nicht lesbar“ fehl, und die Secrets müssen in den Einstellungen neu erzeugt und in n8n eingetragen werden. Die Postgres-Backups sichern das Volume **nicht**; es muss separat gesichert werden (ADR-009).
    Ein benanntes Volume übernimmt beim ersten Start die Rechte aus dem Image (`app`, UID 1654). Bei einem **Bind Mount** (Host-Verzeichnis) muss das Verzeichnis vorher per `chown 1654:1654` beschreibbar gemacht werden.
 5. **Healthcheck**
    - Enabled, Method `GET`, Scheme `http`, Host `localhost`, Port `8080`, Path `/health/ready`
@@ -92,6 +92,8 @@ Anschließend **Backup Now** auslösen und prüfen, dass die Datei im Bucket ank
    | `Serilog__MinimumLevel__Default` | `Information` | optional, zur Fehlersuche `Debug` |
    | `App__BaseUrl` | `https://crm.example.de` | für spätere absolute Links (Webhooks, Mails) |
    | `App__TimeZone` | `Europe/Berlin` | optional (Default `Europe/Berlin`); IANA-Zeitzone für „Heute“, „überfällig“ und angezeigte Uhrzeiten. Ein ungültiger Wert verhindert den Start |
+   | `Webhooks__AllowedHttpHosts` | `n8n` | optional; kommagetrennte Hosts, an die Webhooks per `http` gehen dürfen (z. B. n8n im selben Docker-Netz). Alle anderen Ziele brauchen `https` |
+   | `Outbox__PollingInterval` | `00:00:10` | optional; wie oft die Outbox auf neue Ereignisse geprüft wird. Weitere Werte: `Outbox__BatchSize` (20), `Outbox__LeaseDuration` (5 min), `Outbox__Retention` (30 Tage) |
 
    **Sonderzeichen in Werten:** Coolify reicht die Variablen über eine Docker-Compose-`.env`-Datei weiter. Dabei werden `$` (Variablen-Interpolation) und `\` (Escape-Zeichen, wird z. B. verdoppelt) verändert, Anführungszeichen (`"`, `'`, `` ` ``) und Leerzeichen am Rand können mit in den Wert geraten. Diese Zeichen in Passwörtern vermeiden oder die Variable als **Is Literal** markieren. Was tatsächlich ankommt, zeigt `printenv <Variable>` im Terminal des App-Containers (siehe unten).
 
@@ -121,6 +123,13 @@ Ab jetzt stößt der Workflow **Docker** nach jedem erfolgreichen Push das Deplo
 - [ ] Response-Header enthält `Strict-Transport-Security`
 - [ ] Kein Redirect-Loop und Auth-Cookie mit Flag `Secure` (Forwarded Headers greifen, die App erkennt HTTPS hinter Traefik)
 - [ ] Container-Logs sind JSON und enthalten keine E-Mail-Adressen im Klartext
+
+### Integration (ab Iteration 5)
+- [ ] *Einstellungen → API-Keys*: Key erzeugen; `curl -H "X-Api-Key: scrm_…" https://crm.example.de/api/v1/stages` liefert `200`, ohne Header `401`
+- [ ] `https://crm.example.de/scalar/v1` zeigt die API-Referenz nur nach dem Login (sonst Weiterleitung zum Login)
+- [ ] *Einstellungen → Webhooks*: Webhook auf n8n anlegen, *Test senden* ist erfolgreich, die Signatur wird in n8n geprüft ([docs/n8n-integration.md](../docs/n8n-integration.md))
+- [ ] Stage-Wechsel einer Anfrage erscheint im Versandprotokoll mit HTTP 2xx
+- [ ] Ältere Outbox-Nachrichten aus Iteration 2–4 werden als verarbeitet markiert, aber nicht gesendet (Webhook erhält nur Ereignisse ab seiner Anlage)
 
 ### Redeploy-Test (persistente Data-Protection-Keys)
 
