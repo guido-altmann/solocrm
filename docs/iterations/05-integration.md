@@ -2,7 +2,7 @@
 
 **Ziel:** SoloCRM ist von außen automatisierbar. Domain Events erreichen n8n zuverlässig als signierte Webhooks, eine REST-API mit API-Key erlaubt Lesen und Schreiben (z. B. Lead-Eingang aus n8n), und der Kontaktbestand aus HubSpot lässt sich per CSV übernehmen.
 
-**Stories:** US-16 – US-18
+**Stories:** US-16 – US-18, Erweiterung: Adressen und Organisationsimport (Entscheidungen 14–17)
 **Referenzen:** `docs/SPEC.md` Kap. 2.4 (WebhookSubscription, WebhookDelivery, ApiKey), 2.6 (Domain Events), 3.3 S6 (Einstellungen), 4 (US-16 – US-18), 5 (REST-API, Webhook-Payload), 6 (Sicherheit, Datenschutz, Performance), 7.4 (Outbox-Verarbeitung); ADR-008, ADR-009, ADR-010
 
 **Aus früheren Iterationen übernommen:**
@@ -91,6 +91,26 @@
 - [x] README-Stand, Beispiel-Workflow für n8n (Signaturprüfung, `docs/n8n-integration.md`) und Screenshot
 - [x] SPEC nachziehen (Entscheidungen, Payload, API-Details) – v0.15
 
+## Schritt 10 – Adressen für Kontakte und Organisationen (Entscheidung 14)
+- [ ] Value Object `Address` (Straße, Adresszusatz, PLZ, Ort, Region, Land) mit fester Länderliste (ISO 3166-1 Alpha-2, deutsche und englische Namen); Unit-Tests
+- [ ] `Contact.Address` und `Organization.Address` als nullable Complex Types; `Organization.City` geht in `Address.City` auf (Spalte `city` bleibt, Suche unverändert); Migration additiv
+- [ ] Use Cases (`Create…`, `Update…`, `Get…`) und Validierung um die Adresse erweitert
+- [ ] Oberfläche: Adresse als Gruppe im Inline-Editing der Detailansichten, Land als Auswahl; Organisationsdialog mit Adresse statt Ort
+- [ ] REST-API: flache Adressfelder (`street`, `street2`, `postalCode`, `city`, `region`, `countryCode`), wie beim Preis
+- [ ] Kontakt-Import: Adress-Zielfelder, HubSpot-Vorlage (`Street Address`, `Postal Code`, `City`, `State/Region`, `Country/Region Code` mit Ersatz `Country/Region`)
+
+## Schritt 11 – Organisationsimport (Entscheidung 15)
+- [ ] Import-Assistent mit Zieltyp (Kontakte / Organisationen); gemeinsamer Unterbau für Parsing, Mapping, Blöcke und Bericht
+- [ ] Zielfelder: Name, Typ, Website, Telefon, LinkedIn-Seite, Adresse, Tag, HubSpot-ID; Dubletten per `HubSpotRecordId`, sonst Name (case-insensitive); überspringen/aktualisieren
+- [ ] HubSpot-Firmenvorlage inkl. Typ-Mapping; Kopfzeile eines echten Firmenexports abgleichen (steht aus)
+- [ ] Audit und `OrganizationCreated` je Organisation wie bei manueller Anlage
+
+## Schritt 12 – Verknüpfung Kontakt ↔ Organisation (Entscheidung 16)
+- [ ] Zielfeld „HubSpot-Firmen-ID“ im Kontakt-Import: verknüpft mit der Organisation gleicher `HubSpotRecordId`, sonst per Firmenname wie bisher; bei mehreren IDs zählt die erste (primäre)
+- [ ] Spaltenname der Zuordnung im echten Kontaktexport bestätigen (steht aus)
+- [ ] Tests: Firmen → Kontakte importieren, Verknüpfung per ID vor Name, nachträgliche Verknüpfung per „aktualisieren“
+- [ ] SPEC, README und n8n-/Import-Doku nachziehen; Ende-zu-Ende mit echtem HubSpot-Export (Firmen und Kontakte)
+
 ## Entscheidungen (2026-09-30)
 1. **Hintergrundprozess:** eigener `BackgroundService` mit `PeriodicTimer` für die Outbox (ADR-008 Option B); Retry und Backoff über `Attempts`/`NextAttemptAt` der Outbox. Hangfire erst, wenn weitere Jobarten hinzukommen.
 2. **Payload:** nur Ids und Status wie in den Domain Events (SPEC 5); Details holt n8n per REST-API. Keine personenbezogenen Daten in Outbox und Versandprotokoll.
@@ -116,7 +136,7 @@
    | Tag | `Lifecycle Stage` | – (siehe B) |
    | ExtraFields `HubSpotRecordId` | `Record ID` | – |
 
-   Nicht übernommen: Adressen, übrige Lifecycle-/Lead-Daten, Zeitstempel (`Create Date` usw.; `CreatedAt` setzt ausschließlich der Interceptor), Marketing-Kennzahlen, `Associated … IDs`.
+   Nicht übernommen: ~~Adressen~~ (revidiert durch Entscheidung 14), übrige Lifecycle-/Lead-Daten, Zeitstempel (`Create Date` usw.; `CreatedAt` setzt ausschließlich der Interceptor), Marketing-Kennzahlen, `Associated … IDs` (außer der Firmen-ID, Entscheidung 16).
 
    **Technische Folgen:** Spaltennamen sind *nicht eindeutig* (`Billing Contact IDs` kommt dreimal vor) und enthalten maskierte Anführungszeichen (`Date entered ""Kunde …""`). Das Parsing arbeitet daher mit Spaltenindizes, nicht mit Namen; die Vorlage sucht die erste passende Spalte. Bei ~300 Spalten wird das Mapping je *Zielfeld* gewählt (Zielfeld → Quellspalte), nicht je Quellspalte, und die Vorschau zeigt nur die zugeordneten Spalten. Dubletten innerhalb von SoloCRM: zuerst per E-Mail (AK2), bei Kontakten ohne E-Mail per `HubSpotRecordId`, damit ein erneuter Import keine Dubletten erzeugt.
 
@@ -129,11 +149,18 @@
 12. **Fehlerhafte Zeilen:** Anzeige im Bericht genügt; Download erst bei Bedarf.
 13. **Neue Pakete:** `CsvHelper`, `Microsoft.AspNetCore.OpenApi` (erzeugt das OpenAPI-Dokument) und `Scalar.AspNetCore` (interaktive API-Referenz zum Dokument, US-17 AK3). Kein Hangfire.
 
+## Entscheidungen (2026-10-01, Erweiterung)
+14. **Adressen:** Kontakte und Organisationen erhalten je eine vollständige Anschrift als Value Object `Address` (Straße inkl. Hausnummer, Adresszusatz, PLZ, Ort, Bundesland/Region, Land) analog zu `Pricing` (ADR-011). Das Land wird als ISO-3166-1-Alpha-2-Code gespeichert und in der Oberfläche als deutscher Name zur Auswahl angeboten; die Namensliste ist fest im Code (unabhängig von ICU). Der Import erkennt Code, deutschen und englischen Namen. Entscheidung 9 wird insoweit revidiert: Adressen werden übernommen.
+15. **Organisationsimport:** derselbe Assistent mit Zieltyp „Organisationen“ und einer HubSpot-Firmenvorlage. Dubletten per `HubSpotRecordId` (in `ExtraFields`), sonst per Name (case-insensitive). Typ-Mapping: `Prospect` → Endkunde, `Partner` → Partner, `Reseller` → Vermittler, alles andere → Sonstige.
+16. **Verknüpfung:** Der Kontakt-Import verknüpft über die HubSpot-Firmen-ID aus der Zuordnungsspalte des Kontaktexports, ohne Treffer über den Firmennamen. Reihenfolge: erst Organisationen, dann Kontakte; bereits importierte Kontakte lassen sich per „aktualisieren“ nachträglich verknüpfen.
+17. **Einplanung:** Die Erweiterung gehört zu Iteration 5 und geht mit ihr in Produktion.
+
 ## Definition of Done
 - CI grün (Build + alle Tests); keine Warnings
 - Ein Stage-Wechsel erreicht einen n8n-Webhook signiert und wird dort erfolgreich geprüft; Fehler werden mit Backoff wiederholt und protokolliert
 - Kontakte lassen sich per REST-API mit API-Key anlegen, lesen und ändern; ohne gültigen Key gibt es 401, über 60 Requests/Minute 429
 - OpenAPI-Dokument und Scalar-UI sind erreichbar
 - Ein echter HubSpot-Export lässt sich mit Vorschau, Mapping und Dublettenprüfung importieren; der Bericht nennt Zeile und Grund jedes Fehlers
+- Kontakte und Organisationen haben eine vollständige Anschrift; HubSpot-Firmen und -Kontakte lassen sich nacheinander importieren und sind danach verknüpft
 - Keine Secrets oder personenbezogenen Daten in Logs; API-Keys nur gehasht, Webhook-Secrets verschlüsselt gespeichert
 - In Produktion deployt, Migration ohne Datenverlust

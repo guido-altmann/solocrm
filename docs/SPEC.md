@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** Entwurf v0.15 · **Stand:** 2026-10-01 · **Owner:** Guido Altmann
+> **Status:** Entwurf v0.16 · **Stand:** 2026-10-01 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, konkrete Iterationsaufträge in `docs/iterations/`.
 
@@ -82,7 +82,7 @@ erDiagram
 | Name | string(200) | ✅ | |
 | Type | enum `OrganizationType` | ✅ | `Client`, `Agency`, `Partner`, `Other`; Default: `Other` |
 | Website | string(500) | | URL-Validierung |
-| City | string(100) | | |
+| Address | Value Object `Address`? | | Anschrift, siehe unten; `Address.City` ersetzt das frühere Feld `City` (Spalte `city`) |
 | Notes | text | | Freitext-Stammnotiz (Verlauf läuft über Activities) |
 
 #### Contact
@@ -96,6 +96,17 @@ erDiagram
 | LinkedInUrl | string(500) | | |
 | OrganizationId | Guid? | | Kontakt ohne Organisation erlaubt |
 | Source | enum `LeadSource` | | `LinkedIn`, `ProjectPortal`, `Referral`, `Website`, `Event`, `Other` |
+| Address | Value Object `Address`? | | Anschrift, siehe unten |
+
+**Value Object `Address`** (EF Core Complex Type wie `Pricing`, ADR-011; `null`, wenn alle Felder leer sind)
+| Feld | Typ | Hinweis |
+|---|---|---|
+| Street | string(200)? | Straße inkl. Hausnummer |
+| Street2 | string(200)? | Adresszusatz (c/o, Gebäude, Postfach) |
+| PostalCode | string(20)? | ohne Formatprüfung (international) |
+| City | string(100)? | |
+| Region | string(100)? | Bundesland, Kanton, State |
+| CountryCode | string(2)? | ISO 3166-1 Alpha-2 (`DE`, `AT`, `CH` …); Anzeige und Auswahl mit deutschem Namen aus fester Liste |
 
 #### Opportunity (Projektanfrage / Angebot)
 | Feld | Typ | Pflicht | Hinweis |
@@ -354,6 +365,7 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 - AK2: Dubletten werden per E-Mail erkannt (Optionen: überspringen / aktualisieren).
 - AK3: Ein Ergebnisbericht zeigt angelegt, aktualisiert, übersprungen und fehlerhaft (mit Zeile und Grund).
 - AK4: Eine Mapping-Vorlage für den HubSpot-Kontaktexport ist enthalten.
+- AK5: Organisationen lassen sich ebenso importieren (Vorlage für den HubSpot-Firmenexport); beim anschließenden Kontakt-Import werden Kontakte über die HubSpot-Firmen-ID mit ihren Organisationen verknüpft.
 
 **US-17 · REST-API mit API-Key** · It. 5
 - AK1: Der Key wird in den Einstellungen erzeugt und nur einmal im Klartext angezeigt; gespeichert wird der Hash.
@@ -648,6 +660,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.8 | 2026-09-29 | Abschluss It. 2: mindestens eine offene Stage bleibt erhalten; Ziel-Stage beim Löschen mit gleichem Status (2.3); Umsetzungsentscheidungen in `docs/iterations/02-kerndomaene.md` |
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
+| 0.16 | 2026-10-01 | Erweiterung It. 5: Anschrift (`Address`) für Kontakte und Organisationen (2.3), Organisationsimport mit HubSpot-Vorlage und Verknüpfung per HubSpot-Firmen-ID (US-16) |
 | 0.15 | 2026-10-01 | Umsetzung It. 5: REST-API final (5: Listenparameter, Statuscodes, `organizationName`, Tasks per `PATCH` erledigen); Webhook-Header `X-SoloCrm-Event` und `webhook.ping`; `WebhookDelivery` mit `EventId`/`EventType` statt FK, `ProtectedSecret`, Key-Format `scrm_<prefix>_<secret>` (2.4); Outbox mit Lease (7.4) |
 | 0.14 | 2026-10-01 | Backlog: Nextcloud-Synchronisation (Einweg für Kontakte und Tasks, Rückkanal für erledigte Tasks); ICS-Export als Vorstufe |
 | 0.13 | 2026-09-30 | Planung It. 5: Outbox per eigenem `BackgroundService` (ADR-008); schlanke Webhook-Payloads, Zeitstempel in der Signatur, Aufbewahrung 30 Tage (5, 7.4); PATCH als JSON Merge Patch; OpenAPI/Scalar nur angemeldet; Umsetzungsentscheidungen in `docs/iterations/05-integration.md` |
