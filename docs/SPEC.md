@@ -203,7 +203,7 @@ n:m-Beziehungen zu Contact, Organization und Opportunity über drei typisierte J
 | **WebhookSubscription** | Ziel-URLs für Events | Name, Url, Events (text[]), ProtectedSecret (per Data Protection verschlüsselt), IsActive |
 | **WebhookDelivery** | Versandprotokoll (30 Tage) | SubscriptionId, EventId (= Outbox-Id bzw. Id des Test-Pings, kein FK), EventType, Attempt, StatusCode?, DurationMs, Error?, AttemptedAt, Succeeded |
 | **AppSetting** | Anwenderseitige Einstellungen (Key/Value, typisiert gelesen über `IAppSettings`) | Key, Value (jsonb), UpdatedAt – z. B. `HoursPerDay`, `RetainerValuationMonths`, `DefaultPricingModel`, `DefaultCurrency`, `StaleOpportunityDays` |
-| **ApiKey** | Zugriff auf die REST-API | Name, Prefix (erste 8 Zeichen), KeyHash (SHA-256), CreatedAt, LastUsedAt?, RevokedAt? |
+| **ApiKey** | Zugriff auf die REST-API | Name, Prefix (8 zufällige Zeichen, Key-Format `scrm_<prefix>_<64 hex>`), KeyHash (SHA-256), CreatedAt, LastUsedAt? (höchstens minütlich aktualisiert), RevokedAt? |
 
 ### 2.5 Timeline-Regeln
 Die Timeline eines Objekts ist ein chronologischer Strom, absteigend sortiert, aus:

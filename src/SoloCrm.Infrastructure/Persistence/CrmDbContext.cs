@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Domain.Activities;
+using SoloCrm.Domain.ApiKeys;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
@@ -44,6 +45,8 @@ public class CrmDbContext(DbContextOptions options)
     public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
 
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
+
+    public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

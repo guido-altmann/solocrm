@@ -1,0 +1,158 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.ApiKeys
+@using SoloCrm.Domain.ApiKeys
+@inject IQueryHandler<GetApiKeys.Query, GetApiKeys.Result> GetApiKeysHandler
+@inject ICommandHandler<CreateApiKey.Command, CreateApiKey.Result> CreateHandler
+@inject ICommandHandler<RevokeApiKey.Command, RevokeApiKey.Result> RevokeHandler
+@inject AppClock Clock
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* API keys (US-17 AK1, SPEC 3.3 S6): create (shown once), list with prefix and last use, revoke. *@
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="api-keys">
+    <MudText Typo="Typo.h6">API-Keys</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Zugriff auf die REST-API unter <code>/api/v1</code> mit dem Header <code>X-Api-Key</code> (höchstens 60 Anfragen pro Minute).
+        Die Beschreibung der Endpunkte steht in der <MudLink Href="/scalar/v1" Target="_blank">API-Referenz</MudLink>.
+    </MudText>
+
+    @if (_keys is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        @if (_keys.Count == 0)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">Noch keine API-Keys vorhanden.</MudText>
+        }
+        else
+        {
+            <MudSimpleTable Dense="true" Elevation="0" Class="api-key-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Key</th>
+                        <th>Angelegt</th>
+                        <th>Zuletzt genutzt</th>
+                        <th><span class="visually-hidden">Aktionen</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var key in _keys)
+                    {
+                        <tr class="@(key.IsRevoked ? "api-key-revoked" : null)">
+                            <td>@key.Name</td>
+                            <td class="font-monospace">@key.Display</td>
+                            <td>@Formats.Date(Clock.ToLocal(key.CreatedAt))</td>
+                            <td>@(key.LastUsedAt is { } used ? Formats.DateTime(Clock.ToLocal(used)) : "nie")</td>
+                            <td style="text-align: right;">
+                                @if (key.RevokedAt is { } revoked)
+                                {
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                                        @($"widerrufen am {Formats.Date(Clock.ToLocal(revoked))}")
+                                    </MudText>
+                                }
+                                else
+                                {
+                                    <MudButton Size="Size.Small" Color="Color.Error" Variant="Variant.Text" Disabled="_busy"
+                                               aria-label="@($"API-Key {key.Name} widerrufen")" OnClick="() => RevokeAsync(key)">
+                                        Widerrufen
+                                    </MudButton>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </MudSimpleTable>
+        }
+
+        <form @onsubmit="CreateAsync">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2" Class="mt-4">
+                <MudTextField @bind-Value="_newName" Label="Neuer API-Key" Placeholder="Name, z. B. n8n" Margin="Margin.Dense"
+                              MaxLength="@ApiKey.NameMaxLength" Immediate="true" Class="flex-grow-1"
+                              Error="@(_newNameError is not null)" ErrorText="@_newNameError" />
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add" Disabled="_busy">
+                    Erzeugen
+                </MudButton>
+            </MudStack>
+        </form>
+    }
+</MudPaper>
+
+@code {
+    private List<GetApiKeys.Item>? _keys;
+    private string? _newName;
+    private string? _newNameError;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await GetApiKeysHandler.Handle(new GetApiKeys.Query(), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        _keys = [.. result.Value.Items];
+    }
+
+    private async Task CreateAsync()
+    {
+        _busy = true;
+        _newNameError = null;
+        try
+        {
+            var result = await CreateHandler.Handle(new CreateApiKey.Command(_newName), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                _newNameError = result.Error is ValidationError validation
+                    ? string.Join(" ", validation.Errors.Values.SelectMany(m => m))
+                    : result.Error.Message;
+                return;
+            }
+
+            _newName = null;
+            await LoadAsync();
+            var parameters = new DialogParameters<SecretDialog>
+            {
+                { d => d.Secret, result.Value.Key },
+                { d => d.Label, "API-Key" },
+                { d => d.Hint, "Im aufrufenden System (z. B. n8n) als Header X-Api-Key hinterlegen." },
+            };
+            var dialog = await DialogService.ShowAsync<SecretDialog>("Neuer API-Key", parameters, DialogDefaults.Small);
+            await dialog.Result;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RevokeAsync(GetApiKeys.Item key)
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "API-Key widerrufen", $"Den API-Key „{key.Name}“ wirklich widerrufen? Aufrufe mit diesem Key schlagen sofort fehl.",
+            yesText: "Widerrufen", cancelText: "Abbrechen", options: DialogDefaults.ExtraSmall);
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await RevokeHandler.Handle(new RevokeApiKey.Command(key.Id), CancellationToken.None);
+            Snackbar.Add(result.IsSuccess ? "API-Key widerrufen." : result.Error.Message, result.IsSuccess ? Severity.Success : Severity.Error);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

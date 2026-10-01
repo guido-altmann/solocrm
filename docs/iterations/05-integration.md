@@ -45,11 +45,11 @@
 - [x] Aufräumen nach 30 Tagen: Protokoll und verarbeitete Outbox-Nachrichten (Entscheidung 8)
 
 ## Schritt 4 – API-Keys (US-17 AK1)
-- [ ] Entität `ApiKey` (Name, Prefix, KeyHash SHA-256, CreatedAt, LastUsedAt, RevokedAt) (SPEC 2.4)
-- [ ] Key-Format z. B. `scrm_<prefix>_<secret>`; Klartext nur einmal bei der Erzeugung, gespeichert wird der Hash
-- [ ] Use Cases `CreateApiKey`, `RevokeApiKey`, `GetApiKeys`
-- [ ] Abschnitt „API-Keys“ in `/settings` (Liste mit Prefix, zuletzt genutzt, Widerrufen)
-- [ ] Migration (additiv)
+- [x] Entität `ApiKey` (Name, Prefix, KeyHash SHA-256, CreatedAt, LastUsedAt, RevokedAt) (SPEC 2.4)
+- [x] Key-Format `scrm_<prefix>_<secret>` (8 Zeichen Prefix, 32 Byte hex); Klartext nur einmal bei der Erzeugung, gespeichert wird der Hash
+- [x] Use Cases `CreateApiKey`, `RevokeApiKey`, `GetApiKeys`
+- [x] Abschnitt „API-Keys“ in `/settings` (Liste mit Prefix, zuletzt genutzt, Widerrufen)
+- [x] Migration (additiv)
 
 ## Schritt 5 – REST-API (US-17, SPEC 5)
 - [ ] Authentication-Handler für `X-Api-Key` (eigenes Schema, getrennt vom Cookie-Login); Vergleich in konstanter Zeit, `LastUsedAt` gedrosselt aktualisieren

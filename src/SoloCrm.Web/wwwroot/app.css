@@ -350,3 +350,16 @@ kbd {
 .secret-value input {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+
+.api-key-revoked td {
+    color: var(--mud-palette-text-secondary);
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}

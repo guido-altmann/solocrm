@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Domain.Activities;
+using SoloCrm.Domain.ApiKeys;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Opportunities;
@@ -42,6 +43,8 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
 
     /// <summary>Read by the delivery log; entries are written by the outbox processor and the ping.</summary>
     DbSet<WebhookDelivery> WebhookDeliveries { get; }
+
+    DbSet<ApiKey> ApiKeys { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
