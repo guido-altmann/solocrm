@@ -80,12 +80,12 @@
 - [x] API-Tests mit `WebApplicationFactory`: ohne/mit falschem/widerrufenem Key, Rate-Limit, Problem Details, CRUD und Stage-Wechsel per `PATCH`, OpenAPI-Dokument abrufbar
 - [x] Import: Vorschau, Mapping, Dubletten (überspringen/aktualisieren), Bericht mit Zeilennummern, HubSpot-Vorlage
 - [x] bUnit: Secret/Key einmalig anzeigen, Import-Assistent
-- [ ] Ende-zu-Ende mit n8n (manuell): Webhook empfangen und Signatur prüfen, Kontakt per API anlegen
+- [x] Ende-zu-Ende mit n8n (manuell): Webhook empfangen und Signatur prüfen, Kontakt per API anlegen
 - [x] Browser-Smoke-Test (Playwright, Wegwerf-DB) mit lokalem Empfänger, der die Signatur wie im n8n-Beispiel prüft: API-Key und Secret nur einmal sichtbar, Ping, `contact.created` und `opportunity.stage_changed` signiert zugestellt, Versandprotokoll, HubSpot-Import mit Bericht; Logs ohne Keys, Secrets und E-Mails; Scalar ohne externe Anfragen
 - [x] Zeitbudget-Tests laufen in einer eigenen, nicht parallelen Collection (sonst misst der Test die Last der übrigen Testcontainer)
 
 ## Schritt 9 – Abschluss
-- [ ] Migrationen erzeugt (`AddWebhooks`, `AddApiKeys`, beide additiv) und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009) – Rollout steht aus
+- [x] Migrationen erzeugt (`AddWebhooks`, `AddApiKeys`, `AddAddresses`, alle additiv) und per `efbundle` in Produktion ausgerollt (abwärtskompatibel, siehe ADR-009)
 - [x] ADR-008 und ADR-010 mit den Erfahrungen ergänzen; API-Authentifizierung als Umsetzungsabschnitt in ADR-004 statt eines neuen ADR (die Entscheidung selbst stand dort schon)
 - [x] `deploy/coolify.md`: neue Konfiguration, Hinweis auf das Volume `/app/keys` (Webhook-Secrets)
 - [x] README-Stand, Beispiel-Workflow für n8n (Signaturprüfung, `docs/n8n-integration.md`) und Screenshot
@@ -109,10 +109,10 @@
 
 ## Schritt 12 – Verknüpfung Kontakt ↔ Organisation (Entscheidung 16)
 - [x] Zielfeld „HubSpot-Firmen-ID“ im Kontakt-Import: verknüpft mit der Organisation gleicher `HubSpotRecordId`, sonst per Firmenname wie bisher; bei mehreren IDs (`;`-getrennt) zählt die erste; eine unbekannte ID ohne Namen verknüpft nichts
-- [ ] Spaltenname der Zuordnung im echten Kontaktexport bestätigen (steht aus; die Vorlage sucht nacheinander `Associated Company IDs (Primary)`, `Primary Associated Company ID`, `Associated Company IDs`, `Associated Company ID`)
+- [x] Spaltenname der Zuordnung im echten Kontaktexport bestätigt (die Vorlage sucht nacheinander `Associated Company IDs (Primary)`, `Primary Associated Company ID`, `Associated Company IDs`, `Associated Company ID`)
 - [x] Tests: Firmen → Kontakte importieren, Verknüpfung per ID vor Name, nachträgliche Verknüpfung per „aktualisieren“, bestehende Verknüpfung bleibt ohne Firmenangabe erhalten; Browser-Smoke-Test des Ablaufs
 - [x] SPEC und README nachziehen
-- [ ] Ende-zu-Ende mit echtem HubSpot-Export (Firmen und Kontakte)
+- [x] Ende-zu-Ende mit echtem HubSpot-Export (Firmen und Kontakte)
 
 ## Entscheidungen (2026-09-30)
 1. **Hintergrundprozess:** eigener `BackgroundService` mit `PeriodicTimer` für die Outbox (ADR-008 Option B); Retry und Backoff über `Attempts`/`NextAttemptAt` der Outbox. Hangfire erst, wenn weitere Jobarten hinzukommen.
