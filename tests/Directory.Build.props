@@ -12,6 +12,8 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="AwesomeAssertions" />
+    <!-- Coverage of Domain and Application (NFR at least 80 %, iteration 6 decision 9), see README "Tests". -->
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
   </ItemGroup>
 
   <ItemGroup>

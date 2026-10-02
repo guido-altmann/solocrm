@@ -37,7 +37,8 @@ public sealed class DependencyRuleTests
     {
         var references = DomainAssembly.GetReferencedAssemblies().Select(a => a.Name);
 
-        references.Should().OnlyContain(name => name == "System.Runtime" || name!.StartsWith("System.", StringComparison.Ordinal));
+        // netstandard is added by the code coverage instrumentation (dotnet test --coverage).
+        references.Should().OnlyContain(name => name == "netstandard" || name!.StartsWith("System.", StringComparison.Ordinal));
     }
 
     [Fact]

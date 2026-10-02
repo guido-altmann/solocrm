@@ -36,5 +36,25 @@ jobs:
         run: dotnet build --no-restore -c Release
 
       # Includes integration tests: Testcontainers uses the Docker daemon of the hosted runner.
+      # Coverage of Domain and Application is measured and reported, not enforced (iteration 6 decision 9).
       - name: Test
-        run: dotnet test --no-build -c Release
+        run: >-
+          dotnet test --no-build -c Release
+          --coverage --coverage-output-format cobertura --coverage-settings tests/coverage.config
+          --results-directory TestResults
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          if ls TestResults/*.cobertura.xml > /dev/null 2>&1; then
+            python3 tests/coverage-summary.py TestResults/*.cobertura.xml | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage
+          path: TestResults/*.cobertura.xml
+          if-no-files-found: ignore
+          retention-days: 30

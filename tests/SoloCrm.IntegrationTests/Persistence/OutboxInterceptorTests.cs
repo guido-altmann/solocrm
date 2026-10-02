@@ -37,7 +37,10 @@ public sealed class OutboxInterceptorTests : IClassFixture<PostgresFixture>, IAs
         await using var verify = _database.CreateContext();
         var messages = await verify.OutboxMessages.OrderBy(m => m.Id).ToListAsync(ct);
         messages.Select(m => m.Type).Should().Equal("probe.renamed", "probe.renamed");
-        messages[0].Payload.Should().Be($$"""{"name": "first", "probeId": "{{probe.Id}}"}""");
+        // UUIDv7 ids created within the same millisecond are not ordered, so the order is not asserted.
+        messages.Select(m => m.Payload).Should().BeEquivalentTo(
+            $$"""{"name": "first", "probeId": "{{probe.Id}}"}""",
+            $$"""{"name": "second", "probeId": "{{probe.Id}}"}""");
         messages.Should().AllSatisfy(m =>
         {
             m.OccurredAt.Should().Be(Now);
