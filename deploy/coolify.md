@@ -179,7 +179,64 @@ Datum und Ergebnis des Restore-Tests in ADR-009 festhalten.
 
 **Echter Restore (Notfall):** App-Ressource stoppen, `solocrm` droppen und neu anlegen, `pg_restore` wie oben in `solocrm` ausführen, App starten. `efbundle` spielt beim Start nur noch fehlende Migrationen ein.
 
+## 8. Sicherung von `/app/keys` (Data-Protection-Keys)
+
+Das Volume `solocrm-keys` enthält den Schlüsselring von ASP.NET Core Data Protection. Damit werden Login-Cookies und Antiforgery-Tokens signiert und die **Webhook-Secrets** verschlüsselt. Die Postgres-Backups enthalten es nicht (ADR-009). Ohne Sicherung bedeutet ein verlorenes Volume: alle Sitzungen ungültig (harmlos, neu anmelden) und alle Webhook-Secrets unlesbar (in den Einstellungen neu erzeugen und in n8n eintragen).
+
+Die Schlüsseldateien (`key-<guid>.xml`) liegen im Container **unverschlüsselt** auf der Platte. Eine Kopie ist so schützenswert wie ein Passwort: nur verschlüsselt und nicht im selben Bucket wie die Datenbank-Backups ablegen.
+
+**Wann sichern?** Nach dem ersten Start und danach monatlich. Data Protection erzeugt etwa alle 90 Tage einen neuen Schlüssel; ältere bleiben zum Entschlüsseln erhalten, eine monatliche Sicherung erfasst also jeden neuen Schlüssel rechtzeitig.
+
+### Sichern (Server-Shell)
+
+```bash
+# Name des Volumes ermitteln (Coolify stellt die Ressourcen-UUID voran)
+docker volume ls | grep solocrm-keys
+VOLUME=<name-aus-der-liste>
+
+# Archiv erzeugen und mit einer Passphrase verschlüsseln
+docker run --rm -v "$VOLUME":/keys:ro -v /root:/backup alpine \
+  tar czf /backup/solocrm-keys.tar.gz -C /keys .
+openssl enc -aes-256-cbc -pbkdf2 -salt -in /root/solocrm-keys.tar.gz -out /root/solocrm-keys-$(date +%F).tar.gz.enc
+rm /root/solocrm-keys.tar.gz
+```
+
+Die `.enc`-Datei auf den lokalen Rechner holen (`scp user@server:/root/solocrm-keys-*.tar.gz.enc .`), z. B. im Passwortmanager neben der Passphrase ablegen und auf dem Server löschen.
+
+### Wiederherstellen (Server-Shell)
+
+1. App-Ressource in Coolify **stoppen**.
+2. Archiv entschlüsseln und in das (leere oder neu angelegte) Volume entpacken; die Rechte müssen dem Benutzer `app` (UID 1654) gehören:
+
+   ```bash
+   openssl enc -d -aes-256-cbc -pbkdf2 -in /root/solocrm-keys-<datum>.tar.gz.enc -out /root/solocrm-keys.tar.gz
+   docker run --rm -v "$VOLUME":/keys -v /root:/backup alpine \
+     sh -c 'tar xzf /backup/solocrm-keys.tar.gz -C /keys && chown -R 1654:1654 /keys'
+   rm /root/solocrm-keys.tar.gz
+   ```
+
+3. App **starten**.
+4. Prüfen: Eine vor dem Verlust angemeldete Browser-Sitzung ist weiterhin angemeldet (kein erneuter Login), und *Einstellungen → Webhooks → Test senden* ist erfolgreich (das Secret ist lesbar).
+
+**Getestet** (Iteration 6, lokal mit dem Produktions-Image): Webhook angelegt, Volume gesichert, gelöscht und aus dem Archiv wiederhergestellt; danach blieb die Sitzung erhalten und der Test-Ping wurde mit HTTP 200 zugestellt. Gegenprobe mit leerem Volume: Sitzung verloren. Der Test auf dem Server steht in der Checkliste unten.
+
+## 9. Verifikation nach Iteration 6 (DSGVO & 2FA)
+
+- [ ] *Konto → Zwei-Faktor → Authenticator-App einrichten*: QR-Code mit der App scannen, Code bestätigen, die Wiederherstellungscodes sicher ablegen
+- [ ] Abmelden, Login mit Passwort und Authenticator-Code funktioniert
+- [ ] Abmelden, Login mit einem Wiederherstellungscode funktioniert (der Code ist danach verbraucht; bei Bedarf neue Codes erzeugen)
+- [ ] Optional: Passkey hinzufügen und damit anmelden
+- [ ] Test-Kontakt anlegen, *Daten exportieren (DSGVO)* lädt eine JSON-Datei, *Endgültig löschen (DSGVO)* entfernt ihn; ein Webhook mit `contact.deleted` erhält nur die Id
+- [ ] Sicherung von `/app/keys` wie in Abschnitt 8 angelegt und einmal wiederhergestellt (Sitzung bleibt, Webhook-Test erfolgreich)
+
 ## Fehlersuche
+
+**Nach der Anmeldung wird kein Code abgefragt, obwohl 2FA eingerichtet ist**
+- Bei der letzten Anmeldung war „Diesem Browser vertrauen“ aktiv. Unter *Konto → Zwei-Faktor → Diesen Browser vergessen* zurücksetzen.
+
+**Authenticator-Code wird immer abgelehnt**
+- Die Uhrzeit auf Smartphone und Server muss stimmen (TOTP verträgt nur wenige Sekunden Abweichung über das 30-s-Fenster hinaus). Auf dem Server `date -u` prüfen.
+- Kein Zugriff mehr auf App und Wiederherstellungscodes: Im Postgres-Terminal `psql -U solocrm -d solocrm -c 'update "AspNetUsers" set two_factor_enabled = false;'` deaktiviert 2FA; danach in der App neu einrichten.
 
 **Login meldet „Invalid login attempt“, obwohl der Admin laut Log angelegt wurde**
 - Meist wurde das Passwort beim Weiterreichen verändert (siehe *Sonderzeichen in Werten*). Im Terminal des App-Containers `printenv Admin__InitialPassword` ausführen und genau diesen Wert zum Login verwenden, danach das Passwort in der App ändern.

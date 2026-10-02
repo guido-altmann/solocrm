@@ -10,7 +10,7 @@
 @inject AppClock Clock
 
 @* GDPR access (US-19) and erasure (US-20), kept apart from archiving, which is the normal case (SPEC 2.2). *@
-<MudMenu Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Weitere Aktionen" AnchorOrigin="Origin.BottomRight"
+<MudMenu @ref="_menu" Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Weitere Aktionen" AnchorOrigin="Origin.BottomRight"
          TransformOrigin="Origin.TopRight" data-testid="contact-actions">
     <MudMenuItem Icon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="contact-export">
         Daten exportieren (DSGVO)
@@ -29,6 +29,7 @@
     [Parameter, EditorRequired]
     public string Name { get; set; } = "";
 
+    private MudMenu? _menu;
     private IJSObjectReference? _download;
 
     /// <summary>Downloads the export straight from the circuit; nothing is stored on the server.</summary>
@@ -54,6 +55,12 @@
         {
             Snackbar.Add(erasure.Error.Message, Severity.Error);
             return;
+        }
+
+        // The menu would otherwise stay open behind the dialog until this handler completes.
+        if (_menu is not null)
+        {
+            await _menu.CloseMenuAsync();
         }
 
         var parameters = new DialogParameters<ContactErasureDialog> { { d => d.Erasure, erasure.Value } };
