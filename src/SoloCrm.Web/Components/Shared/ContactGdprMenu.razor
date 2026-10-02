@@ -1,0 +1,84 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Contacts
+@implements IAsyncDisposable
+@inject IQueryHandler<ExportContactData.Query, ExportContactData.Result> ExportHandler
+@inject IQueryHandler<GetContactErasure.Query, GetContactErasure.Result> GetErasureHandler
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject AppClock Clock
+
+@* GDPR access (US-19) and erasure (US-20), kept apart from archiving, which is the normal case (SPEC 2.2). *@
+<MudMenu Icon="@Icons.Material.Filled.MoreVert" AriaLabel="Weitere Aktionen" AnchorOrigin="Origin.BottomRight"
+         TransformOrigin="Origin.TopRight" data-testid="contact-actions">
+    <MudMenuItem Icon="@Icons.Material.Outlined.Download" OnClick="ExportAsync" data-testid="contact-export">
+        Daten exportieren (DSGVO)
+    </MudMenuItem>
+    <MudDivider />
+    <MudMenuItem Icon="@Icons.Material.Outlined.DeleteForever" IconColor="Color.Error" OnClick="EraseAsync" data-testid="contact-erase">
+        <MudText Color="Color.Error">Endgültig löschen (DSGVO)</MudText>
+    </MudMenuItem>
+</MudMenu>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid ContactId { get; set; }
+
+    /// <summary>Display name, used for the file name.</summary>
+    [Parameter, EditorRequired]
+    public string Name { get; set; } = "";
+
+    private IJSObjectReference? _download;
+
+    /// <summary>Downloads the export straight from the circuit; nothing is stored on the server.</summary>
+    private async Task ExportAsync()
+    {
+        var export = await ExportHandler.Handle(new ExportContactData.Query(ContactId), CancellationToken.None);
+        if (export.IsFailure)
+        {
+            Snackbar.Add(export.Error.Message, Severity.Error);
+            return;
+        }
+
+        _download ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/download.js");
+        await _download.InvokeVoidAsync(
+            "downloadText", FileNames.ContactExport(Name, Clock.Today), "application/json", ExportContactData.ToJson(export.Value));
+    }
+
+    /// <summary>Erasure after confirmation by name; then back to the contact list.</summary>
+    private async Task EraseAsync()
+    {
+        var erasure = await GetErasureHandler.Handle(new GetContactErasure.Query(ContactId), CancellationToken.None);
+        if (erasure.IsFailure)
+        {
+            Snackbar.Add(erasure.Error.Message, Severity.Error);
+            return;
+        }
+
+        var parameters = new DialogParameters<ContactErasureDialog> { { d => d.Erasure, erasure.Value } };
+        var dialog = await DialogService.ShowAsync<ContactErasureDialog>("Kontakt endgültig löschen", parameters, DialogDefaults.Small);
+        if (await dialog.Result is { Canceled: false })
+        {
+            Snackbar.Add("Kontakt endgültig gelöscht.", Severity.Success);
+            Navigation.NavigateTo("/contacts");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_download is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _download.DisposeAsync();
+        }
+        catch (JSDisconnectedException)
+        {
+            // The circuit is gone; the browser has released the module already.
+        }
+    }
+}

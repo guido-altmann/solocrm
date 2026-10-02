@@ -6,7 +6,7 @@ namespace SoloCrm.Domain.Contacts;
 /// <summary>
 /// A person the freelancer is in touch with (SPEC 2.3).
 /// </summary>
-public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
+public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields, IErasable
 {
     public const int FirstNameMaxLength = 100;
     public const int LastNameMaxLength = 100;
@@ -112,6 +112,11 @@ public sealed class Contact : ArchivableEntity, IAuditable, IHasExtraFields
     /// A new dictionary is assigned, so the change tracker sees the jsonb value as modified.
     /// </summary>
     public void SetExtraField(string key, string? value) => ExtraFields = ExtraFieldValues.With(ExtraFields, key, value);
+
+    /// <summary>
+    /// Records the GDPR erasure (US-20) before the contact is removed; contacts are deleted only this way.
+    /// </summary>
+    public void Erase() => AddDomainEvent(new ContactDeleted(Id));
 
     private static string? Normalize(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -103,4 +103,15 @@ public sealed class ContactTests
 
         contact.ExtraFields.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Erase_Always_RaisesContactDeletedWithIdOnly()
+    {
+        var contact = Contact.Create("Ada", "Lovelace", "ada@example.test");
+        contact.ClearDomainEvents();
+
+        contact.Erase();
+
+        contact.DomainEvents.Should().Equal(new ContactDeleted(contact.Id));
+    }
 }

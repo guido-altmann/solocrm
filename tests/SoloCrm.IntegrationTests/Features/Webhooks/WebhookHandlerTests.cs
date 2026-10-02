@@ -63,7 +63,7 @@ public sealed class WebhookHandlerTests(PostgresFixture postgres) : HandlerTest(
         var none = await SendAsync<CreateWebhook.Command, CreateWebhook.Result>(
             new CreateWebhook.Command("n8n", "https://n8n.example.test", []));
         var unknown = await SendAsync<CreateWebhook.Command, CreateWebhook.Result>(
-            new CreateWebhook.Command("n8n", "https://n8n.example.test", ["contact.deleted"]));
+            new CreateWebhook.Command("n8n", "https://n8n.example.test", ["contact.merged"]));
         var noName = await SendAsync<CreateWebhook.Command, CreateWebhook.Result>(
             new CreateWebhook.Command(" ", "https://n8n.example.test", StageChanged));
 

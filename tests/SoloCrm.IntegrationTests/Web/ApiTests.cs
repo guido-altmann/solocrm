@@ -197,6 +197,43 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
     }
 
     [Fact]
+    public async Task ExportContact_WithKey_ReturnsGdprDocument()
+    {
+        var client = CreateClient();
+        var created = await ReadAsync(await client.PostAsJsonAsync("/api/v1/contacts", new { firstName = "Ada", email = "ada@example.test" }, Ct));
+        var id = created.GetProperty("id").GetGuid();
+
+        var response = await client.GetAsync($"/api/v1/contacts/{id}/export", Ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        response.Content.Headers.ContentType!.MediaType.Should().Be("application/json");
+        var export = await ReadAsync(response);
+        export.GetProperty("formatVersion").GetInt32().Should().Be(1);
+        export.GetProperty("contact").GetProperty("email").GetString().Should().Be("ada@example.test");
+        export.GetProperty("auditEntries").GetArrayLength().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ExportContact_WithoutKeyOrUnknownId_ReturnsUnauthorizedOrNotFound()
+    {
+        var path = $"/api/v1/contacts/{Guid.NewGuid()}/export";
+
+        (await CreateClient(key: null).GetAsync(path, Ct)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await CreateClient().GetAsync(path, Ct)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task DeleteContact_ViaApi_IsNotOffered()
+    {
+        var client = CreateClient();
+        var created = await ReadAsync(await client.PostAsJsonAsync("/api/v1/contacts", new { firstName = "Ada" }, Ct));
+
+        var response = await client.DeleteAsync($"/api/v1/contacts/{created.GetProperty("id").GetGuid()}", Ct);
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.MethodNotAllowed, HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task GetContacts_SearchTagAndPaging_UsesSameSearchAsUi()
     {
         var client = CreateClient();
@@ -309,7 +346,7 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
 
         document.GetProperty("info").GetProperty("title").GetString().Should().Be("SoloCRM API");
         document.GetProperty("paths").EnumerateObject().Select(p => p.Name)
-            .Should().Contain(["/api/v1/contacts", "/api/v1/contacts/{id}", "/api/v1/opportunities/{id}", "/api/v1/stages"])
+            .Should().Contain(["/api/v1/contacts", "/api/v1/contacts/{id}", "/api/v1/contacts/{id}/export", "/api/v1/opportunities/{id}", "/api/v1/stages"])
             .And.NotContain(p => p.StartsWith("/Account", StringComparison.Ordinal));
         document.GetProperty("components").GetProperty("securitySchemes").GetProperty("ApiKey").GetProperty("name").GetString()
             .Should().Be("X-Api-Key");

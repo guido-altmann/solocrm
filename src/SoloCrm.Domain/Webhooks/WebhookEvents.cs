@@ -18,6 +18,7 @@ public static class WebhookEvents
     public static IReadOnlyList<string> All { get; } =
     [
         DomainEventNames.Of(typeof(ContactCreated)),
+        DomainEventNames.Of(typeof(ContactDeleted)),
         DomainEventNames.Of(typeof(OrganizationCreated)),
         DomainEventNames.Of(typeof(OpportunityCreated)),
         DomainEventNames.Of(typeof(OpportunityStageChanged)),

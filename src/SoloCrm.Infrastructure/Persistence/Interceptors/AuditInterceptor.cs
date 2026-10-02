@@ -15,6 +15,13 @@ namespace SoloCrm.Infrastructure.Persistence.Interceptors;
 /// Complex type members are diffed as individual fields (<c>Pricing.Amount</c>); generated columns are skipped.
 /// Adding or removing a tag (<see cref="ITagAssignment"/>) is recorded as <c>Updated</c> of the tagged record with the
 /// field <see cref="TagsField"/> and the tag name as new or old value.
+/// <para>
+/// Deleting an <see cref="IErasable"/> entity is a GDPR erasure (US-20): its <c>Deleted</c> entry has no field values,
+/// and so have the entries of auditable records deleted with it whose foreign key cascades from it (activities and
+/// tasks of a contact). All earlier entries of these records are anonymized in the same save, including those of
+/// records deleted before (found by the foreign key in their <c>Created</c>/<c>Deleted</c> entry). Entries of other
+/// records that only contain the id (e.g. <c>PrimaryContactId</c> of an opportunity) stay (iteration 6 decision 3).
+/// </para>
 /// </summary>
 public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInterceptor
 {
@@ -26,7 +33,20 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
         ArgumentNullException.ThrowIfNull(eventData);
-        AddAuditEntries(eventData.Context);
+        if (eventData.Context is { } context)
+        {
+            var erasure = Erasure.Collect(context);
+            AddAuditEntries(context, erasure);
+            if (!erasure.IsEmpty)
+            {
+                var ids = erasure.HistoryIds(context);
+                foreach (var entry in context.Set<AuditEntry>().Where(a => ids.Contains(a.EntityId)))
+                {
+                    entry.Anonymize();
+                }
+            }
+        }
+
         return base.SavingChanges(eventData, result);
     }
 
@@ -36,30 +56,46 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(eventData);
-        AddAuditEntries(eventData.Context);
-        return base.SavingChangesAsync(eventData, result, cancellationToken);
+        return SavingChangesCoreAsync(eventData, result, cancellationToken);
     }
 
-    private void AddAuditEntries(DbContext? context)
+    private async ValueTask<InterceptionResult<int>> SavingChangesCoreAsync(
+        DbContextEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken)
     {
-        if (context is null)
+        if (eventData.Context is { } context)
         {
-            return;
+            var erasure = Erasure.Collect(context);
+            AddAuditEntries(context, erasure);
+            if (!erasure.IsEmpty)
+            {
+                var ids = await erasure.HistoryIdsAsync(context, cancellationToken);
+                await foreach (var entry in context.Set<AuditEntry>().Where(a => ids.Contains(a.EntityId)).AsAsyncEnumerable().WithCancellation(cancellationToken))
+                {
+                    entry.Anonymize();
+                }
+            }
         }
 
+        return await base.SavingChangesAsync(eventData, result, cancellationToken);
+    }
+
+    private void AddAuditEntries(DbContext context, Erasure erasure)
+    {
         var now = timeProvider.GetUtcNow();
 
         // Materialize first: adding entries while enumerating the change tracker is not allowed.
         var auditEntries = context.ChangeTracker.Entries<IAuditable>()
-            .Select(entry => CreateAuditEntry(entry, now))
+            .Select(entry => CreateAuditEntry(entry, erasure, now))
             .OfType<AuditEntry>()
-            .Concat(CreateTagAuditEntries(context, now))
+            .Concat(CreateTagAuditEntries(context, erasure, now))
             .ToList();
 
         context.Set<AuditEntry>().AddRange(auditEntries);
     }
 
-    private static AuditEntry? CreateAuditEntry(EntityEntry<IAuditable> entry, DateTimeOffset now)
+    private static AuditEntry? CreateAuditEntry(EntityEntry<IAuditable> entry, Erasure erasure, DateTimeOffset now)
     {
         var entityType = entry.Metadata.ClrType.Name;
         var entityId = entry.Entity.Id;
@@ -91,6 +127,9 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
                     : AuditAction.Updated;
                 return new AuditEntry(entityType, entityId, action, changes, now);
 
+            case EntityState.Deleted when erasure.Contains(entityId):
+                return new AuditEntry(entityType, entityId, AuditAction.Deleted, [], now);
+
             case EntityState.Deleted:
                 var deleted = fields
                     .Select(f => new AuditChange(f.Name, Format(f.Original), null))
@@ -104,9 +143,9 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
     }
 
     /// <summary>One <c>Updated</c> entry per tagged record, listing all tags added or removed in this save.</summary>
-    private static IEnumerable<AuditEntry> CreateTagAuditEntries(DbContext context, DateTimeOffset now) =>
+    private static IEnumerable<AuditEntry> CreateTagAuditEntries(DbContext context, Erasure erasure, DateTimeOffset now) =>
         context.ChangeTracker.Entries<ITagAssignment>()
-            .Where(e => e.State is EntityState.Added or EntityState.Deleted)
+            .Where(e => (e.State is EntityState.Added or EntityState.Deleted) && !erasure.Contains(e.Entity.RecordId))
             .GroupBy(e => (e.Entity.RecordType, e.Entity.RecordId))
             .Select(record => new AuditEntry(
                 record.Key.RecordType,
@@ -190,4 +229,81 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
     };
 
     private readonly record struct Field(string Name, object? Original, object? Current);
+
+    /// <summary>The records erased in one save: deleted <see cref="IErasable"/> entities and their cascading dependents.</summary>
+    private sealed class Erasure
+    {
+        private readonly HashSet<Guid> _ids;
+        private readonly List<(string EntityType, string ForeignKey, Guid PrincipalId)> _dependents;
+
+        private Erasure(HashSet<Guid> ids, List<(string, string, Guid)> dependents)
+        {
+            _ids = ids;
+            _dependents = dependents;
+        }
+
+        public bool IsEmpty => _ids.Count == 0;
+
+        public bool Contains(Guid id) => _ids.Contains(id);
+
+        public static Erasure Collect(DbContext context)
+        {
+            var erased = context.ChangeTracker.Entries<IErasable>()
+                .Where(e => e.State == EntityState.Deleted)
+                .ToList();
+            if (erased.Count == 0)
+            {
+                return new Erasure([], []);
+            }
+
+            var ids = erased.Select(e => e.Entity.Id).ToHashSet();
+
+            // Auditable records that the database deletes with an erased entity (cascading foreign key).
+            var cascades = erased
+                .Select(e => e.Metadata)
+                .Distinct()
+                .SelectMany(t => t.GetReferencingForeignKeys())
+                .Where(fk => fk.DeleteBehavior == DeleteBehavior.Cascade
+                    && typeof(IAuditable).IsAssignableFrom(fk.DeclaringEntityType.ClrType)
+                    && fk.Properties.Count == 1)
+                .ToList();
+
+            var dependents = (
+                from fk in cascades
+                from e in erased
+                where fk.PrincipalEntityType.IsAssignableFrom(e.Metadata)
+                select (fk.DeclaringEntityType.ClrType.Name, fk.Properties[0].Name, e.Entity.Id)).ToList();
+
+            foreach (var entry in context.ChangeTracker.Entries<IAuditable>().Where(e => e.State == EntityState.Deleted))
+            {
+                var linked = cascades
+                    .Where(fk => fk.DeclaringEntityType.IsAssignableFrom(entry.Metadata))
+                    .Any(fk => entry.Property(fk.Properties[0].Name).OriginalValue is Guid id && ids.Contains(id));
+                if (linked)
+                {
+                    ids.Add(entry.Entity.Id);
+                }
+            }
+
+            return new Erasure(ids, dependents);
+        }
+
+        /// <summary>Erased records plus earlier deleted dependents, found by the foreign key in their audit entries.</summary>
+        public List<Guid> HistoryIds(DbContext context) =>
+            [.. _ids, .. _dependents.SelectMany(d => DependentQuery(context, d).ToList())];
+
+        public async Task<List<Guid>> HistoryIdsAsync(DbContext context, CancellationToken cancellationToken)
+        {
+            var result = new List<Guid>(_ids);
+            foreach (var dependent in _dependents)
+            {
+                result.AddRange(await DependentQuery(context, dependent).ToListAsync(cancellationToken));
+            }
+
+            return result;
+        }
+
+        private static IQueryable<Guid> DependentQuery(DbContext context, (string EntityType, string ForeignKey, Guid PrincipalId) dependent) =>
+            AuditHistory.LinkedRecordIds(context, dependent.EntityType, dependent.ForeignKey, dependent.PrincipalId);
+    }
 }

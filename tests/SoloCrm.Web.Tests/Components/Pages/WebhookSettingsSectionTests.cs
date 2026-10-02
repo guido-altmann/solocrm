@@ -5,6 +5,7 @@ using MudBlazor.Services;
 using NSubstitute;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.Webhooks;
+using SoloCrm.Domain.Webhooks;
 using SoloCrm.Web.Components.Pages.Settings;
 
 namespace SoloCrm.Web.Tests.Components.Pages;
@@ -54,7 +55,7 @@ public sealed class WebhookSettingsSectionTests : BunitContext
         dialogs.WaitForAssertion(() => dialogs.FindAll("input").Should().NotBeEmpty());
         dialogs.FindAll("input")[0].Input("n8n");
         dialogs.FindAll("input")[1].Input("https://n8n.example.test/webhook/abc");
-        dialogs.FindAll("input[type=checkbox]")[3].Change(true);
+        dialogs.FindAll("input[type=checkbox]")[WebhookEvents.All.ToList().IndexOf("opportunity.stage_changed")].Change(true);
         _get.Handle(Arg.Any<GetWebhooks.Query>(), Arg.Any<CancellationToken>())
             .Returns(Result<GetWebhooks.Result>.Success(new GetWebhooks.Result(
                 [new GetWebhooks.Item(id, "n8n", "https://n8n.example.test/webhook/abc", ["opportunity.stage_changed"], true, Created, null, null)])));

@@ -113,6 +113,12 @@ public static class ContactErrors
     public static Error OrganizationNotFound { get; } =
         Error.NotFound("Contact.OrganizationNotFound", "Die gewählte Organisation existiert nicht.");
 
+    /// <summary>The typed name does not match the contact (GDPR erasure, US-20).</summary>
+    public static Error ErasureNotConfirmed { get; } = new ValidationError(new Dictionary<string, string[]>
+    {
+        [nameof(DeleteContactPermanently.Command.Confirmation)] = ["Der eingegebene Name stimmt nicht mit dem Kontakt überein."],
+    });
+
     /// <summary>The form field a business error belongs to, or <c>null</c>.</summary>
     public static string? FieldOf(Error error) =>
         error == DuplicateEmail ? nameof(IContactFields.Email)

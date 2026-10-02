@@ -1,0 +1,101 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Contacts
+@inject ICommandHandler<DeleteContactPermanently.Command, DeleteContactPermanently.Result> DeleteHandler
+
+@* GDPR erasure (US-20): names the consequences and asks for the name like GitHub (iteration 6 decision 6). *@
+<MudDialog>
+    <DialogContent>
+        <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">
+            Der Kontakt wird endgültig gelöscht und kann nicht wiederhergestellt werden.
+        </MudAlert>
+        <MudText Class="mb-2">Gelöscht werden:</MudText>
+        <ul class="mb-3 ml-6" data-testid="erasure-consequences">
+            <li>der Kontakt „@Erasure.Name“ mit allen Stammdaten und Tag-Zuordnungen</li>
+            <li>@Count(Erasure.ActivityCount, "Aktivität", "Aktivitäten") und @Count(Erasure.TaskCount, "Aufgabe", "Aufgaben") mit Bezug zum Kontakt</li>
+            <li>die Feldwerte im Änderungsprotokoll; nur ein Eintrag „gelöscht“ bleibt als Nachweis</li>
+        </ul>
+        @if (Erasure.Opportunities.Count > 0)
+        {
+            <MudText Class="mb-1">
+                @(Erasure.Opportunities.Count == 1 ? "Diese Anfrage bleibt" : "Diese Anfragen bleiben") erhalten, aber ohne Ansprechpartner:
+            </MudText>
+            <ul class="mb-3 ml-6" data-testid="erasure-opportunities">
+                @foreach (var opportunity in Erasure.Opportunities)
+                {
+                    <li>@opportunity.Name</li>
+                }
+            </ul>
+        }
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
+            Datensicherungen laufen nach 30 Tagen aus; bis dahin ist der Kontakt dort noch enthalten.
+            Ist er auch in HubSpot oder n8n gespeichert, muss er dort ebenfalls gelöscht werden.
+        </MudText>
+        <MudTextField T="string" @bind-Value="_confirmation" Immediate="true" AutoFocus="true"
+                      Label="@($"Zur Bestätigung „{Erasure.Name}“ eingeben")" Error="_error is not null" ErrorText="@_error"
+                      OnKeyDown="OnKeyDownAsync" data-testid="erasure-confirmation" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel">Abbrechen</MudButton>
+        <MudButton OnClick="ConfirmAsync" Color="Color.Error" Variant="Variant.Filled" Disabled="!IsConfirmed || _busy"
+                   data-testid="erasure-submit">
+            Endgültig löschen
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public GetContactErasure.Result Erasure { get; set; } = default!;
+
+    private string? _confirmation;
+    private string? _error;
+    private bool _busy;
+
+    /// <summary>Enables the button; the handler checks the confirmation again.</summary>
+    private bool IsConfirmed =>
+        string.Join(' ', (_confirmation ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries)) == Erasure.Name;
+
+    private async Task OnKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter" && IsConfirmed)
+        {
+            await ConfirmAsync();
+        }
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (!IsConfirmed || _busy)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await DeleteHandler.Handle(
+                new DeleteContactPermanently.Command(Erasure.ContactId, _confirmation ?? ""), CancellationToken.None);
+            if (result.IsSuccess)
+            {
+                MudDialog.Close(DialogResult.Ok(result.Value));
+                return;
+            }
+
+            _error = result.Error is ValidationError validation
+                ? string.Join(" ", validation.Errors.Values.SelectMany(m => m))
+                : result.Error.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private static string Count(int count, string singular, string plural) =>
+        count == 1 ? $"1 {singular}" : $"{Formats.Number(count)} {plural}";
+}

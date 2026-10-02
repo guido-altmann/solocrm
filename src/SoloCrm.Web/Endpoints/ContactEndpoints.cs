@@ -31,6 +31,11 @@ internal static class ContactEndpoints
             .Produces<ContactDetail>()
             .ProducesProblem(StatusCodes.Status404NotFound);
 
+        group.MapGet("/{id:guid}/export", ExportAsync)
+            .WithSummary("DSGVO-Auskunft: alle Daten des Kontakts als JSON (US-19, formatVersion 1)")
+            .Produces<ExportContactData.Result>()
+            .ProducesProblem(StatusCodes.Status404NotFound);
+
         group.MapPost("/", CreateAsync)
             .WithSummary("Kontakt anlegen")
             .Produces<ContactDetail>(StatusCodes.Status201Created)
@@ -86,6 +91,18 @@ internal static class ContactEndpoints
         IQueryHandler<GetRecordTags.Query, GetRecordTags.Result> getRecordTags,
         CancellationToken cancellationToken) =>
         LoadAsync(id, getContact, getRecordTags, created: false, cancellationToken);
+
+    /// <summary>The same document as the download in the UI (iteration 6 decision 5); erasure is UI only.</summary>
+    private static async Task<IResult> ExportAsync(
+        Guid id,
+        IQueryHandler<ExportContactData.Query, ExportContactData.Result> exportContactData,
+        CancellationToken cancellationToken)
+    {
+        var result = await exportContactData.Handle(new ExportContactData.Query(id), cancellationToken);
+        return result.Match(
+            export => TypedResults.Text(ExportContactData.ToJson(export), "application/json"),
+            ApiResults.Problem);
+    }
 
     private static async Task<IResult> CreateAsync(
         CreateContactRequest request,

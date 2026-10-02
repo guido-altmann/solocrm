@@ -46,6 +46,13 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
 
     DbSet<ApiKey> ApiKeys { get; }
 
+    /// <summary>
+    /// Ids of the audited records of <paramref name="entityType"/> (e.g. <c>Activity</c>) whose foreign key
+    /// <paramref name="foreignKey"/> points or pointed to <paramref name="principalId"/>, including records deleted
+    /// since (GDPR export and erasure, US-19/US-20).
+    /// </summary>
+    IQueryable<Guid> AuditedRecordIds(string entityType, string foreignKey, Guid principalId);
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 

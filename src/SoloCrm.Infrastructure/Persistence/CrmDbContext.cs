@@ -52,6 +52,9 @@ public class CrmDbContext(DbContextOptions options)
 
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();
 
+    public IQueryable<Guid> AuditedRecordIds(string entityType, string foreignKey, Guid principalId) =>
+        AuditHistory.LinkedRecordIds(this, entityType, foreignKey, principalId);
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);

@@ -29,7 +29,7 @@ public sealed class WebhookSubscriptionTests
     [Fact]
     public void Create_UnknownEvent_Throws()
     {
-        var act = () => WebhookSubscription.Create("n8n", "https://n8n.example.test", ["contact.deleted"], Secret);
+        var act = () => WebhookSubscription.Create("n8n", "https://n8n.example.test", ["contact.merged"], Secret);
 
         act.Should().Throw<ArgumentException>();
     }

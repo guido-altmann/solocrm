@@ -103,6 +103,7 @@ public static class Labels
     public static string ForWebhookEvent(string eventType) => eventType switch
     {
         "contact.created" => "Kontakt angelegt",
+        "contact.deleted" => "Kontakt gelöscht (DSGVO)",
         "organization.created" => "Organisation angelegt",
         "opportunity.created" => "Anfrage angelegt",
         "opportunity.stage_changed" => "Phase der Anfrage geändert",

@@ -29,15 +29,20 @@ else
         <MudItem xs="12" md="4">
             <MudStack Spacing="4">
                 <MudPaper Outlined="true" Class="pa-4">
-                    <MudText Typo="Typo.h5">@Name</MudText>
-                    @if (_contact.JobTitle is not null)
-                    {
-                        <MudText Typo="Typo.body2" Class="mud-text-secondary">@_contact.JobTitle</MudText>
-                    }
-                    @if (_contact.IsArchived)
-                    {
-                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-0">Archiviert</MudChip>
-                    }
+                    <div class="d-flex align-start">
+                        <div class="flex-grow-1">
+                            <MudText Typo="Typo.h5">@Name</MudText>
+                            @if (_contact.JobTitle is not null)
+                            {
+                                <MudText Typo="Typo.body2" Class="mud-text-secondary">@_contact.JobTitle</MudText>
+                            }
+                            @if (_contact.IsArchived)
+                            {
+                                <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" Class="ml-0">Archiviert</MudChip>
+                            }
+                        </div>
+                        <ContactGdprMenu ContactId="Id" Name="@Name" />
+                    </div>
                     @* Master data are edited inline (US-14); each change is saved with all current values. *@
                     <MudStack Spacing="1" Class="mt-3">
                         <InlineText Label="Vorname" Field="@nameof(IContactFields.FirstName)" Value="@_contact.FirstName"

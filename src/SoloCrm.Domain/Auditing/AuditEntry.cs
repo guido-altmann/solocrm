@@ -39,4 +39,9 @@ public sealed class AuditEntry
     public IReadOnlyList<AuditChange> Changes { get; private set; }
 
     public DateTimeOffset OccurredAt { get; private set; }
+
+    /// <summary>
+    /// Removes the field values after the GDPR erasure of the record (US-20); entity, action and time remain as proof.
+    /// </summary>
+    public void Anonymize() => Changes = [];
 }
