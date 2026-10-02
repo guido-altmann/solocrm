@@ -80,8 +80,8 @@
 
 ## Schritt 9 – Abschluss MVP
 - [x] Migration `AddOpportunityReceivedOn` erzeugt (additiv, mit Befüllung aus `created_at`)
-- [ ] Per `efbundle` in Produktion ausgerollt (mit dem Deploy nach dem Push auf `main`)
-- [ ] 2FA in Produktion aktiviert und Login mit Authenticator, Wiederherstellungscode und Passkey geprüft
+- [x] Per `efbundle` in Produktion ausgerollt (mit dem Deploy nach dem Push auf `main`)
+- [x] 2FA in Produktion aktiviert und Login mit Authenticator, Wiederherstellungscode und Passkey geprüft
 - [x] ADRs final durchgehen (Status, Erfahrungen); ADR-006 um Löschen/Anonymisieren ergänzen
 - [x] SPEC: US-19/20/21 mit Umsetzungsdetails, Kap. 10: Datenanreicherung (App oder n8n) und Stundensatz-Varianten in den Backlog (Kap. 8) verschieben (Entscheidung 10), Iterationsplan abschließen
 - [x] README: Stand MVP, Screenshots aktualisieren (u. a. Kontoseite mit 2FA, Löschdialog), Funktionsübersicht, Testabdeckung
