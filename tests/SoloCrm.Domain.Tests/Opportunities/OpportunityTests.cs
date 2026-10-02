@@ -6,6 +6,7 @@ namespace SoloCrm.Domain.Tests.Opportunities;
 public sealed class OpportunityTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 29, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateOnly ReceivedOn = new(2026, 9, 15);
 
     private readonly Stage _new = Stage.Create("Neu", 1, StageStatus.Open);
     private readonly Stage _talks = Stage.Create("Im Gespräch", 2, StageStatus.Open);
@@ -16,9 +17,10 @@ public sealed class OpportunityTests
     [Fact]
     public void Create_TitleOnly_StartsOpenAndRaisesCreated()
     {
-        var opportunity = Opportunity.Create(" Migration Azure ", _new);
+        var opportunity = Opportunity.Create(" Migration Azure ", _new, ReceivedOn);
 
         opportunity.Title.Should().Be("Migration Azure");
+        opportunity.ReceivedOn.Should().Be(ReceivedOn);
         opportunity.StageId.Should().Be(_new.Id);
         opportunity.Status.Should().Be(StageStatus.Open);
         opportunity.Pricing.Should().BeNull();
@@ -29,7 +31,7 @@ public sealed class OpportunityTests
     [Fact]
     public void Create_ClosedStage_Throws()
     {
-        var act = () => Opportunity.Create("Migration", _won);
+        var act = () => Opportunity.Create("Migration", _won, ReceivedOn);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -39,7 +41,7 @@ public sealed class OpportunityTests
     [InlineData(" ")]
     public void Create_BlankTitle_Throws(string title)
     {
-        var act = () => Opportunity.Create(title, _new);
+        var act = () => Opportunity.Create(title, _new, ReceivedOn);
 
         act.Should().Throw<ArgumentException>();
     }
@@ -51,7 +53,7 @@ public sealed class OpportunityTests
     [InlineData(null, 101)]
     public void Create_PercentageOutOfRange_Throws(int? utilization, int? remote)
     {
-        var act = () => Opportunity.Create("Migration", _new, new OpportunityDetails(Utilization: utilization, RemotePercentage: remote));
+        var act = () => Opportunity.Create("Migration", _new, ReceivedOn, new OpportunityDetails(Utilization: utilization, RemotePercentage: remote));
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
@@ -63,9 +65,9 @@ public sealed class OpportunityTests
     [InlineData(PricingModel.Retainer, null)]
     public void Update_PricingModel_KeepsUtilizationOnlyForRates(PricingModel model, int? expected)
     {
-        var opportunity = Opportunity.Create("Migration", _new);
+        var opportunity = Opportunity.Create("Migration", _new, ReceivedOn);
 
-        opportunity.Update("Migration", new OpportunityDetails(Pricing: Pricing.Create(model, 100m), Utilization: 80, Source: LeadSource.Referral));
+        opportunity.Update("Migration", ReceivedOn, new OpportunityDetails(Pricing: Pricing.Create(model, 100m), Utilization: 80, Source: LeadSource.Referral));
 
         opportunity.Utilization.Should().Be(expected);
         opportunity.Source.Should().Be(LeadSource.Referral);
@@ -74,7 +76,7 @@ public sealed class OpportunityTests
     [Fact]
     public void EstimatedValue_WithPricingAndDuration_UsesValuation()
     {
-        var opportunity = Opportunity.Create("Migration", _new, new OpportunityDetails(
+        var opportunity = Opportunity.Create("Migration", _new, ReceivedOn, new OpportunityDetails(
             Pricing: Pricing.Create(PricingModel.Daily, 800m), Duration: Duration.Create(2, DurationUnit.Weeks), Utilization: 50));
 
         opportunity.EstimatedValue(ValuationSettings.Default).Should().Be(4_000m);
@@ -210,9 +212,20 @@ public sealed class OpportunityTests
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
+    [Fact]
+    public void Update_EarlierReceivedOn_ChangesOnlyTheDate()
+    {
+        var opportunity = Opportunity.Create("Migration", _new, ReceivedOn);
+
+        opportunity.Update("Migration", new DateOnly(2026, 8, 3), new OpportunityDetails());
+
+        opportunity.ReceivedOn.Should().Be(new DateOnly(2026, 8, 3));
+        opportunity.Title.Should().Be("Migration");
+    }
+
     private Opportunity CreateOpen()
     {
-        var opportunity = Opportunity.Create("Migration Azure", _new);
+        var opportunity = Opportunity.Create("Migration Azure", _new, ReceivedOn);
         opportunity.ClearDomainEvents();
         return opportunity;
     }

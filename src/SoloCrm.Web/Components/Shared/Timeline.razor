@@ -63,6 +63,10 @@
                             <MudText Typo="Typo.body2">@entry.TaskTitle</MudText>
                             break;
                         default:
+                            @if (entry.ReceivedOn is { } receivedOn)
+                            {
+                                <MudText Typo="Typo.body2" Class="timeline-change" data-test="received-on">Eingegangen am @Formats.Date(receivedOn)</MudText>
+                            }
                             @foreach (var change in entry.Changes ?? [])
                             {
                                 <MudText Typo="Typo.body2" Class="timeline-change">@change.Label: @change.Old → @change.New</MudText>

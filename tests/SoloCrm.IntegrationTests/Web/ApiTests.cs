@@ -234,6 +234,29 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
     }
 
     [Fact]
+    public async Task Opportunity_ReceivedOn_CanBeSetOnPostAndPatchedButNotCleared()
+    {
+        var client = CreateClient();
+
+        var withDefault = await ReadAsync(await client.PostAsJsonAsync("/api/v1/opportunities", new { title = "Heute" }, Ct));
+        var created = await client.PostAsJsonAsync("/api/v1/opportunities", new { title = "Nachgetragen", receivedOn = "2026-08-03" }, Ct);
+        var id = (await ReadAsync(created)).GetProperty("id").GetGuid();
+        var patched = await PatchAsync(client, $"/api/v1/opportunities/{id}", "{\"receivedOn\":\"2026-08-01\"}");
+        var cleared = await PatchAsync(client, $"/api/v1/opportunities/{id}", "{\"receivedOn\":null}");
+        var future = await client.PostAsJsonAsync("/api/v1/opportunities", new { title = "Zukunft", receivedOn = "2999-01-01" }, Ct);
+        var list = await ReadAsync(await client.GetAsync("/api/v1/opportunities", Ct));
+
+        DateOnly.Parse(withDefault.GetProperty("receivedOn").GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+            .Should().BeOnOrAfter(new DateOnly(2026, 10, 1));
+        (await ReadAsync(patched)).GetProperty("receivedOn").GetString().Should().Be("2026-08-01");
+        cleared.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadAsync(cleared)).GetProperty("errors").EnumerateObject().Select(p => p.Name).Should().Equal("receivedOn");
+        future.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadAsync(future)).GetProperty("errors").EnumerateObject().Select(p => p.Name).Should().Equal("receivedOn");
+        list.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("title").GetString()).Should().Equal("Heute", "Nachgetragen");
+    }
+
+    [Fact]
     public async Task GetContacts_SearchTagAndPaging_UsesSameSearchAsUi()
     {
         var client = CreateClient();

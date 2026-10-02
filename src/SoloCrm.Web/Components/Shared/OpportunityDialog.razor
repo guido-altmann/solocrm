@@ -10,6 +10,7 @@
 @inject IQueryHandler<GetOpportunity.Query, GetOpportunity.Result> GetHandler
 @inject IQueryHandler<GetOpportunityDefaults.Query, GetOpportunityDefaults.Result> DefaultsHandler
 @inject ISnackbar Snackbar
+@inject AppClock Clock
 
 <form @onsubmit="SaveAsync">
     <MudDialog>
@@ -129,9 +130,15 @@
                                          ErrorText="@_errors.Text(nameof(IOpportunityFields.RemotePercentage))" />
                     </MudItem>
                     <MudItem xs="12" sm="6">
+                        @* Requests are sometimes recorded later (iteration 6 decision 11). *@
+                        <MudDatePicker @bind-Date="_receivedOn" Label="Eingegangen am" DateFormat="dd.MM.yyyy" MaxDate="Clock.Today.ToDateTime(TimeOnly.MinValue)"
+                                       Required="true" Error="@_errors.Has(nameof(IOpportunityFields.ReceivedOn))"
+                                       ErrorText="@_errors.Text(nameof(IOpportunityFields.ReceivedOn))" data-test="received-on" />
+                    </MudItem>
+                    <MudItem xs="12" sm="6">
                         <MudDatePicker @bind-Date="_startDate" Label="Start" Clearable="true" DateFormat="dd.MM.yyyy" />
                     </MudItem>
-                    <MudItem xs="12" sm="6" Class="d-flex flex-column justify-center">
+                    <MudItem xs="12" Class="d-flex flex-column justify-center">
                         <MudText Typo="Typo.subtitle2" data-test="estimated-value">
                             Geschätzter Wert: @(EstimatedValue is { } value ? Currency.Format(decimal.Round(value, 2), _currency) : "–")
                         </MudText>
@@ -198,6 +205,7 @@
     private int? _utilization;
     private int? _remotePercentage;
     private DateTime? _startDate;
+    private DateTime? _receivedOn;
     private bool _saving;
 
     /// <summary>New requests start in an open stage; existing ones can move anywhere.</summary>
@@ -240,6 +248,7 @@
         _pricingModel = defaults.Value.DefaultPricingModel;
         _currency = defaults.Value.DefaultCurrency;
         _stageId = defaults.Value.Stages.FirstOrDefault(s => s.Status == StageStatus.Open)?.Id;
+        _receivedOn = Clock.Today.ToDateTime(TimeOnly.MinValue);
 
         if (OpportunityId is { } id)
         {
@@ -279,6 +288,7 @@
         _utilization = o.Utilization;
         _remotePercentage = o.RemotePercentage;
         _startDate = o.StartDate?.ToDateTime(TimeOnly.MinValue);
+        _receivedOn = o.ReceivedOn.ToDateTime(TimeOnly.MinValue);
     }
 
     private void OnCurrencyChanged(string? currency) => _currency = currency?.Trim().ToUpperInvariant() ?? "";
@@ -296,6 +306,7 @@
         try
         {
             var startDate = _startDate is { } date ? DateOnly.FromDateTime(date) : (DateOnly?)null;
+            var receivedOn = _receivedOn is { } received ? DateOnly.FromDateTime(received) : (DateOnly?)null;
             var durationUnit = _durationValue is null ? (DurationUnit?)null : _durationUnit;
             var utilization = UsesUtilization ? _utilization : null;
             var currency = string.IsNullOrWhiteSpace(_currency) ? null : _currency;
@@ -305,13 +316,13 @@
                         new UpdateOpportunity.Command(existing.Id, _title, _stageId ?? Guid.Empty,
                             SelectedStageStatus == StageStatus.Lost ? _lostReason : null,
                             _client?.Id, _agency?.Id, _contact?.Id, _pricingModel, _amount, currency, startDate,
-                            _durationValue, durationUnit, utilization, _remotePercentage, _source),
+                            _durationValue, durationUnit, utilization, _remotePercentage, _source, receivedOn),
                         CancellationToken.None))
                     .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure)
                 : (await CreateHandler.Handle(
                         new CreateOpportunity.Command(_title, _stageId, _client?.Id, _agency?.Id, _contact?.Id,
                             _pricingModel, _amount, currency, startDate, _durationValue, durationUnit, utilization,
-                            _remotePercentage, _source),
+                            _remotePercentage, _source, receivedOn),
                         CancellationToken.None))
                     .Match(r => Result<Guid>.Success(r.Id), Result<Guid>.Failure);
 

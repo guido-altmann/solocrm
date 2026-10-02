@@ -120,9 +120,11 @@ public sealed record OpportunityListItem(
     string? Currency,
     LeadSource? Source,
     bool IsArchived,
+    DateOnly ReceivedOn,
     DateTimeOffset CreatedAt,
     IReadOnlyList<TagResponse> Tags);
 
+/// <param name="ReceivedOn">When the request came in; may lie before the recording.</param>
 public sealed record OpportunityDetail(
     Guid Id,
     string Title,
@@ -143,6 +145,7 @@ public sealed record OpportunityDetail(
     int? Utilization,
     int? RemotePercentage,
     LeadSource? Source,
+    DateOnly ReceivedOn,
     bool IsArchived,
     decimal? EstimatedValue,
     decimal? MonthlyRecurringValue,
@@ -162,7 +165,8 @@ public sealed record CreateOpportunityRequest(
     DurationUnit? DurationUnit = null,
     int? Utilization = null,
     int? RemotePercentage = null,
-    LeadSource? Source = null);
+    LeadSource? Source = null,
+    DateOnly? ReceivedOn = null);
 
 /// <param name="Type">Default: <c>Note</c>.</param>
 /// <param name="OccurredAt">Default: now; not in the future.</param>

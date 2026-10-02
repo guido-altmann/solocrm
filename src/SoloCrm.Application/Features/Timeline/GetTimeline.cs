@@ -56,6 +56,7 @@ public static class GetTimeline
     public sealed record Change(string Label, string Old, string New);
 
     /// <param name="SourceId">The activity or task; for audit entries the audited record.</param>
+    /// <param name="ReceivedOn">For „Angelegt“ of a request recorded later: the day it came in (iteration 6 decision 11).</param>
     public sealed record Entry(
         TimelineEntryKind Kind,
         Guid SourceId,
@@ -66,7 +67,8 @@ public static class GetTimeline
         string? Subject = null,
         string? Body = null,
         string? TaskTitle = null,
-        IReadOnlyList<Change>? Changes = null);
+        IReadOnlyList<Change>? Changes = null,
+        DateOnly? ReceivedOn = null);
 
     public sealed record Result(IReadOnlyList<Entry> Entries, Cursor? Next);
 
@@ -84,7 +86,7 @@ public static class GetTimeline
         }
     }
 
-    public sealed class Handler(ICrmDbContextFactory dbFactory, IValidator<Query> validator) : IQueryHandler<Query, Result>
+    public sealed class Handler(ICrmDbContextFactory dbFactory, AppClock clock, IValidator<Query> validator) : IQueryHandler<Query, Result>
     {
         /// <summary>Audit entries are filtered in memory; they are read in batches until a page is full.</summary>
         private const int AuditBatchSize = 100;
@@ -110,7 +112,7 @@ public static class GetTimeline
             entries.AddRange(await LoadActivitiesAsync(db, scope, query.Before, take, cancellationToken));
             entries.AddRange(await LoadTasksCreatedAsync(db, scope, query.Before, take, cancellationToken));
             entries.AddRange(await LoadTasksCompletedAsync(db, scope, query.Before, take, cancellationToken));
-            entries.AddRange(await LoadAuditEntriesAsync(db, scope, query.Before, take, cancellationToken));
+            entries.AddRange(await LoadAuditEntriesAsync(db, clock, scope, query.Before, take, cancellationToken));
 
             var page = entries
                 .OrderByDescending(e => e.Position.OccurredAt)
@@ -286,7 +288,7 @@ public static class GetTimeline
         /// <paramref name="take"/> are found (invisible changes such as a new phone number are skipped).
         /// </summary>
         private static async Task<IEnumerable<Entry>> LoadAuditEntriesAsync(
-            ICrmDbContext db, Scope scope, Cursor? before, int take, CancellationToken cancellationToken)
+            ICrmDbContext db, AppClock clock, Scope scope, Cursor? before, int take, CancellationToken cancellationToken)
         {
             var visible = new List<AuditEntry>();
             var position = before;
@@ -324,16 +326,31 @@ public static class GetTimeline
             visible = visible.Take(take).ToList();
             var formatter = await AuditFormatter.CreateAsync(db, visible, cancellationToken);
 
+            var createdOpportunityIds = visible
+                .Where(a => a is { Action: AuditAction.Created, EntityType: nameof(Opportunity) })
+                .Select(a => a.EntityId)
+                .ToList();
+            var receivedOn = createdOpportunityIds.Count == 0
+                ? new Dictionary<Guid, DateOnly>()
+                : await db.Opportunities.AsNoTracking()
+                    .Where(o => createdOpportunityIds.Contains(o.Id))
+                    .ToDictionaryAsync(o => o.Id, o => o.ReceivedOn, cancellationToken);
+
             return visible.Select(a =>
             {
                 var (kind, changes) = formatter.Describe(a);
+                var received = a.Action == AuditAction.Created && receivedOn.TryGetValue(a.EntityId, out var date)
+                    && date != DateOnly.FromDateTime(clock.ToLocal(a.OccurredAt).DateTime)
+                        ? date
+                        : (DateOnly?)null;
                 return new Entry(
                     kind,
                     a.EntityId,
                     a.OccurredAt,
                     scope.ViaFor(a.EntityId),
                     new Cursor(a.OccurredAt, TimelineSource.Audit, a.Id),
-                    Changes: changes);
+                    Changes: changes,
+                    ReceivedOn: received);
             });
         }
 

@@ -17,13 +17,20 @@ public sealed class Opportunity : ArchivableEntity, IAuditable, IHasExtraFields
         Title = null!;
     }
 
-    private Opportunity(string title, Guid stageId)
+    private Opportunity(string title, Guid stageId, DateOnly receivedOn)
     {
         Title = title;
         StageId = stageId;
+        ReceivedOn = receivedOn;
     }
 
     public string Title { get; private set; }
+
+    /// <summary>
+    /// When the request came in (iteration 6 decision 11); may lie before the recording, unlike the technical
+    /// <see cref="Entity.CreatedAt"/>. Sorting and „eingeschlafen“ refer to this date.
+    /// </summary>
+    public DateOnly ReceivedOn { get; private set; }
 
     public Guid StageId { get; private set; }
 
@@ -71,7 +78,7 @@ public sealed class Opportunity : ArchivableEntity, IAuditable, IHasExtraFields
         : LostReason is null ? StageStatus.Won : StageStatus.Lost;
 
     /// <exception cref="ArgumentException">Blank title, stage not open or invalid details.</exception>
-    public static Opportunity Create(string title, Stage stage, OpportunityDetails? details = null)
+    public static Opportunity Create(string title, Stage stage, DateOnly receivedOn, OpportunityDetails? details = null)
     {
         ArgumentNullException.ThrowIfNull(stage);
         if (stage.Status != StageStatus.Open)
@@ -79,17 +86,18 @@ public sealed class Opportunity : ArchivableEntity, IAuditable, IHasExtraFields
             throw new ArgumentException("New opportunities start in an open stage.", nameof(stage));
         }
 
-        var opportunity = new Opportunity(RequireTitle(title), stage.Id);
+        var opportunity = new Opportunity(RequireTitle(title), stage.Id, receivedOn);
         opportunity.Apply(details ?? new OpportunityDetails());
         opportunity.AddDomainEvent(new OpportunityCreated(opportunity.Id, stage.Id));
         return opportunity;
     }
 
     /// <exception cref="ArgumentException">Blank title or invalid details.</exception>
-    public void Update(string title, OpportunityDetails details)
+    public void Update(string title, DateOnly receivedOn, OpportunityDetails details)
     {
         ArgumentNullException.ThrowIfNull(details);
         Title = RequireTitle(title);
+        ReceivedOn = receivedOn;
         Apply(details);
     }
 

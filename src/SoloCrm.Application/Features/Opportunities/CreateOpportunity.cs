@@ -25,19 +25,20 @@ public static class CreateOpportunity
         DurationUnit? DurationUnit = null,
         int? Utilization = null,
         int? RemotePercentage = null,
-        LeadSource? Source = null) : IOpportunityFields;
+        LeadSource? Source = null,
+        DateOnly? ReceivedOn = null) : IOpportunityFields;
 
     public sealed record Result(Guid Id);
 
     public sealed class Validator : AbstractValidator<Command>
     {
-        public Validator()
+        public Validator(AppClock clock)
         {
-            Include(new OpportunityFieldsValidator<Command>());
+            Include(new OpportunityFieldsValidator<Command>(clock));
         }
     }
 
-    public sealed class Handler(ICrmDbContextFactory dbFactory, IAppSettings settings, IValidator<Command> validator)
+    public sealed class Handler(ICrmDbContextFactory dbFactory, IAppSettings settings, AppClock clock, IValidator<Command> validator)
         : ICommandHandler<Command, Result>
     {
         public async Task<Result<Result>> Handle(Command command, CancellationToken cancellationToken)
@@ -73,7 +74,7 @@ public static class CreateOpportunity
             }
 
             var details = await OpportunityRules.ToDetailsAsync(command, settings, cancellationToken);
-            var opportunity = Opportunity.Create(command.Title!, stage, details);
+            var opportunity = Opportunity.Create(command.Title!, stage, command.ReceivedOn ?? clock.Today, details);
 
             db.Opportunities.Add(opportunity);
             await db.SaveChangesAsync(cancellationToken);

@@ -73,7 +73,7 @@ public sealed class TodayHandlerTests(PostgresFixture postgres) : HandlerTest(po
         result.StaleOpportunities.Select(o => (o.Id, o.DaysSinceActivity)).Should().Equal(
             (withoutActivity, 10), (contactOnly, 10), (exactlySeven, 7));
         result.StaleOpportunities[0].Should().Match<GetToday.StaleOpportunity>(o =>
-            o.ClientName == "Contoso" && o.StageName == "Neu" && o.LastActivityAt == Start);
+            o.ClientName == "Contoso" && o.StageName == "Neu" && o.LastActivityAt == new DateTimeOffset(2026, 9, 28, 22, 0, 0, TimeSpan.Zero));
         result.StaleOpportunities.Select(o => o.Id).Should().NotContain([sixDays, archived, won]);
 
         await Get<IAppSettings>().SetAsync(AppSettingKeys.StaleOpportunityDays, 8, Ct);
@@ -123,7 +123,7 @@ public sealed class TodayHandlerTests(PostgresFixture postgres) : HandlerTest(po
 
         var cards = board.Columns.SelectMany(c => c.Cards).ToDictionary(c => c.Id);
         cards[quiet].DaysSinceActivity.Should().Be(5);
-        cards[quiet].LastActivityAt.Should().Be(Start);
+        cards[quiet].LastActivityAt.Should().Be(new DateTimeOffset(2026, 9, 28, 22, 0, 0, TimeSpan.Zero));
         cards[active].DaysSinceActivity.Should().Be(2);
     }
 

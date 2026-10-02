@@ -16,6 +16,7 @@ public static class GetOpportunity
     public sealed record Result(
         Guid Id,
         string Title,
+        DateOnly ReceivedOn,
         Guid StageId,
         string StageName,
         StageStatus StageStatus,
@@ -63,6 +64,7 @@ public static class GetOpportunity
             return new Result(
                 opportunity.Id,
                 opportunity.Title,
+                opportunity.ReceivedOn,
                 opportunity.StageId,
                 opportunity.Stage!.Name,
                 opportunity.Stage.Status,

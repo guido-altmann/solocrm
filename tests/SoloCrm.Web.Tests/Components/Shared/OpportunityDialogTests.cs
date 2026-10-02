@@ -1,6 +1,7 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using MudBlazor;
+using Microsoft.Extensions.Time.Testing;
 using MudBlazor.Services;
 using NSubstitute;
 using SoloCrm.Application.Abstractions;
@@ -16,6 +17,9 @@ public sealed class OpportunityDialogTests : BunitContext
 {
     private static readonly Guid NewStage = Guid.CreateVersion7();
 
+    // 23:30 UTC on 2 October is already 3 October in Berlin.
+    private static readonly DateTimeOffset Now = new(2026, 10, 2, 23, 30, 0, TimeSpan.Zero);
+
     private readonly ICommandHandler<CreateOpportunity.Command, CreateOpportunity.Result> _create =
         Substitute.For<ICommandHandler<CreateOpportunity.Command, CreateOpportunity.Result>>();
 
@@ -28,6 +32,7 @@ public sealed class OpportunityDialogTests : BunitContext
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
         Services.AddMudServices();
+        Services.AddSingleton(new AppClock(new FakeTimeProvider(Now), TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")));
         Services.AddSingleton(_create);
         Services.AddSingleton(_defaults);
         Services.AddSingleton(Substitute.For<ICommandHandler<UpdateOpportunity.Command, UpdateOpportunity.Result>>());
@@ -117,8 +122,17 @@ public sealed class OpportunityDialogTests : BunitContext
         await _create.Received(1).Handle(
             Arg.Is<CreateOpportunity.Command>(c =>
                 c.Title == "Migration Azure" && c.StageId == NewStage && c.PricingModel == PricingModel.Hourly
-                && c.Amount == 95m && c.Currency == "EUR" && c.DurationValue == null && c.DurationUnit == null),
+                && c.Amount == 95m && c.Currency == "EUR" && c.DurationValue == null && c.DurationUnit == null
+                && c.ReceivedOn == new DateOnly(2026, 10, 3)),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Open_NewRequest_PresetsReceivedOnWithTodayInConfiguredTimeZone()
+    {
+        var provider = await OpenDialogAsync();
+
+        provider.Find("input[data-test=received-on]").GetAttribute("value").Should().Be("03.10.2026");
     }
 
     /// <summary>MudBlazor renders additional attributes on the input; label and adornment live in its control.</summary>

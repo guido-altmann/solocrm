@@ -9,7 +9,7 @@ namespace SoloCrm.Application.Features.Pipeline;
 /// The pipeline board: one column per stage with its active requests, the sum of <c>EstimatedValue</c> and,
 /// if retainers are contained, the sum of MRR (US-07, SPEC 3.3 S2). Won/lost stages are drop zones whose cards
 /// are only loaded on request ("Abgeschlossene", US-08 AK3). Sums are grouped by currency (no conversion).
-/// Cards show the days since the last direct activity (or since creation), see <see cref="Card.DaysSinceActivity"/>.
+/// Cards show the days since the last direct activity (or since the request came in), see <see cref="Card.DaysSinceActivity"/>.
 /// </summary>
 public static class GetPipelineBoard
 {
@@ -57,6 +57,7 @@ public static class GetPipelineBoard
                 .AsNoTracking()
                 .Where(o => !o.IsArchived && (query.IncludeClosed || o.Stage!.Status == StageStatus.Open))
                 .OrderByDescending(o => o.ClosedAt)
+                .ThenByDescending(o => o.ReceivedOn)
                 .ThenByDescending(o => o.CreatedAt)
                 .Select(o => new
                 {
@@ -70,7 +71,8 @@ public static class GetPipelineBoard
                     o.Utilization,
                     o.LostReason,
                     o.ClosedAt,
-                    LastActivityAt = db.Activities.Where(a => a.OpportunityId == o.Id).Max(a => (DateTimeOffset?)a.OccurredAt) ?? o.CreatedAt,
+                    o.ReceivedOn,
+                    LastActivityAt = db.Activities.Where(a => a.OpportunityId == o.Id).Max(a => (DateTimeOffset?)a.OccurredAt),
                     Tags = db.OpportunityTags
                         .Where(t => t.OpportunityId == o.Id)
                         .OrderBy(t => t.Tag!.Name)
@@ -80,6 +82,8 @@ public static class GetPipelineBoard
                 .ToListAsync(cancellationToken);
 
             var cardsByStage = opportunities
+                .Select(o => new { o.Id, o.StageId, o.Title, o.ClientName, o.AgencyName, o.Pricing, o.Duration, o.Utilization, o.LostReason, o.ClosedAt, o.Tags,
+                    LastActivityAt = o.LastActivityAt ?? clock.StartOfDayUtc(o.ReceivedOn) })
                 .Select(o => new Card(
                     o.Id,
                     o.StageId,

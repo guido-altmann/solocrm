@@ -34,6 +34,7 @@ public static class GetOpportunities
         Pricing? Pricing,
         LeadSource? Source,
         bool IsArchived,
+        DateOnly ReceivedOn,
         DateTimeOffset CreatedAt,
         IReadOnlyList<TagRef> Tags);
 
@@ -86,7 +87,7 @@ public static class GetOpportunities
 
             var sorted = term is not null
                 ? opportunities.OrderByDescending(SearchPredicates.OpportunityRelevance(term))
-                : opportunities.OrderByDescending(o => o.CreatedAt);
+                : opportunities.OrderByDescending(o => o.ReceivedOn).ThenByDescending(o => o.CreatedAt);
 
             var items = await sorted
                 .ThenByDescending(o => o.Id)
@@ -103,6 +104,7 @@ public static class GetOpportunities
                     o.Pricing,
                     o.Source,
                     o.IsArchived,
+                    o.ReceivedOn,
                     o.CreatedAt,
                     db.OpportunityTags
                         .Where(t => t.OpportunityId == o.Id)

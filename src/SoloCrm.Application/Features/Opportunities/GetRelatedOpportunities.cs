@@ -62,6 +62,7 @@ public static class GetRelatedOpportunities
                 .AsNoTracking()
                 .OrderBy(o => o.IsArchived)
                 .ThenBy(o => o.ClosedAt != null)
+                .ThenByDescending(o => o.ReceivedOn)
                 .ThenByDescending(o => o.CreatedAt)
                 .Select(o => new
                 {

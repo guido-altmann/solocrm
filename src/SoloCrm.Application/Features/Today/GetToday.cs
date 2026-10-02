@@ -59,13 +59,14 @@ public static class GetToday
 
         /// <summary>
         /// Stale = open, not archived and at least <paramref name="staleDays"/> calendar days since the last direct
-        /// activity (or since creation without any activity).
+        /// activity (or since the day the request came in, without any activity; iteration 6 decision 11).
         /// </summary>
         private async Task<List<StaleOpportunity>> LoadStaleOpportunitiesAsync(
             ICrmDbContext db, DateOnly today, int staleDays, CancellationToken cancellationToken)
         {
             // Days since = today - local date of the last activity; ≥ N ⟺ last activity before the start of (today - N + 1).
             var threshold = clock.StartOfDayUtc(today.AddDays(1 - staleDays));
+            var receivedThreshold = today.AddDays(-staleDays);
 
             var rows = await db.Opportunities
                 .AsNoTracking()
@@ -76,20 +77,20 @@ public static class GetToday
                     o.Title,
                     StageName = o.Stage!.Name,
                     ClientName = o.ClientOrganization!.Name,
-                    LastActivityAt = db.Activities.Where(a => a.OpportunityId == o.Id).Max(a => (DateTimeOffset?)a.OccurredAt) ?? o.CreatedAt,
+                    o.ReceivedOn,
+                    LastActivityAt = db.Activities.Where(a => a.OpportunityId == o.Id).Max(a => (DateTimeOffset?)a.OccurredAt),
                 })
-                .Where(o => o.LastActivityAt < threshold)
-                .OrderBy(o => o.LastActivityAt)
+                .Where(o => o.LastActivityAt == null ? o.ReceivedOn <= receivedThreshold : o.LastActivityAt < threshold)
                 .ToListAsync(cancellationToken);
 
             return rows
-                .Select(o => new StaleOpportunity(
-                    o.Id,
-                    o.Title,
-                    o.StageName,
-                    o.ClientName,
-                    o.LastActivityAt,
-                    clock.DaysSince(o.LastActivityAt)))
+                .Select(o =>
+                {
+                    var lastActivityAt = o.LastActivityAt ?? clock.StartOfDayUtc(o.ReceivedOn);
+                    return new StaleOpportunity(o.Id, o.Title, o.StageName, o.ClientName, lastActivityAt, clock.DaysSince(lastActivityAt));
+                })
+                .OrderBy(o => o.LastActivityAt)
+                .ThenBy(o => o.Id)
                 .ToList();
         }
 

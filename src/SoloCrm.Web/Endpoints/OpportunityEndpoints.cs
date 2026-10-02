@@ -17,6 +17,7 @@ internal static class OpportunityEndpoints
     [
         "title", "stageId", "lostReason", "clientOrganizationId", "agencyOrganizationId", "primaryContactId", "pricingModel",
         "amount", "currency", "startDate", "durationValue", "durationUnit", "utilization", "remotePercentage", "source",
+        "receivedOn",
     ];
 
     public static void MapOpportunityEndpoints(this RouteGroupBuilder api)
@@ -76,7 +77,7 @@ internal static class OpportunityEndpoints
                 [.. r.Items.Select(o => new OpportunityListItem(
                     o.Id, o.Title, o.StageId, o.StageName, o.StageStatus, o.ClientOrganizationId, o.AgencyOrganizationId,
                     o.PrimaryContactId, o.Pricing?.Model, o.Pricing?.Amount, o.Pricing?.Currency, o.Source, o.IsArchived,
-                    o.CreatedAt, TagResponse.From(o.Tags)))],
+                    o.ReceivedOn, o.CreatedAt, TagResponse.From(o.Tags)))],
                 pageIndex + 1,
                 size,
                 r.TotalCount)),
@@ -112,7 +113,8 @@ internal static class OpportunityEndpoints
                 request.DurationUnit,
                 request.Utilization,
                 request.RemotePercentage,
-                request.Source),
+                request.Source,
+                request.ReceivedOn),
             cancellationToken);
 
         return result.IsSuccess
@@ -154,10 +156,17 @@ internal static class OpportunityEndpoints
             patch.Value("durationUnit", o.Duration?.Unit),
             patch.Value("utilization", o.Utilization),
             patch.Value("remotePercentage", o.RemotePercentage),
-            patch.Value<LeadSource?>("source", o.Source));
+            patch.Value<LeadSource?>("source", o.Source),
+            patch.Value<DateOnly?>("receivedOn", o.ReceivedOn));
         if (!patch.IsValid)
         {
             return patch.ValidationProblem();
+        }
+
+        // The date is required, so null cannot clear it.
+        if (command.ReceivedOn is null)
+        {
+            return ApiResults.ValidationProblem(new Dictionary<string, string[]> { ["ReceivedOn"] = ["Bitte ein Eingangsdatum angeben."] });
         }
 
         var result = await updateOpportunity.Handle(command, cancellationToken);
@@ -184,7 +193,7 @@ internal static class OpportunityEndpoints
         var detail = new OpportunityDetail(
             o.Id, o.Title, o.StageId, o.StageName, o.StageStatus, o.LostReason, o.ClosedAt, o.ClientOrganizationId,
             o.AgencyOrganizationId, o.PrimaryContactId, o.Pricing?.Model, o.Pricing?.Amount, o.Pricing?.Currency, o.StartDate,
-            o.Duration?.Value, o.Duration?.Unit, o.Utilization, o.RemotePercentage, o.Source, o.IsArchived, o.EstimatedValue,
+            o.Duration?.Value, o.Duration?.Unit, o.Utilization, o.RemotePercentage, o.Source, o.ReceivedOn, o.IsArchived, o.EstimatedValue,
             o.MonthlyRecurringValue, tags.IsSuccess ? TagResponse.From(tags.Value.Items) : []);
 
         return created ? TypedResults.Created($"{ApiEndpoints.BasePath}/opportunities/{id}", detail) : TypedResults.Ok(detail);

@@ -37,13 +37,26 @@ public interface IOpportunityFields
     int? RemotePercentage { get; }
 
     LeadSource? Source { get; }
+
+    /// <summary>
+    /// When the request came in (iteration 6 decision 11); not in the future. <c>null</c> means today on creation and
+    /// unchanged on update.
+    /// </summary>
+    DateOnly? ReceivedOn { get; }
 }
 
 public sealed class OpportunityFieldsValidator<T> : AbstractValidator<T>
     where T : IOpportunityFields
 {
-    public OpportunityFieldsValidator()
+    public OpportunityFieldsValidator(AppClock clock)
     {
+        ArgumentNullException.ThrowIfNull(clock);
+
+        RuleFor(c => c.ReceivedOn)
+            .Must(d => d <= clock.Today)
+            .WithMessage("Das Eingangsdatum darf nicht in der Zukunft liegen.")
+            .When(c => c.ReceivedOn is not null);
+
         RuleFor(c => c.Title)
             .NotEmpty()
             .WithMessage("Bitte einen Titel angeben.")

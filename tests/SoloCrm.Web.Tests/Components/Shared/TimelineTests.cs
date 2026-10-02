@@ -57,6 +57,20 @@ public sealed class TimelineTests : BunitContext
     }
 
     [Fact]
+    public void Render_CreatedOfLateRecordedRequest_ShowsReceivedOn()
+    {
+        var late = Entry(Kind.Created, Now) with { ReceivedOn = new DateOnly(2026, 9, 1) };
+        var sameDay = Entry(Kind.Created, Now.AddHours(-1));
+        Returns(null, new GetTimeline.Result([late, sameDay], null));
+
+        var timeline = RenderTimeline();
+
+        var entries = timeline.FindAll(".timeline-entry");
+        entries[0].TextContent.Should().Contain("Angelegt").And.Contain("Eingegangen am 01.09.2026");
+        entries[1].TextContent.Should().NotContain("Eingegangen");
+    }
+
+    [Fact]
     public async Task LoadMore_NextCursor_AppendsOlderEntries()
     {
         var newer = Entry(Kind.Created, Now);

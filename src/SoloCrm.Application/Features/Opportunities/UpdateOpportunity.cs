@@ -27,15 +27,16 @@ public static class UpdateOpportunity
         DurationUnit? DurationUnit,
         int? Utilization,
         int? RemotePercentage,
-        LeadSource? Source) : IOpportunityFields;
+        LeadSource? Source,
+        DateOnly? ReceivedOn = null) : IOpportunityFields;
 
     public sealed record Result(Guid Id);
 
     public sealed class Validator : AbstractValidator<Command>
     {
-        public Validator()
+        public Validator(AppClock clock)
         {
-            Include(new OpportunityFieldsValidator<Command>());
+            Include(new OpportunityFieldsValidator<Command>(clock));
             RuleFor(c => c.LostReason).IsInEnum().WithMessage("Bitte einen gültigen Absagegrund wählen.");
         }
     }
@@ -79,7 +80,7 @@ public static class UpdateOpportunity
             }
 
             var details = await OpportunityRules.ToDetailsAsync(command, settings, cancellationToken);
-            opportunity.Update(command.Title!, details);
+            opportunity.Update(command.Title!, command.ReceivedOn ?? opportunity.ReceivedOn, details);
             opportunity.ChangeStage(stage, command.LostReason, timeProvider.GetUtcNow());
 
             await db.SaveChangesAsync(cancellationToken);

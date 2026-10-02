@@ -141,7 +141,7 @@ public sealed class OpportunityPersistenceTests(PostgresFixture postgres) : Hand
     {
         await using var db = CreateContext();
         var stage = await db.Stages.SingleAsync(s => s.Id == DefaultStages.New, Ct);
-        var opportunity = Opportunity.Create("Migration Azure", stage, details);
+        var opportunity = Opportunity.Create("Migration Azure", stage, new DateOnly(2026, 9, 1), details);
         db.Opportunities.Add(opportunity);
         await db.SaveChangesAsync(Ct);
         return opportunity.Id;
@@ -151,7 +151,7 @@ public sealed class OpportunityPersistenceTests(PostgresFixture postgres) : Hand
     {
         await using var db = CreateContext();
         var opportunity = await db.Opportunities.SingleAsync(o => o.Id == id, Ct);
-        opportunity.Update(opportunity.Title, details);
+        opportunity.Update(opportunity.Title, opportunity.ReceivedOn, details);
         await db.SaveChangesAsync(Ct);
     }
 

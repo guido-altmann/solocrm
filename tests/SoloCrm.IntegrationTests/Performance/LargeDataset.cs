@@ -49,9 +49,9 @@ public static class LargeDataset
             FROM generate_series(0, {Activities - 1}) g JOIN c ON c.n = g % {Contacts}, seed_base b;
 
             WITH c AS (SELECT id, organization_id, row_number() OVER (ORDER BY id) - 1 AS n FROM contacts)
-            INSERT INTO opportunities (id, title, stage_id, client_organization_id, primary_contact_id, is_archived, extra_fields, created_at, updated_at)
+            INSERT INTO opportunities (id, title, stage_id, client_organization_id, primary_contact_id, is_archived, extra_fields, received_on, created_at, updated_at)
             SELECT gen_random_uuid(), 'Anfrage ' || g, '{DefaultStages.New}', c.organization_id, c.id, false, jsonb_build_object(),
-                   b.now - (g % 60) * interval '1 day', b.now - (g % 60) * interval '1 day'
+                   (b.now - (g % 60) * interval '1 day')::date, b.now - (g % 60) * interval '1 day', b.now - (g % 60) * interval '1 day'
             FROM generate_series(0, 1999) g JOIN c ON c.n = g * 5, seed_base b;
 
             WITH o AS (SELECT id, row_number() OVER (ORDER BY id) - 1 AS n FROM opportunities)

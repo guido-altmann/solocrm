@@ -135,6 +135,8 @@ else
                                 </MudStack>
                             </Editor>
                         </InlineField>
+                        <InlineDate Label="Eingegangen am" Field="@nameof(IOpportunityFields.ReceivedOn)" Value="o.ReceivedOn"
+                                    Save="@(v => SaveAsync(c => c with { ReceivedOn = v ?? o.ReceivedOn }))" />
                         <InlineDate Label="Start" Field="@nameof(IOpportunityFields.StartDate)" Value="o.StartDate"
                                     Save="@(v => SaveAsync(c => c with { StartDate = v }))" />
                         @* Duration = number + unit; empty means open-ended (US-06 AK4). *@
@@ -272,7 +274,7 @@ else
         var command = change(new UpdateOpportunity.Command(
             o.Id, o.Title, o.StageId, o.LostReason, o.ClientOrganizationId, o.AgencyOrganizationId, o.PrimaryContactId,
             o.Pricing?.Model, o.Pricing?.Amount, o.Pricing?.Currency, o.StartDate, o.Duration?.Value, o.Duration?.Unit,
-            o.Utilization, o.RemotePercentage, o.Source));
+            o.Utilization, o.RemotePercentage, o.Source, o.ReceivedOn));
         var result = await UpdateHandler.Handle(command, CancellationToken.None);
         if (result.IsFailure)
         {
