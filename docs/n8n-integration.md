@@ -101,6 +101,11 @@ Antworten:
 
 Weitere Endpunkte (Organisationen, Anfragen mit Phasenwechsel per `PATCH`, Aufgaben, Aktivitäten) beschreibt die API-Referenz unter `/scalar/v1`. Sie ist nur nach dem Login erreichbar.
 
+## Ablauf 3: DSGVO-Löschung weitermelden, Auskunft abrufen
+
+- **Löschung:** Ein Webhook mit dem Ereignis *Kontakt gelöscht (DSGVO)* (`contact.deleted`) erhält nach der endgültigen Löschung in SoloCRM nur die Id: `{"type":"contact.deleted","data":{"contactId":"…"}}`. Details sind dann nicht mehr abrufbar. Damit n8n die Person auch in HubSpot oder anderen Systemen löschen kann, muss der Workflow die Zuordnung selbst kennen, z. B. aus einer eigenen Tabelle *SoloCRM-Id ↔ HubSpot-Id*; nach der Löschung gibt SoloCRM keine Daten des Kontakts mehr heraus.
+- **Auskunft:** `GET https://crm.example.de/api/v1/contacts/{id}/export` liefert dieselbe JSON-Datei wie *Daten exportieren (DSGVO)* in der Oberfläche (Format: [docs/datenschutz.md](datenschutz.md)). Eine Löschung per API gibt es bewusst nicht.
+
 ## Grenzen
 
 - 60 Anfragen pro Minute und API-Key. Darüber antwortet die API mit `429` und `Retry-After`; in n8n hilft „Retry On Fail“ mit Wartezeit.

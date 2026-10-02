@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** Entwurf v0.16 · **Stand:** 2026-10-01 · **Owner:** Guido Altmann
+> **Status:** v1.0 (MVP) · **Stand:** 2026-10-02 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, konkrete Iterationsaufträge in `docs/iterations/`.
 
@@ -116,6 +116,7 @@ erDiagram
 | ClientOrganizationId | Guid? | | Endkunde (kann anfangs unbekannt sein) |
 | AgencyOrganizationId | Guid? | | Vermittler (optional) |
 | PrimaryContactId | Guid? | | Ansprechpartner |
+| ReceivedOn | DateOnly | ✅ | Eingangsdatum („Eingegangen am“); Default heute in `App__TimeZone`, nicht in der Zukunft, nachträglich änderbar. Fachliche Auswertungen (Sortierung, „eingeschlafen“) nutzen dieses Datum, `CreatedAt` bleibt der technische Erfassungszeitpunkt |
 | **Pricing** | Value Object `Pricing`? | | Preismodell + Betrag, siehe unten |
 | StartDate | DateOnly? | | |
 | **Duration** | Value Object `Duration`? | | Laufzeit mit Einheit, siehe unten |
@@ -235,6 +236,7 @@ Die Timeline eines Objekts ist ein chronologischer Strom, absteigend sortiert, a
 | Event | Auslöser | Konsumenten |
 |---|---|---|
 | `ContactCreated` | Anlage Contact | Outbox (Webhook) |
+| `ContactDeleted` | DSGVO-Löschung eines Contacts (US-20); nur die Id | Outbox (z. B. Löschung in HubSpot über n8n) |
 | `OrganizationCreated` | Anlage Organization | Outbox |
 | `OpportunityCreated` | Anlage Opportunity | Outbox |
 | `OpportunityStageChanged` | Stage-Wechsel | Outbox; setzt `ClosedAt` bei Won/Lost |
@@ -272,12 +274,12 @@ Außer `Ctrl/Cmd + K` wirken die Kürzel nur außerhalb von Eingabefeldern und D
 ### 3.3 Screens (MVP)
 | # | Screen | Route | Inhalt |
 |---|---|---|---|
-| S1 | **Heute** | `/` | Überfällige Tasks (rot), heute fällige Tasks, „eingeschlafene“ Anfragen (offen, nicht archiviert, seit mindestens N Kalendertagen keine direkte Activity bzw. seit der Anlage, Default 7), zuletzt bearbeitet (max. 10, ohne Archivierte); eingeklappt: Tasks ohne Termin. „Heute“ und alle Tagesgrenzen gelten in der konfigurierten Zeitzone (`App__TimeZone`, Default `Europe/Berlin`) |
+| S1 | **Heute** | `/` | Überfällige Tasks (rot), heute fällige Tasks, „eingeschlafene“ Anfragen (offen, nicht archiviert, seit mindestens N Kalendertagen keine direkte Activity bzw. ohne Activity seit dem Eingangsdatum `ReceivedOn`, Default 7), zuletzt bearbeitet (max. 10, ohne Archivierte); eingeklappt: Tasks ohne Termin. „Heute“ und alle Tagesgrenzen gelten in der konfigurierten Zeitzone (`App__TimeZone`, Default `Europe/Berlin`) |
 | S2 | **Pipeline** | `/pipeline` | Kanban je offener Stage; Karten mit Titel, Endkunde/Vermittler, Preis im Modellformat (z. B. „95 €/h“, „2.500 €/Monat“), Tags, Tage seit letzter Activity (Definition wie S1); Klick öffnet die Detailansicht; Drag & Drop; je Spalte Summe `EstimatedValue` und – falls Retainer enthalten – Summe MRR; Won/Lost als Drop-Zonen |
 | S3 | **Kontakte** | `/contacts` | Tabelle mit Suche (dieselbe tippfehlertolerante Suche wie die Command Palette), Filter (Organisation, Tags ODER-verknüpft, Quelle), Sortierung, Paging (serverseitig) |
 | S4 | **Organisationen** | `/organizations` | analog S3, Filter nach Typ |
-| S5 | **Detailansicht** | `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}` | Links Stammdaten (inline editierbar ab It. 4; ersetzt dort den Bearbeiten-Dialog; bei Anfragen Preis und Laufzeit als Gruppe mit Live-Wert, Wechsel auf „Verloren“ fragt den Absagegrund ab; Archivieren im Kopf), Tags als Chip-Eingabe, verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe; `N` fokussiert die Eingabe |
-| S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Webhooks, Import, Konto (Passwort, 2FA) |
+| S5 | **Detailansicht** | `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}` | Links Stammdaten (inline editierbar ab It. 4; ersetzt dort den Bearbeiten-Dialog; bei Anfragen Preis und Laufzeit als Gruppe mit Live-Wert, Wechsel auf „Verloren“ fragt den Absagegrund ab; Archivieren im Kopf; bei Kontakten im Menü ⋮ „Daten exportieren (DSGVO)“ und „Endgültig löschen (DSGVO)“, getrennt vom Archivieren), Tags als Chip-Eingabe, verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe; `N` fokussiert die Eingabe |
+| S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Webhooks, Import, Konto (Links zu Passwort, 2FA und Passkeys unter `/Account/Manage`, statisch gerendert) |
 
 ### 3.4 Layout
 - Linke Navigation (einklappbar): Heute, Pipeline, Kontakte, Organisationen, Einstellungen
@@ -319,6 +321,7 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 - AK3: Das Preismodell ist wählbar (Default: Stundensatz). Das Betragsfeld passt Label und Einheit dynamisch an („€/h“, „€/Tag“, „€ fix“, „€/Monat“); das Feld Auslastung erscheint nur bei Stunden- und Tagessatz.
 - AK4: Die Laufzeit wird als Zahl + Einheit (Tage/Wochen/Monate) erfasst oder bleibt leer („offen“).
 - AK5: Der geschätzte Wert (`EstimatedValue`) wird live angezeigt, sobald er berechenbar ist; bei Retainern zusätzlich der MRR.
+- AK6: Das Eingangsdatum ist beim Anlegen (Default heute) und später änderbar, damit nachträglich erfasste Anfragen richtig einsortiert werden; die Timeline zeigt es am Eintrag „Angelegt“, wenn es vom Erfassungstag abweicht (It. 6).
 
 **US-07 · Pipeline per Drag & Drop** · It. 2
 - AK1: Ein Drop in eine andere Spalte ändert die Stage und schreibt einen AuditEntry sowie `OpportunityStageChanged`.
@@ -380,14 +383,17 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 ### Datenschutz & Konto
 **US-19 · DSGVO-Auskunft** · It. 6
 - AK1: Export eines Kontakts inklusive aller Activities, Tasks und AuditEntries als JSON.
+- Umsetzung: Download in der Detailansicht (`kontakt-<name>-<datum>.json`, ohne Zwischenspeicherung auf dem Server) und `GET /api/v1/contacts/{id}/export`; Format `formatVersion: 1` mit Stammdaten, Activities und Tasks mit direktem Bezug, Anfragen mit dem Kontakt als Ansprechpartner (Titel, Phase, Rolle) und AuditEntries des Kontakts sowie seiner (auch gelöschten) Activities und Tasks. Archivierte Kontakte sind exportierbar. Ablauf und Format: `docs/datenschutz.md`.
 
 **US-20 · DSGVO-Löschung** · It. 6
 - AK1: Hartes Löschen des Kontakts inklusive Activities und Tasks mit direktem Bezug (nach Bestätigungsdialog).
 - AK2: AuditEntries zum Kontakt werden anonymisiert (Changes geleert, Aktion `Deleted` bleibt).
+- Umsetzung: Bestätigung durch Eingabe des Namens (auch im Handler geprüft); mitgelöscht werden auch Activities und Tasks, die zusätzlich auf Organisation oder Anfrage verweisen; Anfragen bleiben ohne Ansprechpartner. Anonymisiert werden die Einträge des Kontakts und aller mitgelöschten bzw. früher gelöschten Activities und Tasks (ADR-006); Einträge anderer Datensätze mit der bloßen Id bleiben. Event `ContactDeleted` (nur Id). Nur in der Oberfläche, nicht per API.
 
 **US-21 · Login & 2FA** · It. 1 (Login) / It. 6 (2FA)
 - AK1: Ein einziger User, angelegt per Seed aus Umgebungsvariablen; keine Selbstregistrierung.
 - AK2: TOTP-2FA ist optional aktivierbar.
+- Umsetzung: Einrichtung mit QR-Code (serverseitig als SVG) und Schlüssel als Text, Wiederherstellungscodes, Deaktivieren und Zurücksetzen; Passkeys als Alternative; Login-Rate-Limit gilt auch für Code und Wiederherstellungscode. Kontoseiten deutsch im App-Theme; E-Mail ändern, „Personal Data“ und die auf E-Mail-Versand angewiesenen Seiten sind entfernt (ADR-004).
 
 ---
 
@@ -399,10 +405,11 @@ Basis: `/api/v1` · Auth: `X-Api-Key` · Format: JSON (camelCase, Enums als Name
 |---|---|---|
 | GET | `/contacts?search=&tag=&page=&pageSize=` | Liste |
 | GET | `/contacts/{id}` | Detail (inkl. Tags) |
+| GET | `/contacts/{id}/export` | DSGVO-Auskunft als JSON (US-19, dasselbe Format wie der Download); eine Löschung per API gibt es bewusst nicht |
 | POST | `/contacts` | Anlegen (typischer n8n-Lead-Eingang); `organizationName` nutzt eine bestehende Organisation gleichen Namens (case-insensitive) oder legt sie an |
 | PATCH | `/contacts/{id}` | Teil-Update (JSON Merge Patch, RFC 7396: fehlendes Feld = unverändert, `null` = leeren) |
 | GET/POST/PATCH | `/organizations…` | analog |
-| GET/POST/PATCH | `/opportunities…` | analog, Liste zusätzlich mit `stageId`; `PATCH` mit `stageId` löst den Stage-Wechsel aus (Wechsel auf `Lost` verlangt `lostReason`) |
+| GET/POST/PATCH | `/opportunities…` | analog, Liste zusätzlich mit `stageId`, sortiert nach `receivedOn`; `PATCH` mit `stageId` löst den Stage-Wechsel aus (Wechsel auf `Lost` verlangt `lostReason`); `receivedOn` (ISO-Datum) ist beim `POST` optional (Default heute) und im `PATCH` nicht leerbar |
 | POST | `/activities` | Activity erfassen (`type` Default `Note`, mindestens ein Bezug) |
 | GET/POST/PATCH | `/tasks` (`GET`/`PATCH` mit `/{id}`) | Tasks; `PATCH` mit `completed: true/false` erledigt bzw. öffnet wieder |
 | GET | `/stages` | Stages lesen |
@@ -439,7 +446,7 @@ Die Endpoints rufen dieselben Handler wie die UI; Validierung, Audit und Domain 
 | Sicherheit | HTTPS only (HSTS); Cookies Secure/HttpOnly/SameSite=Lax; API-Keys nur gehasht gespeichert; Rate-Limiting auf API und Login; Antiforgery; optionale 2FA; Secrets ausschließlich über Umgebungsvariablen |
 | Datenschutz | Hosting in der EU; Auskunft und Löschung (US-19/20); keine externen Tracker; Logs ohne personenbezogene Inhalte (keine Bodies, E-Mails nur maskiert) |
 | Beobachtbarkeit | Strukturierte Logs (Serilog, JSON auf stdout); `/health/live` und `/health/ready` (inkl. DB-Check) |
-| Wartbarkeit | Warnings as Errors; Nullable aktiviert; Analyzer; Testabdeckung der Domain- und Application-Schicht ≥ 80 % |
+| Wartbarkeit | Warnings as Errors; Nullable aktiviert; Analyzer; Testabdeckung der Domain- und Application-Schicht ≥ 80 % (gemessen in der CI, Stand MVP: Domain 99,6 %, Application 98,5 % Zeilenabdeckung; noch kein hartes Gate) |
 | Barrierearmut | Tastaturbedienbarkeit der Kernflüsse; ausreichende Kontraste (MudBlazor-Theme prüfen) |
 
 ---
@@ -534,7 +541,7 @@ public static class CreateContact
 | Mechanik | Umsetzung |
 |---|---|
 | Timestamps | `SaveChangesInterceptor` setzt `CreatedAt`/`UpdatedAt` |
-| Audit | `AuditInterceptor` liest den ChangeTracker vor dem Speichern und schreibt `AuditEntry` (Feld-Diffs) in derselben Transaktion |
+| Audit | `AuditInterceptor` liest den ChangeTracker vor dem Speichern und schreibt `AuditEntry` (Feld-Diffs) in derselben Transaktion; das Löschen einer `IErasable`-Entität (Contact) schreibt `Deleted` ohne Feldwerte und anonymisiert die Historie des Kontakts und seiner kaskadierend gelöschten Activities/Tasks (ADR-006) |
 | Domain Events → Outbox | `OutboxInterceptor` sammelt Events aus Entitäten und serialisiert sie als `OutboxMessage` in derselben Transaktion |
 | Outbox-Verarbeitung | `BackgroundService` mit `PeriodicTimer` (alle 10 s, `Outbox__PollingInterval`); Blöcke per `FOR UPDATE SKIP LOCKED` mit Lease (5 min) beansprucht, keine offene Transaktion während HTTP; Versand an alle aktiven Subscriptions mit passendem Event, die bei Auftreten schon existierten; Wiederholung nur an fehlgeschlagene Ziele, Backoff 1 min/5 min/30 min/2 h/12 h, max. 6 Versuche; verarbeitete Nachrichten und Versandprotokoll 30 Tage aufbewahrt (ADR-008, ADR-010) |
 | Suche | generierte `tsvector`-Spalte (Konfiguration `simple`, Shadow Property) + GIN-Index; zusätzlich `pg_trgm` GIN-Index auf Namen/Titel; Treffer bei Präfix-Volltext **oder** Wortähnlichkeit ≥ 0,6 (`<%`); Ranking = Wortähnlichkeit + `ts_rank`; Command Palette, Listen und Autocompletes nutzen dieselbe Suche ab 2 Zeichen (Palette) bzw. 1 Zeichen (Listen); Details siehe ADR-007 |
@@ -568,7 +575,7 @@ public static class CreateContact
 | **3** | Timeline & Tasks | US-10 – US-12 | Activities, Tasks, Timeline-Aggregation, Heute-Ansicht; Einstellungen für Preis-Defaults und Schwellwert „eingeschlafen“ |
 | **4** | Suche & Komfort | US-13 – US-15 | Command Palette, Inline-Editing, Tags, Tastenkürzel |
 | **5** | Integration | US-16 – US-18 | CSV-Import, REST-API + API-Keys, Outbox-Verarbeitung + Webhooks |
-| **6** | DSGVO & Politur | US-19 – US-21 (2FA) | Export/Löschung, 2FA, README, Screenshots, ADRs final |
+| **6** | DSGVO & Politur | US-19 – US-21 (2FA), Eingangsdatum für Anfragen | Export/Löschung, 2FA, README, Screenshots, ADRs final |
 
 **Backlog nach MVP** (nicht priorisiert):
 - Datenanreicherung für Kontakte und Organisationen per Web-Suche/KI (Konzept siehe Kap. 9)
@@ -584,6 +591,8 @@ public static class CreateContact
   - **Technik:** Zuordnungstabelle (Datensatz-Id ↔ Remote-Href + ETag), Abgleich per Hintergrunddienst (ADR-008), Änderungserkennung über `UpdatedAt` bzw. `sync-token` (RFC 6578); Zugang per Nextcloud-App-Passwort, verschlüsselt per Data Protection; Pakete für vCard/iCalendar (z. B. `FolkerKinzel.VCards`, `Ical.Net`) vor der Umsetzung klären; Entscheidung als eigener ADR.
   - **Bewusst nicht im ersten Entwurf:** Zwei-Wege-Sync von Kontakten, Notizen/Activities (passen schlecht zum Modell der Nextcloud-Notes-App).
 - Umrechnung zwischen Währungen (aktuell nur Anzeige in der erfassten Währung)
+- Stundensatz-Varianten je Anfrage (z. B. Remote- vs. Vor-Ort-Satz); im MVP gibt es einen Satz pro Anfrage
+- Entscheidung, ob die Datenanreicherung in der App (Hintergrundjob + LLM-API) oder in n8n läuft (Kap. 9)
 
 ---
 
@@ -628,8 +637,8 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 - [x] Migrations-Strategie beim Deploy (siehe 7.6) → `efbundle` im Entrypoint (ADR-009)
 - [x] Welche HubSpot-Felder werden beim Import tatsächlich benötigt? → Vorlage siehe `docs/iterations/05-integration.md`, Entscheidung 9 (Name, E-Mail, Telefon, Rolle, LinkedIn, Firma, Quelle, Record ID)
 - [x] Repo öffentlich ab Iteration 1 oder erst ab MVP? → öffentlich ab Iteration 1
-- [ ] Datenanreicherung: in der App (Hangfire-Job + LLM-API) oder ausgelagert in n8n?
-- [ ] Brauche ich Stundensatz-Varianten (z. B. Remote- vs. Vor-Ort-Satz) oder reicht ein Satz pro Anfrage?
+- [x] Datenanreicherung: in der App (Hintergrundjob + LLM-API) oder ausgelagert in n8n? → nicht im MVP entschieden, in den Backlog (Kap. 8) verschoben
+- [x] Brauche ich Stundensatz-Varianten (z. B. Remote- vs. Vor-Ort-Satz) oder reicht ein Satz pro Anfrage? → im MVP ein Satz pro Anfrage; Varianten im Backlog (Kap. 8)
 
 ## 11. Glossar
 | Begriff | Bedeutung |
@@ -662,6 +671,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.8 | 2026-09-29 | Abschluss It. 2: mindestens eine offene Stage bleibt erhalten; Ziel-Stage beim Löschen mit gleichem Status (2.3); Umsetzungsentscheidungen in `docs/iterations/02-kerndomaene.md` |
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
+| 1.0 | 2026-10-02 | Abschluss It. 6 (MVP): DSGVO-Auskunft und -Löschung mit Umsetzungsdetails (US-19/20, 2.6 `ContactDeleted`, 5 Export-Endpunkt), 2FA und Kontoseiten (US-21), Eingangsdatum `ReceivedOn` für Anfragen (2.3, US-06 AK6, S1, 5), Konto-Abschnitt in S6, Kontakt-Menü in S5, Testabdeckung gemessen (6); offene Fragen aus Kap. 10 in den Backlog verschoben; Datenschutz-Doku `docs/datenschutz.md` |
 | 0.16 | 2026-10-01 | Erweiterung It. 5: Anschrift (`Address`) für Kontakte und Organisationen (2.3), Organisationsimport mit HubSpot-Vorlage und Verknüpfung per HubSpot-Firmen-ID (US-16) |
 | 0.15 | 2026-10-01 | Umsetzung It. 5: REST-API final (5: Listenparameter, Statuscodes, `organizationName`, Tasks per `PATCH` erledigen); Webhook-Header `X-SoloCrm-Event` und `webhook.ping`; `WebhookDelivery` mit `EventId`/`EventType` statt FK, `ProtectedSecret`, Key-Format `scrm_<prefix>_<secret>` (2.4); Outbox mit Lease (7.4) |
 | 0.14 | 2026-10-01 | Backlog: Nextcloud-Synchronisation (Einweg für Kontakte und Tasks, Rückkanal für erledigte Tasks); ICS-Export als Vorstufe |

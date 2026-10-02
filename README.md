@@ -9,6 +9,14 @@ Schlankes, selbst gehostetes CRM für Freelancer und Einzelunternehmer: Kontakte
 
 ![Pipeline mit Drag & Drop, Preismodellen und Summen je Phase](docs/images/pipeline.png)
 
+## Funktionen (MVP)
+- **Kontakte und Organisationen** mit Typ (Endkunde, Vermittler, Partner), Anschrift, Tags, Archivierung und CSV-Import (Vorlagen für HubSpot-Exporte)
+- **Projektanfragen** mit Preismodell (Stunden-/Tagessatz, Festpreis, Retainer), Laufzeit, live berechnetem Wert und Eingangsdatum für nachträglich erfasste Anfragen; **Pipeline** per Drag & Drop mit Summen je Phase
+- **Timeline** je Kontakt, Organisation und Anfrage: Notizen, Anrufe, Meetings, E-Mails, Bewerbungen, Aufgaben und lesbare Änderungen; Ansicht **Heute** mit fälligen Aufgaben und eingeschlafenen Anfragen
+- **Command Palette** (`Ctrl/Cmd + K`) mit tippfehlertoleranter Suche, Tastenkürzel, Inline-Bearbeitung
+- **Integration:** REST-API mit API-Keys, signierte Webhooks über eine transaktionale Outbox, Beispiel-Workflows für n8n
+- **Datenschutz:** DSGVO-Auskunft als JSON und endgültige Löschung mit anonymisiertem Änderungsprotokoll; Zwei-Faktor-Anmeldung per Authenticator-App und Passkeys
+
 ## Stand
 - **Iteration 1 (Walking Skeleton):** Login (Single-User), CI auf GitHub Actions, Image in GHCR, Deployment auf Coolify mit HTTPS, persistenten Data-Protection-Keys und S3-Backups.
 - **Iteration 2 (Kerndomäne):** Organisationen (Endkunde, Vermittler, Partner) und Kontakte mit Firmenzuordnung, Filtern, Sortierung und Archivierung; Projektanfragen mit Preismodell (Stunden-/Tagessatz, Festpreis, Retainer), Laufzeit und live berechnetem Wert; Pipeline-Board mit Drag & Drop, Won/Lost inklusive Absagegrund; Phasen in den Einstellungen verwalten. Jede Änderung wird per EF-Interceptor auditiert, Domain Events landen transaktional in der Outbox.
@@ -18,7 +26,13 @@ Schlankes, selbst gehostetes CRM für Freelancer und Einzelunternehmer: Kontakte
 
 - **Iteration 5 (Integration):** Domain Events gehen über die Outbox als signierte Webhooks raus (HMAC-SHA256 mit Zeitstempel, Retry mit Backoff bis zu sechsmal, Versandprotokoll in den Einstellungen). Den Hintergrunddienst können zwei Container gleichzeitig betreiben, ohne doppelt zuzustellen (`FOR UPDATE SKIP LOCKED`). Dazu kommt eine REST-API unter `/api/v1` mit API-Keys (nur gehasht gespeichert, 60 Anfragen pro Minute), Problem Details, JSON Merge Patch und OpenAPI/Scalar. Kontakte und Organisationen lassen sich per CSV importieren, mit Vorschau, Spalten-Mapping, Vorlagen für die HubSpot-Exporte, Dublettenprüfung und Bericht je Zeile; importierte Kontakte werden über die HubSpot-Firmen-ID mit ihrer Organisation verknüpft. Kontakte und Organisationen haben eine vollständige Anschrift mit Länderauswahl. Beispiel-Workflows für n8n: [docs/n8n-integration.md](docs/n8n-integration.md).
 
-Als Nächstes folgen DSGVO-Export und -Löschung sowie 2FA gemäß [Iterationsplan](docs/SPEC.md#8-iterationsplan).
+- **Iteration 6 (DSGVO & Politur):** DSGVO-Auskunft je Kontakt als JSON-Download (auch per API) und endgültige Löschung nach Eingabe des Namens: Activities und Aufgaben werden mitgelöscht, Anfragen bleiben ohne Ansprechpartner, und im Änderungsprotokoll bleibt nur ein Nachweis ohne Feldwerte; ein Webhook `contact.deleted` meldet die Löschung weiter. Zwei-Faktor-Anmeldung mit QR-Code für die Authenticator-App, Wiederherstellungscodes und Passkeys; alle Kontoseiten auf Deutsch im Stil der App. Anfragen haben ein Eingangsdatum, damit nachträglich erfasste Anfragen richtig einsortiert werden. Dazu die Sicherung der Data-Protection-Keys und eine [Datenschutz-Doku](docs/datenschutz.md).
+
+Damit ist das MVP abgeschlossen. Ideen für danach (u. a. Datenanreicherung, Dashboard, Nextcloud-Synchronisation) stehen im [Backlog](docs/SPEC.md#8-iterationsplan).
+
+![Endgültig löschen (DSGVO): der Dialog nennt die Folgen und verlangt den Namen des Kontakts](docs/images/contact-erasure.png)
+
+![Konto: Zwei-Faktor-Anmeldung aktiv, Wiederherstellungscodes und Authenticator-App verwalten](docs/images/account-2fa.png)
 
 ![Webhooks in den Einstellungen: Ereignisse, Test senden und Versandprotokoll mit Fehlversuch](docs/images/webhooks.png)
 
@@ -61,7 +75,13 @@ dotnet watch --project src/SoloCrm.Web
 ```bash
 dotnet test                                            # alle Tests (Integrationstests brauchen Docker)
 dotnet test --filter-not-trait "Category=Integration"  # schnell, ohne Docker
+
+# Testabdeckung von Domain und Application (Cobertura je Testprojekt, zusammengefasst als Tabelle)
+dotnet test --coverage --coverage-output-format cobertura --coverage-settings tests/coverage.config --results-directory TestResults
+python3 tests/coverage-summary.py TestResults/*.cobertura.xml
 ```
+
+**Testabdeckung (Stand MVP, Zeilen):** Domain 99,6 %, Application 98,5 %. Die CI misst sie bei jedem Lauf und zeigt sie in der Zusammenfassung des Workflows *Build & Test*; ein Mindestwert wird noch nicht erzwungen.
 
 ## Container
 ```bash
@@ -75,4 +95,5 @@ Das Image führt beim Start zuerst die Migrationen aus (`efbundle`) und startet 
 - [Iterationen](docs/iterations/)
 - [Deployment auf Coolify](deploy/coolify.md)
 - [n8n-Integration (Webhooks, REST-API)](docs/n8n-integration.md)
+- [Datenschutz (Auskunft, Löschung, Aufbewahrung)](docs/datenschutz.md)
 - [Hinweise für Claude Code](CLAUDE.md)
