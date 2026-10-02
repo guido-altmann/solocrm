@@ -1,20 +1,9 @@
-﻿<ul class="nav nav-pills flex-column">
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage" Match="NavLinkMatch.All">Profile</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/Email">Email</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/ChangePassword">Password</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/TwoFactorAuthentication">Two-factor authentication</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/Passkeys">Passkeys</NavLink>
-    </li>
-    <li class="nav-item">
-        <NavLink class="nav-link" href="Account/Manage/PersonalData">Personal data</NavLink>
-    </li>
-</ul>
+@* The account pages kept from the template (iteration 6 decision 8); e-mail and personal data are removed. *@
+<MudPaper Outlined="true" Class="py-2">
+    <MudNavMenu>
+        <MudNavLink Href="Account/Manage" Match="NavLinkMatch.All" Icon="@Icons.Material.Outlined.ManageAccounts">Übersicht</MudNavLink>
+        <MudNavLink Href="Account/Manage/ChangePassword" Icon="@Icons.Material.Outlined.Password">Passwort</MudNavLink>
+        <MudNavLink Href="Account/Manage/TwoFactorAuthentication" Icon="@Icons.Material.Outlined.PhonelinkLock">Zwei-Faktor</MudNavLink>
+        <MudNavLink Href="Account/Manage/Passkeys" Icon="@Icons.Material.Outlined.Key">Passkeys</MudNavLink>
+    </MudNavMenu>
+</MudPaper>

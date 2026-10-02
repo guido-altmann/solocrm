@@ -1,17 +1,14 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @layout SoloCrm.Web.Components.Layout.AccountLayout
 
-<h1>Manage your account</h1>
-
-<div>
-    <h2>Change your account settings</h2>
-    <hr />
-    <div class="row">
-        <div class="col-lg-3">
-            <ManageNavMenu />
-        </div>
-        <div class="col-lg-9">
+<MudText Typo="Typo.h4" Class="mb-4">Konto</MudText>
+<MudGrid Spacing="4">
+    <MudItem xs="12" md="3">
+        <ManageNavMenu />
+    </MudItem>
+    <MudItem xs="12" md="9">
+        <MudPaper Outlined="true" Class="pa-4">
             @Body
-        </div>
-    </div>
-</div>
+        </MudPaper>
+    </MudItem>
+</MudGrid>

@@ -38,7 +38,6 @@ public sealed class AuthorizationTests(PostgresFixture postgres) : IClassFixture
 
     [Theory]
     [InlineData("/Account/Login")]
-    [InlineData("/Account/ForgotPassword")]
     [InlineData("/health/live")]
     [InlineData("/_framework/blazor.web.js")]
     public async Task Get_PublicEndpointAnonymous_ReturnsOk(string path)

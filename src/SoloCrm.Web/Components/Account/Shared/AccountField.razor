@@ -1,0 +1,35 @@
+@using System.Linq.Expressions
+@typeparam TValue
+
+@* Label, native input (ChildContent, e.g. InputText with class "account-input") and validation message for the
+   statically rendered account forms. *@
+<div class="account-field">
+    <label for="@For" class="account-label">@Label</label>
+    @ChildContent
+    @if (Hint is not null)
+    {
+        <div class="account-hint">@Hint</div>
+    }
+    @if (Validation is not null)
+    {
+        <ValidationMessage For="Validation" class="account-error" />
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    /// <summary>Id of the input.</summary>
+    [Parameter, EditorRequired]
+    public string For { get; set; } = "";
+
+    [Parameter]
+    public string? Hint { get; set; }
+
+    [Parameter]
+    public Expression<Func<TValue>>? Validation { get; set; }
+
+    [Parameter, EditorRequired]
+    public RenderFragment ChildContent { get; set; } = default!;
+}

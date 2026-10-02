@@ -1,4 +1,4 @@
-﻿@page "/Account/LoginWithRecoveryCode"
+@page "/Account/LoginWithRecoveryCode"
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @attribute [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting(SoloCrm.Web.Hosting.LoginRateLimiting.PolicyName)]
 
@@ -11,29 +11,25 @@
 @inject IdentityRedirectManager RedirectManager
 @inject ILogger<LoginWithRecoveryCode> Logger
 
-<PageTitle>Recovery code verification</PageTitle>
+<PageTitle>Wiederherstellungscode · SoloCRM</PageTitle>
 
-<h1>Recovery code verification</h1>
-<hr />
-<StatusMessage Message="@message" />
-<p>
-    You have requested to log in with a recovery code. This login will not be remembered until you provide
-    an authenticator app code at log in or disable 2FA and log in again.
-</p>
-<div class="row">
-    <div class="col-md-4">
-        <EditForm Model="Input" FormName="login-with-recovery-code" OnValidSubmit="OnValidSubmitAsync" method="post">
-            <DataAnnotationsValidator />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.RecoveryCode" id="Input.RecoveryCode" class="form-control" autocomplete="off" placeholder="RecoveryCode" />
-                <label for="Input.RecoveryCode" class="form-label">Recovery Code</label>
-                <ValidationMessage For="() => Input.RecoveryCode" class="text-danger" />
-            </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
-        </EditForm>
-    </div>
-</div>
+<MudPaper Outlined="true" Class="pa-6 mx-auto" Style="max-width: 440px;">
+    <MudText Typo="Typo.h5" Class="mb-2">Mit Wiederherstellungscode anmelden</MudText>
+    <MudText Typo="Typo.body2" Class="mb-4">
+        Jeder Code funktioniert genau einmal. Erzeuge danach in den Kontoeinstellungen neue Codes oder richte die
+        Authenticator-App neu ein.
+    </MudText>
+    <StatusMessage Message="@message" />
+    <EditForm Model="Input" FormName="login-with-recovery-code" OnValidSubmit="OnValidSubmitAsync" method="post">
+        <DataAnnotationsValidator />
+        <AccountField Label="Wiederherstellungscode" For="Input.RecoveryCode" Validation="() => Input.RecoveryCode">
+            <InputText @bind-Value="Input.RecoveryCode" id="Input.RecoveryCode" class="account-input" autocomplete="off" autofocus />
+        </AccountField>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large">
+            Anmelden
+        </MudButton>
+    </EditForm>
+</MudPaper>
 
 @code {
     private string? message;
@@ -75,15 +71,14 @@
         else
         {
             Logger.LogWarning("Invalid recovery code entered for user with ID '{UserId}' ", userId);
-            message = "Error: Invalid recovery code entered.";
+            message = $"{StatusMessage.ErrorPrefix}Der Wiederherstellungscode ist ungültig.";
         }
     }
 
     private sealed class InputModel
     {
-        [Required]
+        [Required(ErrorMessage = "Bitte einen Wiederherstellungscode angeben.")]
         [DataType(DataType.Text)]
-        [Display(Name = "Recovery Code")]
         public string RecoveryCode { get; set; } = "";
     }
 }

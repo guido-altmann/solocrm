@@ -1,18 +1,14 @@
-﻿@page "/Account/Manage/EnableAuthenticator"
+@page "/Account/Manage/EnableAuthenticator"
 
 @using System.ComponentModel.DataAnnotations
-@using System.Globalization
-@using System.Text
-@using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Identity
 @using SoloCrm.Infrastructure.Identity
 
 @inject UserManager<ApplicationUser> UserManager
-@inject UrlEncoder UrlEncoder
 @inject IdentityRedirectManager RedirectManager
 @inject ILogger<EnableAuthenticator> Logger
 
-<PageTitle>Configure authenticator app</PageTitle>
+<PageTitle>Authenticator-App einrichten · SoloCRM</PageTitle>
 
 @if (recoveryCodes is not null)
 {
@@ -20,58 +16,38 @@
 }
 else
 {
+    <MudText Typo="Typo.h5" Class="mb-4">Authenticator-App einrichten</MudText>
     <StatusMessage Message="@message" />
-    <h3>Configure authenticator app</h3>
-    <div>
-        <p>To use an authenticator app go through the following steps:</p>
-        <ol class="list">
-            <li>
-                <p>
-                    Download a two-factor authenticator app like Microsoft Authenticator for
-                    <a href="https://go.microsoft.com/fwlink/?Linkid=825072">Android</a> and
-                    <a href="https://go.microsoft.com/fwlink/?Linkid=825073">iOS</a> or
-                    Google Authenticator for
-                    <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2&amp;hl=en">Android</a> and
-                    <a href="https://itunes.apple.com/us/app/google-authenticator/id388497605?mt=8">iOS</a>.
-                </p>
-            </li>
-            <li>
-                <p>Scan the QR Code or enter this key <kbd>@sharedKey</kbd> into your two factor authenticator app. Spaces and casing do not matter.</p>
-                <div class="alert alert-info">Learn how to <a href="https://go.microsoft.com/fwlink/?Linkid=852423">enable QR code generation</a>.</div>
-                <div></div>
-                <div data-url="@authenticatorUri"></div>
-            </li>
-            <li>
-                <p>
-                    Once you have scanned the QR code or input the key above, your two factor authentication app will provide you
-                    with a unique code. Enter the code in the confirmation box below.
-                </p>
-                <div class="row">
-                    <div class="col-xl-6">
-                        <EditForm Model="Input" FormName="send-code" OnValidSubmit="OnValidSubmitAsync" method="post">
-                            <DataAnnotationsValidator />
-                            <div class="form-floating mb-3">
-                                <InputText @bind-Value="Input.Code" id="Input.Code" class="form-control" autocomplete="off" placeholder="Enter the code" />
-                                <label for="Input.Code" class="control-label form-label">Verification Code</label>
-                                <ValidationMessage For="() => Input.Code" class="text-danger" />
-                            </div>
-                            <button type="submit" class="w-100 btn btn-lg btn-primary">Verify</button>
-                            <ValidationSummary class="text-danger" role="alert" />
-                        </EditForm>
-                    </div>
-                </div>
-            </li>
-        </ol>
-    </div>
+    <ol class="account-steps">
+        <li>
+            <MudText Typo="Typo.body1">
+                Installiere eine Authenticator-App, z. B. Aegis oder 2FAS (Android), 2FAS (iOS) oder Microsoft bzw. Google Authenticator.
+            </MudText>
+        </li>
+        <li>
+            <MudText Typo="Typo.body1" Class="mb-2">Scanne den QR-Code oder gib den Schlüssel manuell ein (Leerzeichen und Groß-/Kleinschreibung sind egal).</MudText>
+            <div class="account-qr" data-testid="authenticator-qr" data-uri="@authenticatorUri">@((MarkupString)qrCodeSvg!)</div>
+            <MudText Typo="Typo.body2" Class="mt-2">Schlüssel: <kbd data-testid="authenticator-key">@sharedKey</kbd></MudText>
+        </li>
+        <li>
+            <MudText Typo="Typo.body1" Class="mb-2">Gib den Code ein, den die App anzeigt.</MudText>
+            <EditForm Model="Input" FormName="send-code" OnValidSubmit="OnValidSubmitAsync" method="post" style="max-width: 320px;">
+                <DataAnnotationsValidator />
+                <AccountField Label="Code" For="Input.Code" Validation="() => Input.Code">
+                    <InputText @bind-Value="Input.Code" id="Input.Code" class="account-input" autocomplete="one-time-code" inputmode="numeric" />
+                </AccountField>
+                <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary">Bestätigen und aktivieren</MudButton>
+            </EditForm>
+        </li>
+    </ol>
 }
 
 @code {
-    private const string AuthenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
-
     private string? message;
     private ApplicationUser? user;
     private string? sharedKey;
     private string? authenticatorUri;
+    private string? qrCodeSvg;
     private IEnumerable<string>? recoveryCodes;
 
     [CascadingParameter]
@@ -91,7 +67,7 @@ else
             return;
         }
 
-        await LoadSharedKeyAndQrCodeUriAsync(user);
+        await LoadSharedKeyAndQrCodeAsync(user);
     }
 
     private async Task OnValidSubmitAsync()
@@ -110,7 +86,7 @@ else
 
         if (!is2faTokenValid)
         {
-            message = "Error: Verification code is invalid.";
+            message = $"{StatusMessage.ErrorPrefix}Der Code ist ungültig. Stimmt die Uhrzeit auf dem Smartphone?";
             return;
         }
 
@@ -118,7 +94,7 @@ else
         var userId = await UserManager.GetUserIdAsync(user);
         Logger.LogInformation("User with ID '{UserId}' has enabled 2FA with an authenticator app.", userId);
 
-        message = "Your authenticator app has been verified.";
+        message = "Die Authenticator-App ist eingerichtet, die Zwei-Faktor-Anmeldung ist aktiv.";
 
         if (await UserManager.CountRecoveryCodesAsync(user) == 0)
         {
@@ -130,9 +106,8 @@ else
         }
     }
 
-    private async ValueTask LoadSharedKeyAndQrCodeUriAsync(ApplicationUser user)
+    private async ValueTask LoadSharedKeyAndQrCodeAsync(ApplicationUser user)
     {
-        // Load the authenticator key & QR code URI to display on the form
         var unformattedKey = await UserManager.GetAuthenticatorKeyAsync(user);
         if (string.IsNullOrEmpty(unformattedKey))
         {
@@ -140,45 +115,17 @@ else
             unformattedKey = await UserManager.GetAuthenticatorKeyAsync(user);
         }
 
-        sharedKey = FormatKey(unformattedKey!);
-
+        sharedKey = AuthenticatorSetup.FormatKey(unformattedKey!);
         var email = await UserManager.GetEmailAsync(user);
-        authenticatorUri = GenerateQrCodeUri(email!, unformattedKey!);
-    }
-
-    private string FormatKey(string unformattedKey)
-    {
-        var result = new StringBuilder();
-        int currentPosition = 0;
-        while (currentPosition + 4 < unformattedKey.Length)
-        {
-            result.Append(unformattedKey.AsSpan(currentPosition, 4)).Append(' ');
-            currentPosition += 4;
-        }
-        if (currentPosition < unformattedKey.Length)
-        {
-            result.Append(unformattedKey.AsSpan(currentPosition));
-        }
-
-        return result.ToString().ToLowerInvariant();
-    }
-
-    private string GenerateQrCodeUri(string email, string unformattedKey)
-    {
-        return string.Format(
-            CultureInfo.InvariantCulture,
-            AuthenticatorUriFormat,
-            UrlEncoder.Encode("Microsoft.AspNetCore.Identity.UI"),
-            UrlEncoder.Encode(email),
-            unformattedKey);
+        authenticatorUri = AuthenticatorSetup.Uri(email!, unformattedKey!);
+        qrCodeSvg = AuthenticatorSetup.QrCodeSvg(authenticatorUri);
     }
 
     private sealed class InputModel
     {
-        [Required]
-        [StringLength(7, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [Required(ErrorMessage = "Bitte den Code aus der App angeben.")]
+        [StringLength(7, MinimumLength = 6, ErrorMessage = "Der Code hat sechs Ziffern.")]
         [DataType(DataType.Text)]
-        [Display(Name = "Verification Code")]
         public string Code { get; set; } = "";
     }
 }

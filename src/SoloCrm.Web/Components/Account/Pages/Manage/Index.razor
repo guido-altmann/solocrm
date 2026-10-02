@@ -1,91 +1,56 @@
-﻿@page "/Account/Manage"
+@page "/Account/Manage"
 
-@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Identity
 @using SoloCrm.Infrastructure.Identity
 
 @inject UserManager<ApplicationUser> UserManager
-@inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Profile</PageTitle>
+<PageTitle>Konto · SoloCRM</PageTitle>
 
-<h3>Profile</h3>
+<MudText Typo="Typo.h5" Class="mb-4">Übersicht</MudText>
 <StatusMessage />
 
-<div class="row">
-    <div class="col-xl-6">
-        <EditForm Model="Input" FormName="profile" OnValidSubmit="OnValidSubmitAsync" method="post">
-            <DataAnnotationsValidator />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <input type="text" value="@username" id="username" class="form-control" placeholder="Choose your username." disabled />
-                <label for="username" class="form-label">Username</label>
-            </div>
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.PhoneNumber" id="Input.PhoneNumber" class="form-control" placeholder="Enter your phone number" />
-                <label for="Input.PhoneNumber" class="form-label">Phone number</label>
-                <ValidationMessage For="() => Input.PhoneNumber" class="text-danger" />
-            </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Save</button>
-        </EditForm>
-    </div>
-</div>
+<MudSimpleTable Dense="true" Elevation="0" Class="mb-4">
+    <tbody>
+        <tr>
+            <th scope="row">Angemeldet als</th>
+            <td data-testid="account-name">@userName</td>
+        </tr>
+        <tr>
+            <th scope="row">Zwei-Faktor-Anmeldung</th>
+            <td data-testid="account-2fa">@(is2faEnabled ? "aktiv" : "nicht aktiv")</td>
+        </tr>
+        <tr>
+            <th scope="row">Passkeys</th>
+            <td>@(passkeyCount == 1 ? "1 Passkey" : $"{passkeyCount} Passkeys")</td>
+        </tr>
+    </tbody>
+</MudSimpleTable>
+
+<MudText Typo="Typo.body2" Class="mud-text-secondary">
+    Die E-Mail-Adresse des Kontos kommt aus der Konfiguration (<code>Admin__Email</code>) und wird hier nicht geändert.
+</MudText>
 
 @code {
-    private ApplicationUser? user;
-    private string? username;
-    private string? phoneNumber;
+    private string? userName;
+    private bool is2faEnabled;
+    private int passkeyCount;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 
-    [SupplyParameterFromForm]
-    private InputModel Input { get; set; } = default!;
-
     protected override async Task OnInitializedAsync()
     {
-        Input ??= new();
-
-        user = await UserManager.GetUserAsync(HttpContext.User);
+        var user = await UserManager.GetUserAsync(HttpContext.User);
         if (user is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
             return;
         }
 
-        username = await UserManager.GetUserNameAsync(user);
-        phoneNumber = await UserManager.GetPhoneNumberAsync(user);
-
-        Input.PhoneNumber ??= phoneNumber;
-    }
-
-    private async Task OnValidSubmitAsync()
-    {
-        if (user is null)
-        {
-            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
-            return;
-        }
-
-        if (Input.PhoneNumber != phoneNumber)
-        {
-            var setPhoneResult = await UserManager.SetPhoneNumberAsync(user, Input.PhoneNumber);
-            if (!setPhoneResult.Succeeded)
-            {
-                RedirectManager.RedirectToCurrentPageWithStatus("Error: Failed to set phone number.", HttpContext);
-                return;
-            }
-        }
-
-        await SignInManager.RefreshSignInAsync(user);
-        RedirectManager.RedirectToCurrentPageWithStatus("Your profile has been updated", HttpContext);
-    }
-
-    private sealed class InputModel
-    {
-        [Phone]
-        [Display(Name = "Phone number")]
-        public string? PhoneNumber { get; set; }
+        userName = await UserManager.GetUserNameAsync(user);
+        is2faEnabled = await UserManager.GetTwoFactorEnabledAsync(user);
+        passkeyCount = (await UserManager.GetPasskeysAsync(user)).Count;
     }
 }

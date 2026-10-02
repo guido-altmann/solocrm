@@ -71,9 +71,9 @@ try
         })
         .AddEntityFrameworkStores<CrmDbContext>()
         .AddSignInManager()
-        .AddDefaultTokenProviders();
+        .AddDefaultTokenProviders()
+        .AddErrorDescriber<GermanIdentityErrorDescriber>();
 
-    builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
     builder.Services.AddAdminSeeding(builder.Configuration);
 
     var app = builder.Build();

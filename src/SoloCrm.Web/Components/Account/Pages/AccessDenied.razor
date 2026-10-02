@@ -1,9 +1,8 @@
-﻿@page "/Account/AccessDenied"
+@page "/Account/AccessDenied"
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 
-<PageTitle>Access denied</PageTitle>
+<PageTitle>Zugriff verweigert · SoloCRM</PageTitle>
 
-<header>
-    <h1 class="text-danger">Access denied</h1>
-    <p class="text-danger">You do not have access to this resource.</p>
-</header>
+<MudAlert Severity="Severity.Error" Class="mx-auto" Style="max-width: 440px;" role="alert">
+    Kein Zugriff auf diese Seite.
+</MudAlert>

@@ -1,15 +1,28 @@
 @inherits LayoutComponentBase
 
-@* Identity pages are statically rendered (SSR) and keep the Bootstrap-based template styling for now. *@
-<HeadContent>
-    <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
-</HeadContent>
+@* Identity pages are rendered statically (SSR): signing in and changing the password need the HttpContext to write
+   the cookie. They use the app theme and the MudBlazor components that render plain HTML; form inputs are native
+   elements styled like the app (AccountField), because MudBlazor inputs need interactivity. *@
+<MudThemeProvider Theme="SoloCrmTheme.Instance" />
 
-<div class="container py-4" style="max-width: 960px;">
-    <header class="d-flex align-items-center justify-content-between mb-4">
-        <a href="/" class="h4 mb-0 text-decoration-none">SoloCRM</a>
-    </header>
-    <main>
-        @Body
-    </main>
-</div>
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
+        <MudLink Href="/" Typo="Typo.h6" Color="Color.Inherit" Underline="Underline.None" Class="ml-2">SoloCRM</MudLink>
+        <MudSpacer />
+        <AuthorizeView>
+            <Authorized>
+                <MudButton Href="/" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.ArrowBack">Zur App</MudButton>
+                <form action="Account/Logout" method="post" class="ml-2">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="ReturnUrl" value="" />
+                    <MudButton ButtonType="ButtonType.Submit" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Logout">Abmelden</MudButton>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+    </MudAppBar>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Medium" Class="py-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>

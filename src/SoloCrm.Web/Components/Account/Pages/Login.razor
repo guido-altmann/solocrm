@@ -13,52 +13,32 @@
 @inject ILogger<Login> Logger
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Log in</PageTitle>
+<PageTitle>Anmelden · SoloCRM</PageTitle>
 
-<h1>Log in</h1>
-<div class="row">
-    <div class="col-lg-6">
-        <section>
-            <StatusMessage Message="@errorMessage" />
-            <EditForm EditContext="editContext" method="post" OnSubmit="LoginUser" FormName="login">
-                <DataAnnotationsValidator />
-                <h2>Use a local account to log in.</h2>
-                <hr />
-                <ValidationSummary class="text-danger" role="alert" />
-                <div class="form-floating mb-3">
-                    <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username webauthn" aria-required="true" placeholder="name@example.com" />
-                    <label for="Input.Email" class="form-label">Email</label>
-                    <ValidationMessage For="() => Input.Email" class="text-danger" />
-                </div>
-                <div class="form-floating mb-3">
-                    <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
-                    <label for="Input.Password" class="form-label">Password</label>
-                    <ValidationMessage For="() => Input.Password" class="text-danger" />
-                </div>
-                <div class="checkbox mb-3">
-                    <label class="form-label">
-                        <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input" />
-                        Remember me
-                    </label>
-                </div>
-                <div>
-                    <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
-                </div>
-                <hr />
-                <div class="d-flex flex-column">
-                    <span class="text-secondary mx-auto mt-2">OR</span>
-                    <PasskeySubmit Operation="PasskeyOperation.Request" Name="Input.Passkey" EmailName="Input.Email" class="btn btn-link mx-auto">Log in with a passkey</PasskeySubmit>
-                </div>
-                <hr />
-                <div>
-                    <p>
-                        <a href="Account/ForgotPassword">Forgot your password?</a>
-                    </p>
-                </div>
-            </EditForm>
-        </section>
-    </div>
-</div>
+<MudPaper Outlined="true" Class="pa-6 mx-auto" Style="max-width: 440px;">
+    <MudText Typo="Typo.h5" Class="mb-4">Anmelden</MudText>
+    <StatusMessage Message="@errorMessage" />
+    <EditForm EditContext="editContext" method="post" OnSubmit="LoginUser" FormName="login">
+        <DataAnnotationsValidator />
+        <AccountField Label="E-Mail" For="Input.Email" Validation="() => Input.Email">
+            <InputText @bind-Value="Input.Email" id="Input.Email" class="account-input" autocomplete="username webauthn" aria-required="true" />
+        </AccountField>
+        <AccountField Label="Passwort" For="Input.Password" Validation="() => Input.Password">
+            <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="account-input" autocomplete="current-password" aria-required="true" />
+        </AccountField>
+        <label class="account-checkbox mb-4">
+            <InputCheckbox @bind-Value="Input.RememberMe" />
+            Angemeldet bleiben
+        </label>
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large">
+            Anmelden
+        </MudButton>
+        <MudDivider Class="my-4" />
+        <PasskeySubmit Operation="PasskeyOperation.Request" Name="Input.Passkey" EmailName="Input.Email" class="account-button-outlined">
+            Mit Passkey anmelden
+        </PasskeySubmit>
+    </EditForm>
+</MudPaper>
 
 @code {
     private string? errorMessage;
@@ -90,7 +70,7 @@
     {
         if (!string.IsNullOrEmpty(Input.Passkey?.Error))
         {
-            errorMessage = $"Error: {Input.Passkey.Error}";
+            errorMessage = $"{StatusMessage.ErrorPrefix}{Input.Passkey.Error}";
             return;
         }
 
@@ -131,21 +111,20 @@
         }
         else
         {
-            errorMessage = "Error: Invalid login attempt.";
+            errorMessage = $"{StatusMessage.ErrorPrefix}E-Mail oder Passwort ist falsch.";
         }
     }
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "Bitte die E-Mail-Adresse angeben.")]
+        [EmailAddress(ErrorMessage = "Bitte eine gültige E-Mail-Adresse angeben.")]
         public string Email { get; set; } = "";
 
-        [Required]
+        [Required(ErrorMessage = "Bitte das Passwort angeben.")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = "";
 
-        [Display(Name = "Remember me?")]
         public bool RememberMe { get; set; }
 
         public PasskeyInputModel? Passkey { get; set; }
