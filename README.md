@@ -92,7 +92,7 @@ Das Image führt beim Start zuerst die Migrationen aus (`efbundle`) und startet 
 ## Dokumentation
 - [Spezifikation](docs/SPEC.md)
 - [Architekturentscheidungen (ADRs)](docs/adr/README.md)
-- [Iterationen](docs/iterations/)
+- [Iterationen des MVP](docs/iterations/) (abgeschlossen); Backlog seitdem in Jira (Projekt `SOL`)
 - [Deployment auf Coolify](deploy/coolify.md)
 - [n8n-Integration (Webhooks, REST-API)](docs/n8n-integration.md)
 - [Datenschutz (Auskunft, Löschung, Aufbewahrung)](docs/datenschutz.md)

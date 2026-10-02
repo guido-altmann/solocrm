@@ -4,7 +4,8 @@
 **SoloCRM**: ein schlankes, selbst gehostetes CRM für Freelancer (Eigenbedarf, Lern- und Referenzprojekt).
 - Fachliche und technische Spezifikation: `docs/SPEC.md` (**vor jeder Feature-Arbeit lesen**)
 - Architekturentscheidungen: `docs/adr/` (bindend; Abweichungen nur mit neuem ADR)
-- Aktueller Auftrag: die jeweils offene Datei in `docs/iterations/`
+- Backlog und aktueller Auftrag: Jira-Projekt **SoloCRM** (Key `SOL`, Kanban), <https://guido-altmann-team.atlassian.net/browse/SOL>. Zugriff über den Atlassian-Connector.
+- `docs/iterations/`: Historie der MVP-Iterationen 1–6 (abgeschlossen, nicht mehr fortführen)
 
 ## Sprache
 - Code, Bezeichner, Commit-Messages, Code-Kommentare: **Englisch**
@@ -56,7 +57,7 @@ docker build -t solocrm:local .
 - EF-Konfiguration per `IEntityTypeConfiguration<T>` in `Infrastructure/Persistence/Configurations/`
 - Tabellen- und Spaltennamen in snake_case (`EFCore.NamingConventions`)
 - Enums als string in der DB speichern
-- Keine auskommentierten Code-Leichen; TODOs nur mit Verweis auf eine Story (`// TODO(US-12): …`)
+- Keine auskommentierten Code-Leichen; TODOs nur mit Verweis auf ein Ticket (`// TODO(SOL-12): …`)
 
 ## Tests
 - Jeder Handler bekommt mindestens einen Test für den Happy Path und die Validierungsfehler.
@@ -67,12 +68,12 @@ docker build -t solocrm:local .
 - Integrationstests mit `[Trait("Category","Integration")]` markieren.
 
 ## Arbeitsweise
-1. Vor der Umsetzung einer Story: die relevanten Abschnitte in `docs/SPEC.md` lesen und einen kurzen Plan nennen.
+1. Vor der Umsetzung eines Tickets: das Jira-Ticket und die dort verlinkten Abschnitte in `docs/SPEC.md` lesen und einen kurzen Plan nennen. Beim Start das Ticket auf „In Arbeit“ setzen.
 2. In kleinen, lauffähigen Schritten arbeiten. Nach jedem Schritt `dotnet build` und die betroffenen Tests ausführen.
 3. Weicht die Umsetzung von der Spec ab oder ist die Spec unklar: **nachfragen**, nicht raten. Ist eine Spec-Änderung nötig, `docs/SPEC.md` mit anpassen.
 4. Bei neuen Architekturentscheidungen: einen ADR in `docs/adr/` vorschlagen (Vorlage: `docs/adr/0000-template.md`).
-5. Nach Abschluss einer Story: die Checkbox in der Iterationsdatei abhaken.
-6. Commits im Conventional-Commits-Format: `feat(contacts): add quick-add dialog (US-01)`
+5. Nach Abschluss eines Tickets: es in Jira auf „Fertig“ setzen. Umsetzungsentscheidungen, die die Spec betreffen, in `docs/SPEC.md` nachziehen, alles andere als Kommentar ins Ticket.
+6. Commits im Conventional-Commits-Format mit Jira-Key: `feat(sync): add ics feed for tasks (SOL-6)`. Die alten Story-IDs (`US-01` … `US-21`) bleiben für das MVP gültig.
 
 ## Sicherheit & Datenschutz
 - Secrets niemals ins Repo; nur über Umgebungsvariablen bzw. `dotnet user-secrets` lokal.

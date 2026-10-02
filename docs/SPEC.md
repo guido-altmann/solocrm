@@ -1,9 +1,9 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** v1.0 (MVP) · **Stand:** 2026-10-02 · **Owner:** Guido Altmann
+> **Status:** v1.1 (MVP) · **Stand:** 2026-10-02 · **Owner:** Guido Altmann
 
-Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, konkrete Iterationsaufträge in `docs/iterations/`.
+Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, die abgeschlossenen MVP-Iterationen in `docs/iterations/`; der Backlog nach dem MVP liegt im Jira-Projekt `SOL` (siehe Kap. 8).
 
 ---
 
@@ -577,22 +577,13 @@ public static class CreateContact
 | **5** | Integration | US-16 – US-18 | CSV-Import, REST-API + API-Keys, Outbox-Verarbeitung + Webhooks |
 | **6** | DSGVO & Politur | US-19 – US-21 (2FA), Eingangsdatum für Anfragen | Export/Löschung, 2FA, README, Screenshots, ADRs final |
 
-**Backlog nach MVP** (nicht priorisiert):
-- Datenanreicherung für Kontakte und Organisationen per Web-Suche/KI (Konzept siehe Kap. 9)
-- Custom Properties (Ausbau von `ExtraFields`)
-- Gespeicherte Filter und Listen
-- E-Mail-Logging via Microsoft Graph/IMAP
-- Dashboard: Win-Rate, Ø Stunden-/Tagessatz (normalisiert auf €/h), Pipeline-Wert, MRR aus gewonnenen Retainern
-- KI-Features: Zusammenfassung von Notizen, semantische Suche via pgvector
-- ICS-Export der Tasks (abonnierbarer Feed, nur lesend; schnelle Vorstufe der Nextcloud-Synchronisation)
-- **Nextcloud-Synchronisation** über die Standardschnittstellen (nicht über die AppAPI, die für in Nextcloud eingebettete ExApps gedacht ist). Erster Entwurf:
+**Backlog nach MVP:** Die Iterationen sind mit dem MVP abgeschlossen. Offene Punkte werden seitdem im Jira-Projekt **SoloCRM** (Key `SOL`) auf einem Kanban-Board gepflegt: <https://guido-altmann-team.atlassian.net/browse/SOL>. Die Tickets verweisen auf die Abschnitte dieser Spec; fachliche Konzepte bleiben hier, Priorisierung und Status liegen im Board.
+
+**Konzeptentwurf Nextcloud-Synchronisation** (Epic SOL-2) über die Standardschnittstellen (nicht über die AppAPI, die für in Nextcloud eingebettete ExApps gedacht ist). Vorstufe ist ein ICS-Export der Tasks (abonnierbarer Feed, nur lesend).
   - **Einweg SoloCRM → Nextcloud:** Kontakte per CardDAV in ein eigenes Adressbuch „SoloCRM“, Tasks per CalDAV (`VTODO`) in eine eigene Aufgabenliste; SoloCRM ist Master. Feldzuordnung vCard: Name, `EMAIL`, `TEL`, `ORG`, `TITLE`, `URL` (LinkedIn); `VTODO`: Titel, Fälligkeit, Status, Link zum Bezugsobjekt in der Beschreibung.
   - **Rückkanal nur für Tasks:** in Nextcloud bzw. auf dem Handy (z. B. DAVx5) abgehakte oder wieder geöffnete Aufgaben werden in SoloCRM erledigt bzw. geöffnet (über `CompleteTask`/`ReopenTask`, also mit Audit und Events); andere Änderungen an synchronisierten Einträgen werden beim nächsten Abgleich überschrieben.
   - **Technik:** Zuordnungstabelle (Datensatz-Id ↔ Remote-Href + ETag), Abgleich per Hintergrunddienst (ADR-008), Änderungserkennung über `UpdatedAt` bzw. `sync-token` (RFC 6578); Zugang per Nextcloud-App-Passwort, verschlüsselt per Data Protection; Pakete für vCard/iCalendar (z. B. `FolkerKinzel.VCards`, `Ical.Net`) vor der Umsetzung klären; Entscheidung als eigener ADR.
   - **Bewusst nicht im ersten Entwurf:** Zwei-Wege-Sync von Kontakten, Notizen/Activities (passen schlecht zum Modell der Nextcloud-Notes-App).
-- Umrechnung zwischen Währungen (aktuell nur Anzeige in der erfassten Währung)
-- Stundensatz-Varianten je Anfrage (z. B. Remote- vs. Vor-Ort-Satz); im MVP gibt es einen Satz pro Anfrage
-- Entscheidung, ob die Datenanreicherung in der App (Hintergrundjob + LLM-API) oder in n8n läuft (Kap. 9)
 
 ---
 
@@ -637,8 +628,8 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 - [x] Migrations-Strategie beim Deploy (siehe 7.6) → `efbundle` im Entrypoint (ADR-009)
 - [x] Welche HubSpot-Felder werden beim Import tatsächlich benötigt? → Vorlage siehe `docs/iterations/05-integration.md`, Entscheidung 9 (Name, E-Mail, Telefon, Rolle, LinkedIn, Firma, Quelle, Record ID)
 - [x] Repo öffentlich ab Iteration 1 oder erst ab MVP? → öffentlich ab Iteration 1
-- [x] Datenanreicherung: in der App (Hintergrundjob + LLM-API) oder ausgelagert in n8n? → nicht im MVP entschieden, in den Backlog (Kap. 8) verschoben
-- [x] Brauche ich Stundensatz-Varianten (z. B. Remote- vs. Vor-Ort-Satz) oder reicht ein Satz pro Anfrage? → im MVP ein Satz pro Anfrage; Varianten im Backlog (Kap. 8)
+- [x] Datenanreicherung: in der App (Hintergrundjob + LLM-API) oder ausgelagert in n8n? → nicht im MVP entschieden, in den Backlog verschoben (SOL-3)
+- [x] Brauche ich Stundensatz-Varianten (z. B. Remote- vs. Vor-Ort-Satz) oder reicht ein Satz pro Anfrage? → im MVP ein Satz pro Anfrage; Varianten im Backlog (SOL-17)
 
 ## 11. Glossar
 | Begriff | Bedeutung |
@@ -672,6 +663,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
 | 1.0 | 2026-10-02 | Abschluss It. 6 (MVP): DSGVO-Auskunft und -Löschung mit Umsetzungsdetails (US-19/20, 2.6 `ContactDeleted`, 5 Export-Endpunkt), 2FA und Kontoseiten (US-21), Eingangsdatum `ReceivedOn` für Anfragen (2.3, US-06 AK6, S1, 5), Konto-Abschnitt in S6, Kontakt-Menü in S5, Testabdeckung gemessen (6); offene Fragen aus Kap. 10 in den Backlog verschoben; Datenschutz-Doku `docs/datenschutz.md` |
+| 1.1 | 2026-10-02 | Backlog nach MVP ins Jira-Projekt `SOL` verlagert (8); Nextcloud-Entwurf bleibt als Konzept in Kap. 8; Verweise in Kap. 10 auf Tickets umgestellt |
 | 0.16 | 2026-10-01 | Erweiterung It. 5: Anschrift (`Address`) für Kontakte und Organisationen (2.3), Organisationsimport mit HubSpot-Vorlage und Verknüpfung per HubSpot-Firmen-ID (US-16) |
 | 0.15 | 2026-10-01 | Umsetzung It. 5: REST-API final (5: Listenparameter, Statuscodes, `organizationName`, Tasks per `PATCH` erledigen); Webhook-Header `X-SoloCrm-Event` und `webhook.ping`; `WebhookDelivery` mit `EventId`/`EventType` statt FK, `ProtectedSecret`, Key-Format `scrm_<prefix>_<secret>` (2.4); Outbox mit Lease (7.4) |
 | 0.14 | 2026-10-01 | Backlog: Nextcloud-Synchronisation (Einweg für Kontakte und Tasks, Rückkanal für erledigte Tasks); ICS-Export als Vorstufe |
