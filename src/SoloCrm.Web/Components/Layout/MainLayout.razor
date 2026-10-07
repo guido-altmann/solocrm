@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 @inject IDialogService DialogService
 @inject IJSRuntime JS
+@inject SoloCrm.Application.Abstractions.AppClock Clock
 
 <MudThemeProvider @ref="_themeProvider" Theme="SoloCrmTheme.Instance" @bind-IsDarkMode="_isDarkMode" />
 <MudPopoverProvider />
@@ -40,6 +41,10 @@
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="1"
                Variant="DrawerVariant.Responsive" Breakpoint="Breakpoint.Md">
         <NavMenu />
+        <div class="mt-auto pa-4">
+            <MudLink Href="https://www.guido-altmann.de" Target="_blank" Typo="Typo.caption"
+                     Color="Color.Default" Underline="Underline.Hover">© @Clock.Now.Year Guido Altmann</MudLink>
+        </div>
     </MudDrawer>
 
     <MudMainContent>
