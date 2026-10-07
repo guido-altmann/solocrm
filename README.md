@@ -97,3 +97,8 @@ Das Image führt beim Start zuerst die Migrationen aus (`efbundle`) und startet 
 - [n8n-Integration (Webhooks, REST-API)](docs/n8n-integration.md)
 - [Datenschutz (Auskunft, Löschung, Aufbewahrung)](docs/datenschutz.md)
 - [Hinweise für Claude Code](CLAUDE.md)
+
+## Lizenz
+Copyright (C) 2026 Guido Altmann
+
+SoloCRM steht unter der [GNU Affero General Public License v3.0 oder später](LICENSE) (`AGPL-3.0-or-later`). Wer modifizierte Versionen als Netzwerkdienst betreibt, muss den Quelltext seiner Version den Nutzern zur Verfügung stellen. Begründung: [ADR-012](docs/adr/0012-lizenz-agpl-3.md).

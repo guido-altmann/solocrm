@@ -13,5 +13,6 @@
 | [009](0009-deployment-coolify.md) | Deployment auf Coolify | Accepted |
 | [010](0010-outbox-pattern-webhooks.md) | Transactional Outbox für Webhooks | Accepted |
 | [011](0011-value-objects-pricing-duration.md) | Preismodell und Laufzeit als Value Objects | Accepted |
+| [012](0012-lizenz-agpl-3.md) | Lizenz AGPL-3.0-or-later | Proposed |
 
 Neue ADRs: Vorlage `0000-template.md` kopieren, fortlaufend nummerieren, Tabelle ergänzen.
