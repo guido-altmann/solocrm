@@ -7,7 +7,8 @@ namespace SoloCrm.Web.Components.Shared;
 /// </summary>
 public static class Formats
 {
-    private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");
+    /// <summary>German culture, also used by the date pickers (weekday names, first day of the week).</summary>
+    public static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");
 
     public static string Date(DateOnly date) => date.ToString("dd.MM.yyyy", German);
 

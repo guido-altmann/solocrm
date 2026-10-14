@@ -18,7 +18,7 @@
                     }
                 </MudSelect>
                 <div class="d-flex gap-2">
-                    <MudDatePicker @bind-Date="_date" Label="Datum" Editable="true" DateFormat="dd.MM.yyyy" MaxDate="@Clock.Now.Date"
+                    <MudDatePicker Culture="Formats.German" @bind-Date="_date" Label="Datum" Editable="true" DateFormat="dd.MM.yyyy" MaxDate="@Clock.Now.Date"
                                    Error="@_errors.Has(nameof(UpdateActivity.Command.OccurredAt))"
                                    ErrorText="@_errors.Text(nameof(UpdateActivity.Command.OccurredAt))" />
                     <MudTimePicker @bind-Time="_time" Label="Uhrzeit" AmPm="false" Editable="true" />

@@ -30,7 +30,7 @@
                           ErrorText="@_errors.Text(nameof(LogActivity.Command.Subject))" />
         </MudItem>
         <MudItem xs="6" sm="3">
-            <MudDatePicker @bind-Date="_date" Label="Datum" Placeholder="Heute" Clearable="true" Margin="Margin.Dense" Editable="true"
+            <MudDatePicker Culture="Formats.German" @bind-Date="_date" Label="Datum" Placeholder="Heute" Clearable="true" Margin="Margin.Dense" Editable="true"
                            DateFormat="dd.MM.yyyy" MaxDate="@Clock.Now.Date"
                            Error="@_errors.Has(nameof(LogActivity.Command.OccurredAt))"
                            ErrorText="@_errors.Text(nameof(LogActivity.Command.OccurredAt))" />

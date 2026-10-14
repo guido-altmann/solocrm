@@ -131,12 +131,12 @@
                     </MudItem>
                     <MudItem xs="12" sm="6">
                         @* Requests are sometimes recorded later (iteration 6 decision 11). *@
-                        <MudDatePicker @bind-Date="_receivedOn" Label="Eingegangen am" DateFormat="dd.MM.yyyy" MaxDate="Clock.Today.ToDateTime(TimeOnly.MinValue)"
+                        <MudDatePicker Culture="Formats.German" @bind-Date="_receivedOn" Label="Eingegangen am" DateFormat="dd.MM.yyyy" MaxDate="Clock.Today.ToDateTime(TimeOnly.MinValue)"
                                        Required="true" Error="@_errors.Has(nameof(IOpportunityFields.ReceivedOn))"
                                        ErrorText="@_errors.Text(nameof(IOpportunityFields.ReceivedOn))" data-test="received-on" />
                     </MudItem>
                     <MudItem xs="12" sm="6">
-                        <MudDatePicker @bind-Date="_startDate" Label="Start" Clearable="true" DateFormat="dd.MM.yyyy" />
+                        <MudDatePicker Culture="Formats.German" @bind-Date="_startDate" Label="Start" Clearable="true" DateFormat="dd.MM.yyyy" />
                     </MudItem>
                     <MudItem xs="12" Class="d-flex flex-column justify-center">
                         <MudText Typo="Typo.subtitle2" data-test="estimated-value">

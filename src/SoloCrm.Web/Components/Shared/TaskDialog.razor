@@ -15,7 +15,7 @@
                               MaxLength="@TaskItem.TitleMaxLength"
                               Error="@_errors.Has(nameof(ITaskFields.Title))"
                               ErrorText="@_errors.Text(nameof(ITaskFields.Title))" />
-                <MudDatePicker @bind-Date="_dueDate" Label="Fällig am" Clearable="true" Editable="true" DateFormat="dd.MM.yyyy"
+                <MudDatePicker Culture="Formats.German" @bind-Date="_dueDate" Label="Fällig am" Clearable="true" Editable="true" DateFormat="dd.MM.yyyy"
                                HelperText="leer = ohne Termin" />
                 <div class="d-flex flex-wrap gap-1">
                     <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined" OnClick="() => SetDue(0)">Heute</MudChip>
