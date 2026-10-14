@@ -31,6 +31,7 @@ In Coolify (bzw. lokal per `dotnet user-secrets`), niemals im Repo:
 | `Mail__Graph__ClientId` | Anwendungs-ID (Client) | – |
 | `Mail__Graph__ClientSecret` | Wert des Client-Secrets | – |
 | `Mail__BackfillDays` | Beim ersten Abgleich nachgeladene Tage (`0` = nur ab Aktivierung) | `30` |
+| `Mail__RaiseActivityLoggedEvents` | Ob importierte Mails das Event `activity.logged` (und damit Webhooks) auslösen. Aus, damit die Nachladung keine Flut an Webhook-Aufrufen verursacht | `false` |
 | `Mail__PollingInterval` | Abstand der Abgleiche | `00:02:00` |
 
 Ohne diese Variablen bleibt die Funktion abgeschaltet.

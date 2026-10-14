@@ -3,9 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Mail;
 using SoloCrm.Application.Features.Webhooks;
 using SoloCrm.Infrastructure.Identity;
+using SoloCrm.Infrastructure.Mail;
 using SoloCrm.Infrastructure.Persistence;
 using SoloCrm.Infrastructure.Persistence.Interceptors;
 using SoloCrm.Infrastructure.Persistence.Outbox;
@@ -42,6 +45,9 @@ public static class DependencyInjection
                 sp.GetRequiredService<OutboxInterceptor>()));
 
         services.AddSingleton<ICrmDbContextFactory, CrmDbContextFactory>();
+        services.Configure<MailSyncOptions>(configuration.GetSection(MailSyncOptions.SectionName));
+        services.AddTransient(sp => sp.GetRequiredService<IOptions<MailSyncOptions>>().Value);
+        services.TryAddSingleton<IMailSource, NotConnectedMailSource>();
         services.AddSingleton<IAppSettings, AppSettings>();
 
         services.AddWebhooks(configuration);
