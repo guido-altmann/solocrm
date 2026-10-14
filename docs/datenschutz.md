@@ -10,6 +10,7 @@ SoloCRM ist ein Single-User-System: Verantwortlicher und einziger Nutzer ist der
 |---|---|---|---|
 | Postgres: `contacts` | Stammdaten (Name, E-Mail, Telefon, Rolle, LinkedIn, Anschrift, Quelle, Zusatzfelder wie `HubSpotRecordId`) | ja | bis zur Löschung (Archivieren blendet nur aus) |
 | Postgres: `activities`, `tasks` | Notizen, Anrufe, Meetings, E-Mails, Aufgaben mit Bezug zu Kontakt, Organisation oder Anfrage | ja (Freitext) | bis zur Löschung |
+| Postgres: `mail_messages`, `mail_sync_states` | Verknüpfung importierter E-Mails mit ihrer Activity (Provider-Id, Message-ID) bzw. Abgleich-Fortschritt; kein Mail-Inhalt (ADR-013, in Vorbereitung) | `mail_messages` über Message-ID | mit der Activity (`ON DELETE CASCADE`) |
 | Postgres: `opportunities` | Anfragen; `primary_contact_id` verweist auf den Ansprechpartner | nur über die Id | bis zur Löschung (Archivieren als Normalfall) |
 | Postgres: `organizations` | Firmen (keine natürlichen Personen) | in der Regel nein | bis zur Löschung |
 | Postgres: `contact_tags` | Tag-Zuordnungen | über den Kontakt | mit dem Kontakt |
@@ -38,7 +39,7 @@ Inhalt (Format `formatVersion: 1`, camelCase, Zeitstempel in UTC als ISO 8601 mi
 |---|---|
 | `formatVersion`, `exportedAt` | Formatversion und Zeitpunkt des Exports |
 | `contact` | Stammdaten inkl. Anschrift, Quelle, Zusatzfelder, Organisation (Id, Name, Typ), Tags, `createdAt`/`updatedAt` |
-| `activities` | alle Activities mit direktem Bezug zum Kontakt (Typ, Zeitpunkt, Betreff, Text, verknüpfte Organisation/Anfrage) |
+| `activities` | alle Activities mit direktem Bezug zum Kontakt (Typ, Herkunft `origin`, bei importierten E-Mails Richtung `direction`, Zeitpunkt, Betreff, Text, verknüpfte Organisation/Anfrage) |
 | `tasks` | alle Aufgaben mit direktem Bezug (Titel, Fälligkeit, erledigt am) |
 | `opportunities` | Anfragen mit dem Kontakt als Ansprechpartner: Titel, Phase, Status, Rolle (`primaryContact`) |
 | `auditEntries` | Änderungsprotokoll des Kontakts sowie seiner Activities und Tasks, auch bereits gelöschter |

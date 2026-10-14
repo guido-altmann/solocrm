@@ -65,7 +65,7 @@ public sealed class ExportContactDataFormatTests
             ["VIP"],
             Berlin,
             Berlin),
-        [new ExportContactData.ActivityData(Id, ActivityType.Call, Berlin, null, "Telefonat", null, null, Berlin, Berlin)],
+        [new ExportContactData.ActivityData(Id, ActivityType.Call, Berlin, null, "Telefonat", ActivityOrigin.Manual, null, null, null, Berlin, Berlin)],
         [new ExportContactData.TaskData(Id, "Rückruf", new DateOnly(2026, 10, 5), null, null, null, Berlin, Berlin)],
         [new ExportContactData.OpportunityData(Id, "Migration", "Beworben", StageStatus.Open, ExportContactData.ContactRole.PrimaryContact, Berlin)],
         [new ExportContactData.AuditEntryData(Id, "Contact", Id, AuditAction.Created, Berlin, [new AuditChange("LastName", null, "Müller")])]);

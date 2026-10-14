@@ -99,7 +99,8 @@ public sealed class AuditInterceptor(TimeProvider timeProvider) : SaveChangesInt
     {
         var entityType = entry.Metadata.ClrType.Name;
         var entityId = entry.Entity.Id;
-        var fields = Fields(entry).Where(f => !IgnoredProperties.Contains(f.Name));
+        var exclusions = entry.Entity as IAuditFieldExclusions;
+        var fields = Fields(entry).Where(f => !IgnoredProperties.Contains(f.Name) && exclusions?.IsExcludedFromAudit(f.Name) != true);
 
         switch (entry.State)
         {

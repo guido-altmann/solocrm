@@ -9,7 +9,7 @@ namespace SoloCrm.Domain.Activities;
 /// A note, call, meeting, email or application in the history of a contact, organization or
 /// opportunity (SPEC 2.3). Activities can be edited and hard-deleted; they are never archived.
 /// </summary>
-public sealed class Activity : Entity, IAuditable
+public sealed class Activity : Entity, IAuditable, IAuditFieldExclusions
 {
     public const int SubjectMaxLength = 200;
 
@@ -37,6 +37,12 @@ public sealed class Activity : Entity, IAuditable
     /// <summary>Markdown; rendered without raw HTML.</summary>
     public string Body { get; private set; }
 
+    /// <summary><see cref="ActivityOrigin.Mail"/> for emails imported from the mailbox (ADR-013).</summary>
+    public ActivityOrigin Origin { get; private set; }
+
+    /// <summary>Only set for imported emails.</summary>
+    public ActivityDirection? Direction { get; private set; }
+
     public Guid? ContactId { get; private set; }
 
     public Contact? Contact { get; private set; }
@@ -50,7 +56,33 @@ public sealed class Activity : Entity, IAuditable
     public Opportunity? Opportunity { get; private set; }
 
     /// <exception cref="ArgumentException">No linked record or blank body.</exception>
-    public static Activity Log(ActivityType type, DateTimeOffset occurredAt, string? subject, string body, LinkedRecords linkedTo)
+    public static Activity Log(ActivityType type, DateTimeOffset occurredAt, string? subject, string body, LinkedRecords linkedTo) =>
+        Create(type, ActivityOrigin.Manual, null, occurredAt, subject, body, linkedTo);
+
+    /// <summary>Logs an email imported from the mailbox (ADR-013).</summary>
+    /// <exception cref="ArgumentException">No linked record or blank body.</exception>
+    public static Activity LogMail(ActivityDirection direction, DateTimeOffset occurredAt, string? subject, string body, LinkedRecords linkedTo)
+    {
+        if (!Enum.IsDefined(direction))
+        {
+            throw new ArgumentOutOfRangeException(nameof(direction), direction, "Unknown direction.");
+        }
+
+        return Create(ActivityType.Email, ActivityOrigin.Mail, direction, occurredAt, subject, body, linkedTo);
+    }
+
+    /// <summary>Imported content is stored on the activity itself and must not be duplicated into the audit trail.</summary>
+    public bool IsExcludedFromAudit(string fieldName) =>
+        Origin == ActivityOrigin.Mail && fieldName is nameof(Subject) or nameof(Body);
+
+    private static Activity Create(
+        ActivityType type,
+        ActivityOrigin origin,
+        ActivityDirection? direction,
+        DateTimeOffset occurredAt,
+        string? subject,
+        string body,
+        LinkedRecords linkedTo)
     {
         ArgumentNullException.ThrowIfNull(linkedTo);
         if (!linkedTo.HasAny)
@@ -58,7 +90,11 @@ public sealed class Activity : Entity, IAuditable
             throw new ArgumentException("An activity requires a contact, an organization or an opportunity.", nameof(linkedTo));
         }
 
-        var activity = new Activity(linkedTo.ContactId, linkedTo.OrganizationId, linkedTo.OpportunityId);
+        var activity = new Activity(linkedTo.ContactId, linkedTo.OrganizationId, linkedTo.OpportunityId)
+        {
+            Origin = origin,
+            Direction = direction,
+        };
         activity.Update(type, occurredAt, subject, body);
         activity.AddDomainEvent(new ActivityLogged(
             activity.Id,

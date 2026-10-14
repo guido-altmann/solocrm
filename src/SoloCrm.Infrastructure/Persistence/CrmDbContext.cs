@@ -6,6 +6,7 @@ using SoloCrm.Domain.ApiKeys;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
+using SoloCrm.Domain.Mail;
 using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Settings;
@@ -47,6 +48,10 @@ public class CrmDbContext(DbContextOptions options)
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
 
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+
+    public DbSet<MailMessage> MailMessages => Set<MailMessage>();
+
+    public DbSet<MailSyncState> MailSyncStates => Set<MailSyncState>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

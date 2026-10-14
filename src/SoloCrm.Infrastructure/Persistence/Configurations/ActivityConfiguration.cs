@@ -8,11 +8,17 @@ internal sealed class ActivityConfiguration : IEntityTypeConfiguration<Activity>
 {
     public void Configure(EntityTypeBuilder<Activity> builder)
     {
-        builder.ToTable("activities", t => t.HasCheckConstraint(
-            "ck_activities_linked_record_required",
-            "contact_id IS NOT NULL OR organization_id IS NOT NULL OR opportunity_id IS NOT NULL"));
+        builder.ToTable("activities", t =>
+        {
+            t.HasCheckConstraint(
+                "ck_activities_linked_record_required",
+                "contact_id IS NOT NULL OR organization_id IS NOT NULL OR opportunity_id IS NOT NULL");
+            t.HasCheckConstraint("ck_activities_direction_only_for_mail", "(origin = 'Mail') = (direction IS NOT NULL)");
+        });
 
         builder.Property(a => a.Type).HasConversion<string>().HasMaxLength(20);
+        builder.Property(a => a.Origin).HasConversion<string>().HasMaxLength(20).HasDefaultValue(ActivityOrigin.Manual);
+        builder.Property(a => a.Direction).HasConversion<string>().HasMaxLength(20);
         builder.Property(a => a.Subject).HasMaxLength(Activity.SubjectMaxLength);
         builder.Property(a => a.Body);
 

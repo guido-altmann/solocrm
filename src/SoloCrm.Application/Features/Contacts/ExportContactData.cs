@@ -63,6 +63,8 @@ public static class ExportContactData
         DateTimeOffset OccurredAt,
         string? Subject,
         string Body,
+        ActivityOrigin Origin,
+        ActivityDirection? Direction,
         Guid? OrganizationId,
         Guid? OpportunityId,
         DateTimeOffset CreatedAt,
@@ -153,7 +155,7 @@ public static class ExportContactData
                 .Where(a => a.ContactId == id)
                 .OrderBy(a => a.OccurredAt)
                 .ThenBy(a => a.Id)
-                .Select(a => new ActivityData(a.Id, a.Type, a.OccurredAt, a.Subject, a.Body, a.OrganizationId, a.OpportunityId, a.CreatedAt, a.UpdatedAt))
+                .Select(a => new ActivityData(a.Id, a.Type, a.OccurredAt, a.Subject, a.Body, a.Origin, a.Direction, a.OrganizationId, a.OpportunityId, a.CreatedAt, a.UpdatedAt))
                 .ToListAsync(cancellationToken);
 
             var tasks = await db.Tasks

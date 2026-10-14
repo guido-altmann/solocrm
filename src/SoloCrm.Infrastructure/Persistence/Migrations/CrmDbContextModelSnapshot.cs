@@ -234,6 +234,11 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Direction")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("direction");
+
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurred_at");
@@ -245,6 +250,14 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                     b.Property<Guid?>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
+
+                    b.Property<string>("Origin")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("Manual")
+                        .HasColumnName("origin");
 
                     b.Property<string>("Subject")
                         .HasMaxLength(200)
@@ -275,6 +288,8 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
 
                     b.ToTable("activities", null, t =>
                         {
+                            t.HasCheckConstraint("ck_activities_direction_only_for_mail", "(origin = 'Mail') = (direction IS NOT NULL)");
+
                             t.HasCheckConstraint("ck_activities_linked_record_required", "contact_id IS NOT NULL OR organization_id IS NOT NULL OR opportunity_id IS NOT NULL");
                         });
                 });
@@ -506,6 +521,106 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_contacts_name_required", "first_name IS NOT NULL OR last_name IS NOT NULL");
                         });
+                });
+
+            modelBuilder.Entity("SoloCrm.Domain.Mail.MailMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ActivityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("activity_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("external_id");
+
+                    b.Property<string>("Folder")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("folder");
+
+                    b.Property<string>("InternetMessageId")
+                        .IsRequired()
+                        .HasMaxLength(998)
+                        .HasColumnType("character varying(998)")
+                        .HasColumnName("internet_message_id");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mail_messages");
+
+                    b.HasIndex("ActivityId")
+                        .HasDatabaseName("ix_mail_messages_activity_id");
+
+                    b.HasIndex("Provider", "InternetMessageId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_mail_messages_provider_internet_message_id");
+
+                    b.ToTable("mail_messages", (string)null);
+                });
+
+            modelBuilder.Entity("SoloCrm.Domain.Mail.MailSyncState", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DeltaToken")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("delta_token");
+
+                    b.Property<string>("Folder")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("folder");
+
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mail_sync_states");
+
+                    b.HasIndex("Provider", "Folder")
+                        .IsUnique()
+                        .HasDatabaseName("ix_mail_sync_states_provider_folder");
+
+                    b.ToTable("mail_sync_states", (string)null);
                 });
 
             modelBuilder.Entity("SoloCrm.Domain.Opportunities.Opportunity", b =>
@@ -1429,6 +1544,18 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_contacts_organizations_organization_id");
 
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("SoloCrm.Domain.Mail.MailMessage", b =>
+                {
+                    b.HasOne("SoloCrm.Domain.Activities.Activity", "Activity")
+                        .WithMany()
+                        .HasForeignKey("ActivityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_mail_messages_activities_activity_id");
+
+                    b.Navigation("Activity");
                 });
 
             modelBuilder.Entity("SoloCrm.Domain.Opportunities.Opportunity", b =>

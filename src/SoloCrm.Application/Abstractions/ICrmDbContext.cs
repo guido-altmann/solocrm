@@ -3,6 +3,7 @@ using SoloCrm.Domain.Activities;
 using SoloCrm.Domain.ApiKeys;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Contacts;
+using SoloCrm.Domain.Mail;
 using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Tags;
@@ -45,6 +46,10 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
     DbSet<WebhookDelivery> WebhookDeliveries { get; }
 
     DbSet<ApiKey> ApiKeys { get; }
+
+    DbSet<MailMessage> MailMessages { get; }
+
+    DbSet<MailSyncState> MailSyncStates { get; }
 
     /// <summary>
     /// Ids of the audited records of <paramref name="entityType"/> (e.g. <c>Activity</c>) whose foreign key
