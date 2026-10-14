@@ -221,6 +221,7 @@ n:m-Beziehungen zu Contact, Organization und Opportunity über drei typisierte J
 | **AppSetting** | Anwenderseitige Einstellungen (Key/Value, typisiert gelesen über `IAppSettings`) | Key, Value (jsonb), UpdatedAt – z. B. `HoursPerDay`, `RetainerValuationMonths`, `DefaultPricingModel`, `DefaultCurrency`, `StaleOpportunityDays` |
 | **MailMessage** | Verknüpft eine importierte E-Mail mit ihrer Activity und verhindert Dubletten (ADR-013); ohne Inhalt | ActivityId (FK, `ON DELETE CASCADE`), Provider, ExternalId, InternetMessageId (eindeutig je Provider), Folder (`Inbox`/`Sent`) |
 | **MailSyncState** | Fortsetzungspunkt des Mail-Abgleichs je Provider und Ordner | Provider, Folder, DeltaToken?, LastSyncedAt? |
+| **MailConnection** | Das verbundene Postfach (ADR-013): Provider (eindeutig), Account, `ProtectedRefreshToken` (per Data Protection verschlüsselt), ConnectedAt, LastSyncedAt?, LastError? | Provider, Account, ProtectedRefreshToken, ConnectedAt, LastSyncedAt?, LastError? |
 | **ApiKey** | Zugriff auf die REST-API | Name, Prefix (8 zufällige Zeichen, Key-Format `scrm_<prefix>_<64 hex>`), KeyHash (SHA-256), CreatedAt, LastUsedAt? (höchstens minütlich aktualisiert), RevokedAt? |
 
 ### 2.5 Timeline-Regeln
@@ -669,7 +670,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
 | 1.0 | 2026-10-02 | Abschluss It. 6 (MVP): DSGVO-Auskunft und -Löschung mit Umsetzungsdetails (US-19/20, 2.6 `ContactDeleted`, 5 Export-Endpunkt), 2FA und Kontoseiten (US-21), Eingangsdatum `ReceivedOn` für Anfragen (2.3, US-06 AK6, S1, 5), Konto-Abschnitt in S6, Kontakt-Menü in S5, Testabdeckung gemessen (6); offene Fragen aus Kap. 10 in den Backlog verschoben; Datenschutz-Doku `docs/datenschutz.md` |
-| 1.2 | 2026-10-14 | E-Mail-Logging (SOL-13, ADR-013), Datenmodell: `Origin`/`Direction` an Activity, `MailMessage`, `MailSyncState` (2.3, 2.4) |
+| 1.2 | 2026-10-14 | E-Mail-Logging (SOL-13, ADR-013): `Origin`/`Direction` an Activity, `MailMessage`, `MailSyncState`, `MailConnection` (2.3, 2.4) |
 | 1.1 | 2026-10-02 | Backlog nach MVP ins Jira-Projekt `SOL` verlagert (8); Nextcloud-Entwurf bleibt als Konzept in Kap. 8; Verweise in Kap. 10 auf Tickets umgestellt |
 | 0.16 | 2026-10-01 | Erweiterung It. 5: Anschrift (`Address`) für Kontakte und Organisationen (2.3), Organisationsimport mit HubSpot-Vorlage und Verknüpfung per HubSpot-Firmen-ID (US-16) |
 | 0.15 | 2026-10-01 | Umsetzung It. 5: REST-API final (5: Listenparameter, Statuscodes, `organizationName`, Tasks per `PATCH` erledigen); Webhook-Header `X-SoloCrm-Event` und `webhook.ping`; `WebhookDelivery` mit `EventId`/`EventType` statt FK, `ProtectedSecret`, Key-Format `scrm_<prefix>_<secret>` (2.4); Outbox mit Lease (7.4) |

@@ -47,7 +47,7 @@ public static class DependencyInjection
         services.AddSingleton<ICrmDbContextFactory, CrmDbContextFactory>();
         services.Configure<MailSyncOptions>(configuration.GetSection(MailSyncOptions.SectionName));
         services.AddTransient(sp => sp.GetRequiredService<IOptions<MailSyncOptions>>().Value);
-        services.TryAddSingleton<IMailSource, NotConnectedMailSource>();
+        services.AddMailSource(configuration);
         services.AddSingleton<IAppSettings, AppSettings>();
 
         services.AddWebhooks(configuration);
@@ -64,6 +64,42 @@ public static class DependencyInjection
         if (configuration.GetValue($"{OutboxOptions.SectionName}:{nameof(OutboxOptions.Enabled)}", true))
         {
             services.AddHostedService<OutboxBackgroundService>();
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// Microsoft 365 mailbox access (ADR-013) if <c>Mail:Graph</c> is set up; otherwise sync and connecting report that
+    /// no mailbox is connected.
+    /// </summary>
+    private static void AddMailSource(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<GraphMailOptions>(configuration.GetSection(GraphMailOptions.SectionName));
+        services.Configure<MailWorkerOptions>(configuration.GetSection(MailWorkerOptions.SectionName));
+
+        if (configuration.GetSection(GraphMailOptions.SectionName).Get<GraphMailOptions>()?.IsConfigured == true)
+        {
+            services.AddHttpClient(GraphAuthenticator.ClientName, client => client.Timeout = TimeSpan.FromSeconds(30))
+                .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+            services.AddSingleton<GraphAuthenticator>();
+            services.AddSingleton<IMailConnector>(sp => sp.GetRequiredService<GraphAuthenticator>());
+            services.AddSingleton<IGraphAccessTokenProvider>(sp => sp.GetRequiredService<GraphAuthenticator>());
+            services.AddSingleton<IMailSource, GraphMailSource>();
+        }
+        else
+        {
+            services.AddSingleton<IMailConnector, NotConfiguredMailConnector>();
+            services.AddSingleton<IMailSource, NotConnectedMailSource>();
+        }
+    }
+
+    /// <summary>Starts the mail sync (ADR-013) unless <c>Mail:Enabled</c> is <c>false</c>; only the web host calls this.</summary>
+    public static IServiceCollection AddMailSync(this IServiceCollection services, IConfiguration configuration)
+    {
+        if (configuration.GetValue($"{MailWorkerOptions.SectionName}:{nameof(MailWorkerOptions.Enabled)}", true))
+        {
+            services.AddHostedService<MailSyncBackgroundService>();
         }
 
         return services;

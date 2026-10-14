@@ -523,6 +523,60 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SoloCrm.Domain.Mail.MailConnection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Account")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)")
+                        .HasColumnName("account");
+
+                    b.Property<DateTimeOffset>("ConnectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("connected_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<string>("ProtectedRefreshToken")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("protected_refresh_token");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mail_connections");
+
+                    b.HasIndex("Provider")
+                        .IsUnique()
+                        .HasDatabaseName("ix_mail_connections_provider");
+
+                    b.ToTable("mail_connections", (string)null);
+                });
+
             modelBuilder.Entity("SoloCrm.Domain.Mail.MailMessage", b =>
                 {
                     b.Property<Guid>("Id")

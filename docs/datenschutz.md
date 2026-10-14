@@ -11,6 +11,7 @@ SoloCRM ist ein Single-User-System: Verantwortlicher und einziger Nutzer ist der
 | Postgres: `contacts` | Stammdaten (Name, E-Mail, Telefon, Rolle, LinkedIn, Anschrift, Quelle, Zusatzfelder wie `HubSpotRecordId`) | ja | bis zur Löschung (Archivieren blendet nur aus) |
 | Postgres: `activities`, `tasks` | Notizen, Anrufe, Meetings, E-Mails, Aufgaben mit Bezug zu Kontakt, Organisation oder Anfrage | ja (Freitext) | bis zur Löschung |
 | Postgres: `mail_messages`, `mail_sync_states` | Verknüpfung importierter E-Mails mit ihrer Activity (Provider-Id, Message-ID) bzw. Abgleich-Fortschritt; kein Mail-Inhalt (ADR-013, in Vorbereitung) | `mail_messages` über Message-ID | mit der Activity (`ON DELETE CASCADE`) |
+| Postgres: `mail_connections` | verbundenes Postfach des Betreibers: Adresse und verschlüsseltes Refresh-Token (Data Protection), Status des letzten Abgleichs (ADR-013, in Vorbereitung) | Betreiber | bis zum Trennen des Postfachs |
 | Postgres: `opportunities` | Anfragen; `primary_contact_id` verweist auf den Ansprechpartner | nur über die Id | bis zur Löschung (Archivieren als Normalfall) |
 | Postgres: `organizations` | Firmen (keine natürlichen Personen) | in der Regel nein | bis zur Löschung |
 | Postgres: `contact_tags` | Tag-Zuordnungen | über den Kontakt | mit dem Kontakt |

@@ -53,6 +53,8 @@ public class CrmDbContext(DbContextOptions options)
 
     public DbSet<MailSyncState> MailSyncStates => Set<MailSyncState>();
 
+    public DbSet<MailConnection> MailConnections => Set<MailConnection>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     public DbSet<AppSetting> AppSettings => Set<AppSetting>();

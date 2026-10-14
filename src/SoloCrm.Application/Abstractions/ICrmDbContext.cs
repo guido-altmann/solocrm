@@ -51,6 +51,8 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
 
     DbSet<MailSyncState> MailSyncStates { get; }
 
+    DbSet<MailConnection> MailConnections { get; }
+
     /// <summary>
     /// Ids of the audited records of <paramref name="entityType"/> (e.g. <c>Activity</c>) whose foreign key
     /// <paramref name="foreignKey"/> points or pointed to <paramref name="principalId"/>, including records deleted
