@@ -5,7 +5,7 @@
 SoloCRM liest dein Microsoft-365-Postfach (Posteingang und Gesendet) **nur lesend** und legt zu bekannten Kontakten automatisch eine Activity an. Dazu brauchst du einmalig eine eigene App-Registrierung in Microsoft Entra ID. Es werden keine Daten an Dritte gesendet; die App spricht direkt mit Microsoft Graph.
 
 ## 1. App in Entra registrieren
-1. Im [Entra Admin Center](https://entra.microsoft.com) → **Identität → Anwendungen → App-Registrierungen → Neue Registrierung**.
+1. Im [Entra Admin Center](https://entra.microsoft.com) → **Entra Id → App-Registrierungen → Neue Registrierung**.
 2. **Name:** z. B. „SoloCRM Mail“.
 3. **Unterstützte Kontotypen:** „Nur Konten in diesem Organisationsverzeichnis“ (einzelner Mandant).
 4. **Umleitungs-URI:** Plattform **Web**, Wert `https://<deine-domain>/mail/callback`. Die Domain muss `App__BaseUrl` entsprechen (siehe `deploy/coolify.md`), sonst ist die Rückkehr-Adresse eine andere und Microsoft lehnt die Anmeldung ab. Für lokale Tests zusätzlich `http://localhost:<port>/mail/callback`.
