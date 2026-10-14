@@ -27,10 +27,28 @@ public static class SyncMail
     /// <param name="Unmatched">Mails without a known contact (not stored).</param>
     public sealed record Result(int Created, int Duplicates, int Unmatched);
 
-    public sealed class Handler(ICrmDbContextFactory dbFactory, IMailSource source, MailSyncOptions options, AppClock clock)
+    public sealed class Handler(ICrmDbContextFactory dbFactory, IMailSource source, IMailConnector connector, MailSyncOptions options, AppClock clock)
         : ICommandHandler<Command, Result>
     {
+        // One sync at a time: the background service and "Jetzt abgleichen" must not import the same mails twice.
+        private static readonly SemaphoreSlim Gate = new(1, 1);
+
         public async Task<Result<Result>> Handle(Command command, CancellationToken cancellationToken)
+        {
+            await Gate.WaitAsync(cancellationToken);
+            try
+            {
+                var result = await SyncAllAsync(cancellationToken);
+                await connector.RecordSyncAsync(result.IsSuccess ? null : result.Error.Message, cancellationToken);
+                return result;
+            }
+            finally
+            {
+                Gate.Release();
+            }
+        }
+
+        private async Task<Result<Result>> SyncAllAsync(CancellationToken cancellationToken)
         {
             var total = new Result(0, 0, 0);
             foreach (var folder in Folders)

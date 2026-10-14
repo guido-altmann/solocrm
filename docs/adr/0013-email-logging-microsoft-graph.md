@@ -44,3 +44,14 @@ Randbedingungen: Mail-Inhalte sind personenbezogen und gehören nicht in Logs. A
   - Prüfen, ob der `AuditInterceptor` den Body in `AuditEntry.Changes` schreibt (ADR-006); Mail-Texte dürfen dort nicht doppelt landen.
 - Das Entfernen von Zitaten ist verlustbehaftet: Die Heuristik braucht Tests mit echten Mustern (Outlook deutsch/englisch, Apple Mail, Gmail) und darf im Zweifel nichts abschneiden.
 - Später prüfen: Umstieg auf App-only oder Webhooks; Mails an mehrere bekannte Kontakte je Kontakt abbilden, falls der Hauptbezug im Alltag nicht reicht.
+
+## Umsetzung (SOL-13, 2026-10-14)
+- **Aufteilung:** `IMailSource`, `IncomingMail` und `IMailConnector` liegen in `Application/Abstractions`; `SyncMail`, `GetMailStatus`, `ConnectMail`, `DisconnectMail` und `MailTextCleaner` in `Application/Features/Mail`; `GraphMailSource`, `GraphAuthenticator` und `MailSyncBackgroundService` in `Infrastructure/Mail`. Ohne `Mail__Graph__*` ist eine Quelle registriert, die „kein Postfach verbunden“ meldet, weil der App-Start alle Handler validiert.
+- **Zugang gespeichert in `mail_connections`** (nicht in `app_settings`): Provider, Konto, verschlüsseltes Refresh-Token, Zeitpunkt des Verbindens, Status des letzten Abgleichs. Der Zugriffstoken liegt nur im Speicher.
+- **Anmeldung:** `/mail/connect` und `/mail/callback` (nur angemeldet). State und PKCE-Verifier liegen verschlüsselt (Data Protection) in einem HttpOnly-Cookie (Pfad `/mail`, 10 Minuten); die Rückkehr-Adresse stammt aus `App__BaseUrl`. Der Ausgang wird per Code (`connected`, `denied`, `expired`, `failed`) an die Einstellungen übergeben, nie als Freitext.
+- **Fortsetzungs-Links** werden nur auf `https://graph.microsoft.com` verfolgt, damit der Zugriffstoken nie an eine fremde Adresse geht.
+- **Ein Abgleich zugleich:** Ein Prozess-Gate verhindert, dass Hintergrunddienst und „Jetzt abgleichen“ dieselben Mails doppelt importieren.
+- **Webhooks:** Importierte Mails lösen `ActivityLogged` nur aus, wenn `Mail__RaiseActivityLoggedEvents` gesetzt ist (Default aus).
+- **Importierte Mails** sind nicht bearbeitbar (`Activity.ImportedNotEditable`); Löschen ist möglich. Da Graph auch geänderte Mails liefert (z. B. gelesen markiert), kann eine gelöschte Mail wieder auftauchen. Gegenmaßnahme bei Bedarf: Löschvermerke je Message-ID.
+- **Offen bis zum ersten Praxistest:** der echte Austausch mit Microsoft (Berechtigungen, Zustimmung, Umleitungs-URI).
+

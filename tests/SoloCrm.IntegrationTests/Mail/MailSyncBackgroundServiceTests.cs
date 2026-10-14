@@ -32,11 +32,10 @@ public sealed class MailSyncBackgroundServiceTests
         await CreateService(connector, handler).SyncOnceAsync(Ct);
 
         handler.Calls.Should().Be(0);
-        connector.Recorded.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task SyncOnce_Success_RecordsSuccess()
+    public async Task SyncOnce_MailboxConnected_RunsTheSync()
     {
         var connector = new FakeConnector(connected: true);
         var handler = new FakeHandler(new SyncMail.Result(2, 0, 1));
@@ -44,18 +43,20 @@ public sealed class MailSyncBackgroundServiceTests
         await CreateService(connector, handler).SyncOnceAsync(Ct);
 
         handler.Calls.Should().Be(1);
-        connector.Recorded.Should().Equal((string?)null);
     }
 
     [Fact]
-    public async Task SyncOnce_Failure_RecordsTheUserFacingMessage()
+    public async Task SyncOnce_SyncFails_DoesNotThrowAndTriesAgainNextTime()
     {
         var connector = new FakeConnector(connected: true);
         var handler = new FakeHandler(Error.Failure("Mail.SourceFailed", "Das Postfach konnte nicht gelesen werden: Anmeldung abgelaufen."));
 
-        await CreateService(connector, handler).SyncOnceAsync(Ct);
+        var service = CreateService(connector, handler);
 
-        connector.Recorded.Should().Equal("Das Postfach konnte nicht gelesen werden: Anmeldung abgelaufen.");
+        await service.SyncOnceAsync(Ct);
+        await service.SyncOnceAsync(Ct);
+
+        handler.Calls.Should().Be(2);
     }
 
     private sealed class FakeHandler : ICommandHandler<SyncMail.Command, SyncMail.Result>
@@ -75,8 +76,6 @@ public sealed class MailSyncBackgroundServiceTests
 
     private sealed class FakeConnector(bool connected) : IMailConnector
     {
-        public List<string?> Recorded { get; } = [];
-
         public bool IsConfigured => true;
 
         public Uri BuildAuthorizationUri(string redirectUri, string state, string codeChallenge) => throw new NotSupportedException();
@@ -88,10 +87,6 @@ public sealed class MailSyncBackgroundServiceTests
         public Task<MailConnectionInfo?> GetConnectionAsync(CancellationToken cancellationToken) =>
             Task.FromResult(connected ? new MailConnectionInfo("Graph", "guido@example.test", DateTimeOffset.UnixEpoch, null, null) : null);
 
-        public Task RecordSyncAsync(string? error, CancellationToken cancellationToken)
-        {
-            Recorded.Add(error);
-            return Task.CompletedTask;
-        }
+        public Task RecordSyncAsync(string? error, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

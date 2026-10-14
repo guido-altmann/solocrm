@@ -12,9 +12,10 @@ public sealed class SyncMailTests(PostgresFixture postgres) : HandlerTest(postgr
     private static readonly DateTimeOffset Received = new(2026, 9, 30, 10, 0, 0, TimeSpan.Zero);
 
     private readonly FakeMailSource _source = new();
+    private readonly RecordingConnector _connector = new();
 
     private SyncMail.Handler CreateHandler(MailSyncOptions? options = null) =>
-        new(Get<ICrmDbContextFactory>(), _source, options ?? new MailSyncOptions(), Get<AppClock>());
+        new(Get<ICrmDbContextFactory>(), _source, _connector, options ?? new MailSyncOptions(), Get<AppClock>());
 
     private async Task<Contact> AddContactAsync(string email, bool archived = false)
     {
@@ -52,6 +53,7 @@ public sealed class SyncMailTests(PostgresFixture postgres) : HandlerTest(postgr
         var result = await CreateHandler().Handle(new SyncMail.Command(), Ct);
 
         result.Value.Should().Be(new SyncMail.Result(1, 0, 0));
+        _connector.Recorded.Should().Equal((string?)null);
         await using var db = OpenDb();
         var activity = await db.Activities.SingleAsync(Ct);
         activity.Type.Should().Be(ActivityType.Email);
@@ -255,6 +257,7 @@ public sealed class SyncMailTests(PostgresFixture postgres) : HandlerTest(postgr
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Mail.SourceFailed");
         result.Error.Message.Should().Contain("Anmeldung abgelaufen.");
+        _connector.Recorded.Should().ContainSingle().Which.Should().Contain("Anmeldung abgelaufen.");
         await using var db = OpenDb();
         (await db.Activities.CountAsync(Ct)).Should().Be(1);
         (await db.MailSyncStates.AnyAsync(Ct)).Should().BeFalse();
@@ -322,6 +325,27 @@ public sealed class SyncMailTests(PostgresFixture postgres) : HandlerTest(postgr
         result.IsFailure.Should().BeTrue();
         result.Error.Code.Should().Be("Mail.SourceFailed");
         result.Error.Message.Should().Contain("kein Postfach verbunden");
+    }
+
+    private sealed class RecordingConnector : IMailConnector
+    {
+        public List<string?> Recorded { get; } = [];
+
+        public bool IsConfigured => true;
+
+        public Uri BuildAuthorizationUri(string redirectUri, string state, string codeChallenge) => throw new NotSupportedException();
+
+        public Task<string> ConnectAsync(string code, string codeVerifier, string redirectUri, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        public Task DisconnectAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task<MailConnectionInfo?> GetConnectionAsync(CancellationToken cancellationToken) => Task.FromResult<MailConnectionInfo?>(null);
+
+        public Task RecordSyncAsync(string? error, CancellationToken cancellationToken)
+        {
+            Recorded.Add(error);
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeMailSource : IMailSource

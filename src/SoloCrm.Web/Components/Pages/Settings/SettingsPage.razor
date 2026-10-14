@@ -96,10 +96,18 @@
 </div>
 
 <div class="mt-4">
+    <MailSettingsSection Notice="@MailNotice" />
+</div>
+
+<div class="mt-4">
     <AccountSettingsSection />
 </div>
 
 @code {
+    /// <summary>Outcome of the Microsoft sign-in, set by <c>/mail/callback</c>.</summary>
+    [SupplyParameterFromQuery(Name = "mail")]
+    public string? MailNotice { get; set; }
+
     private List<GetStages.Item>? _stages;
     private readonly Dictionary<Guid, string?> _names = [];
     private string? _newName;

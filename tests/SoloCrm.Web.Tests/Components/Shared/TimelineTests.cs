@@ -56,6 +56,31 @@ public sealed class TimelineTests : BunitContext
         timeline.Markup.Should().NotContain("Mehr laden");
     }
 
+    [Theory]
+    [InlineData(ActivityDirection.Inbound, "E-Mail eingegangen")]
+    [InlineData(ActivityDirection.Outbound, "E-Mail gesendet")]
+    public void Render_ImportedMail_ShowsDirectionAndOrigin(ActivityDirection direction, string title)
+    {
+        var mail = Entry(Kind.Activity, Now) with
+        {
+            ActivityType = ActivityType.Email,
+            Subject = "Angebot",
+            Body = "Hallo Guido",
+            Direction = direction,
+        };
+        var note = Entry(Kind.Activity, Now.AddHours(-1)) with { ActivityType = ActivityType.Email, Body = "Telefonisch besprochen" };
+        Returns(null, new GetTimeline.Result([mail, note], null));
+
+        var timeline = RenderTimeline();
+
+        var entries = timeline.FindAll(".timeline-entry");
+        entries[0].QuerySelector(".timeline-title")!.TextContent.Should().Be(title);
+        entries[0].QuerySelector(".timeline-mail")!.TextContent.Should().Be("aus dem Postfach");
+        entries[0].TextContent.Should().Contain("Angebot").And.Contain("Hallo Guido");
+        entries[1].QuerySelector(".timeline-title")!.TextContent.Should().Be("E-Mail");
+        entries[1].QuerySelector(".timeline-mail").Should().BeNull();
+    }
+
     [Fact]
     public void Render_CreatedOfLateRecordedRequest_ShowsReceivedOn()
     {

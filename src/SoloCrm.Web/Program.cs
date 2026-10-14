@@ -110,6 +110,7 @@ try
 
     app.MapCrmHealthChecks();
     app.MapCrmApi();
+    app.MapMailConnect();
     app.MapStaticAssets().AllowAnonymous();
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();

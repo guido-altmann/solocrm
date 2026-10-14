@@ -68,7 +68,8 @@ public static class GetTimeline
         string? Body = null,
         string? TaskTitle = null,
         IReadOnlyList<Change>? Changes = null,
-        DateOnly? ReceivedOn = null);
+        DateOnly? ReceivedOn = null,
+        ActivityDirection? Direction = null);
 
     public sealed record Result(IReadOnlyList<Entry> Entries, Cursor? Next);
 
@@ -202,7 +203,7 @@ public static class GetTimeline
                 .OrderByDescending(a => a.OccurredAt)
                 .ThenByDescending(a => a.Id)
                 .Take(take)
-                .Select(a => new { a.Id, a.Type, a.OccurredAt, a.Subject, a.Body, a.ContactId, a.OrganizationId, a.OpportunityId })
+                .Select(a => new { a.Id, a.Type, a.OccurredAt, a.Subject, a.Body, a.Direction, a.ContactId, a.OrganizationId, a.OpportunityId })
                 .ToListAsync(cancellationToken);
 
             return rows.Select(a => new Entry(
@@ -213,7 +214,8 @@ public static class GetTimeline
                 new Cursor(a.OccurredAt, TimelineSource.Activity, a.Id),
                 ActivityType: a.Type,
                 Subject: a.Subject,
-                Body: a.Body));
+                Body: a.Body,
+                Direction: a.Direction));
         }
 
         private static async Task<IEnumerable<Entry>> LoadTasksCreatedAsync(

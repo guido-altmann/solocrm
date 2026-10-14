@@ -230,6 +230,8 @@ Die Timeline eines Objekts ist ein chronologischer Strom, absteigend sortiert, a
 2. Tasks (angelegt / erledigt),
 3. relevanten AuditEntries (Anlage, Stage-Wechsel, Änderung von Schlüsselfeldern). Die Anlage erscheint als „Angelegt“; in der aggregierten Organisations-Timeline nur für Anfragen, nicht für die Kontakte der Organisation.
 
+Aus dem Postfach importierte E-Mails (`Origin = Mail`) erscheinen als „E-Mail eingegangen“ bzw. „E-Mail gesendet“ mit dem Hinweis „aus dem Postfach“; sie lassen sich nicht bearbeiten, aber löschen (ADR-013).
+
 **Aggregation:**
 - **Organization-Timeline** enthält zusätzlich die Einträge ihrer Contacts und Opportunities (Kennzeichnung „via Max Mustermann“).
 - **Opportunity-Timeline** enthält nur Einträge mit direktem Bezug.
@@ -286,7 +288,7 @@ Außer `Ctrl/Cmd + K` wirken die Kürzel nur außerhalb von Eingabefeldern und D
 | S3 | **Kontakte** | `/contacts` | Tabelle mit Suche (dieselbe tippfehlertolerante Suche wie die Command Palette), Filter (Organisation, Tags ODER-verknüpft, Quelle), Sortierung, Paging (serverseitig) |
 | S4 | **Organisationen** | `/organizations` | analog S3, Filter nach Typ |
 | S5 | **Detailansicht** | `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}` | Links Stammdaten (inline editierbar ab It. 4; ersetzt dort den Bearbeiten-Dialog; bei Anfragen Preis und Laufzeit als Gruppe mit Live-Wert, Wechsel auf „Verloren“ fragt den Absagegrund ab; Archivieren im Kopf; bei Kontakten im Menü ⋮ „Daten exportieren (DSGVO)“ und „Endgültig löschen (DSGVO)“, getrennt vom Archivieren), Tags als Chip-Eingabe, verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe; `N` fokussiert die Eingabe |
-| S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Webhooks, Import, Konto (Links zu Passwort, 2FA und Passkeys unter `/Account/Manage`, statisch gerendert) |
+| S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Webhooks, Import, E-Mail (Microsoft-365-Postfach verbinden und trennen, Status und „Jetzt abgleichen“, ADR-013), Konto (Links zu Passwort, 2FA und Passkeys unter `/Account/Manage`, statisch gerendert) |
 
 ### 3.4 Layout
 - Linke Navigation (einklappbar): Heute, Pipeline, Kontakte, Organisationen, Einstellungen
@@ -670,7 +672,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
 | 1.0 | 2026-10-02 | Abschluss It. 6 (MVP): DSGVO-Auskunft und -Löschung mit Umsetzungsdetails (US-19/20, 2.6 `ContactDeleted`, 5 Export-Endpunkt), 2FA und Kontoseiten (US-21), Eingangsdatum `ReceivedOn` für Anfragen (2.3, US-06 AK6, S1, 5), Konto-Abschnitt in S6, Kontakt-Menü in S5, Testabdeckung gemessen (6); offene Fragen aus Kap. 10 in den Backlog verschoben; Datenschutz-Doku `docs/datenschutz.md` |
-| 1.2 | 2026-10-14 | E-Mail-Logging (SOL-13, ADR-013): `Origin`/`Direction` an Activity, `MailMessage`, `MailSyncState`, `MailConnection` (2.3, 2.4) |
+| 1.2 | 2026-10-14 | E-Mail-Logging (SOL-13, ADR-013): `Origin`/`Direction` an Activity, `MailMessage`, `MailSyncState`, `MailConnection` (2.3, 2.4); Timeline-Darstellung importierter Mails (2.5); Einstellungsabschnitt „E-Mail“ (S6); Anleitung `docs/email-logging-einrichtung.md` |
 | 1.1 | 2026-10-02 | Backlog nach MVP ins Jira-Projekt `SOL` verlagert (8); Nextcloud-Entwurf bleibt als Konzept in Kap. 8; Verweise in Kap. 10 auf Tickets umgestellt |
 | 0.16 | 2026-10-01 | Erweiterung It. 5: Anschrift (`Address`) für Kontakte und Organisationen (2.3), Organisationsimport mit HubSpot-Vorlage und Verknüpfung per HubSpot-Firmen-ID (US-16) |
 | 0.15 | 2026-10-01 | Umsetzung It. 5: REST-API final (5: Listenparameter, Statuscodes, `organizationName`, Tasks per `PATCH` erledigen); Webhook-Header `X-SoloCrm-Event` und `webhook.ping`; `WebhookDelivery` mit `EventId`/`EventType` statt FK, `ProtectedSecret`, Key-Format `scrm_<prefix>_<secret>` (2.4); Outbox mit Lease (7.4) |

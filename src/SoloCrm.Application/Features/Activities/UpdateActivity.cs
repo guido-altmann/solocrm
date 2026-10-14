@@ -49,6 +49,11 @@ public static class UpdateActivity
                 return ActivityErrors.NotFound;
             }
 
+            if (activity.Origin == ActivityOrigin.Mail)
+            {
+                return ActivityErrors.ImportedNotEditable;
+            }
+
             activity.Update(command.Type, command.OccurredAt!.Value, command.Subject, command.Body!);
             await db.SaveChangesAsync(cancellationToken);
 

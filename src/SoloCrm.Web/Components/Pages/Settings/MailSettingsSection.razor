@@ -1,0 +1,171 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Mail
+@inject IQueryHandler<GetMailStatus.Query, GetMailStatus.Result> GetStatusHandler
+@inject ICommandHandler<SyncMail.Command, SyncMail.Result> SyncHandler
+@inject ICommandHandler<DisconnectMail.Command, DisconnectMail.Result> DisconnectHandler
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+@inject AppClock Clock
+
+@* Connects the Microsoft 365 mailbox for the email log (ADR-013). *@
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="mail">
+    <MudText Typo="Typo.h6">E-Mail</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Übernimmt E-Mails aus Posteingang und Gesendet deines Microsoft-365-Postfachs als Aktivitäten, aber nur solche, bei denen
+        Absender oder Empfänger als Kontakt bekannt sind. Der Zugriff ist rein lesend.
+    </MudText>
+
+    @if (NoticeMessage is { } notice)
+    {
+        <MudAlert Severity="@notice.Severity" Dense="true" Class="mb-3" data-testid="mail-notice">@notice.Text</MudAlert>
+    }
+
+    @if (_status is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!_status.IsConfigured)
+    {
+        <MudAlert Severity="Severity.Info" Dense="true" data-testid="mail-not-configured">
+            Noch nicht eingerichtet. Die Entra-App wird über die Umgebungsvariablen <code>Mail__Graph__TenantId</code>,
+            <code>Mail__Graph__ClientId</code> und <code>Mail__Graph__ClientSecret</code> hinterlegt; die Schritte stehen in
+            <code>docs/email-logging-einrichtung.md</code>.
+        </MudAlert>
+    }
+    else if (_status.Connection is not { } connection)
+    {
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Kein Postfach verbunden. Beim ersten Abgleich werden
+            @(_status.BackfillDays == 0 ? "nur neue E-Mails ab dem Verbinden" : $"die letzten {_status.BackfillDays} Tage") geladen.
+        </MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Link"
+                   OnClick="Connect" data-testid="mail-connect">
+            Mit Microsoft verbinden
+        </MudButton>
+    }
+    else
+    {
+        <MudSimpleTable Dense="true" Hover="false" Elevation="0" Class="mb-3">
+            <tbody>
+                <tr><th scope="row">Postfach</th><td data-testid="mail-account">@connection.Account</td></tr>
+                <tr><th scope="row">Verbunden seit</th><td>@Formats.DateTime(Clock.ToLocal(connection.ConnectedAt))</td></tr>
+                <tr>
+                    <th scope="row">Letzter Abgleich</th>
+                    <td data-testid="mail-last-sync">
+                        @(connection.LastSyncedAt is { } last ? Formats.DateTime(Clock.ToLocal(last)) : "noch nicht")
+                    </td>
+                </tr>
+            </tbody>
+        </MudSimpleTable>
+
+        @if (connection.LastError is { } error)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="mail-error">@error</MudAlert>
+        }
+
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Sync"
+                       OnClick="SyncAsync" Disabled="_busy" data-testid="mail-sync">
+                Jetzt abgleichen
+            </MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Outlined.LinkOff"
+                       OnClick="DisconnectAsync" Disabled="_busy" data-testid="mail-disconnect">
+                Verbindung trennen
+            </MudButton>
+        </MudStack>
+    }
+</MudPaper>
+
+@code {
+    /// <summary>Outcome of the sign-in at Microsoft (query <c>mail</c> of the settings page).</summary>
+    [Parameter]
+    public string? Notice { get; set; }
+
+    private GetMailStatus.Result? _status;
+    private bool _busy;
+
+    private (Severity Severity, string Text)? NoticeMessage => Notice switch
+    {
+        "connected" => (Severity.Success, "Das Postfach ist verbunden."),
+        "denied" => (Severity.Warning, "Die Anmeldung wurde abgebrochen oder abgelehnt."),
+        "expired" => (Severity.Warning, "Die Anmeldung ist abgelaufen. Bitte erneut verbinden."),
+        "notconfigured" => (Severity.Info, "Die Microsoft-365-Anbindung ist nicht eingerichtet."),
+        "failed" => (Severity.Error, "Das Verbinden ist fehlgeschlagen. Bitte Einrichtung und Berechtigungen prüfen und erneut versuchen."),
+        _ => null,
+    };
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await GetStatusHandler.Handle(new GetMailStatus.Query(), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        _status = result.Value;
+    }
+
+    // A full page load: the sign-in redirects to Microsoft and back.
+    private void Connect() => Navigation.NavigateTo("mail/connect", forceLoad: true);
+
+    private async Task SyncAsync()
+    {
+        _busy = true;
+        try
+        {
+            var result = await SyncHandler.Handle(new SyncMail.Command(), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+            else
+            {
+                Snackbar.Add(
+                    result.Value.Created == 0 ? "Keine neuen E-Mails." : $"{result.Value.Created} E-Mail(s) übernommen.",
+                    Severity.Success);
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DisconnectAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Verbindung trennen",
+            "Der Zugang wird entfernt und der Abgleich gestoppt. Bereits übernommene E-Mails bleiben in der Timeline.",
+            yesText: "Trennen",
+            cancelText: "Abbrechen",
+            options: DialogDefaults.ExtraSmall);
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await DisconnectHandler.Handle(new DisconnectMail.Command(), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Die Verbindung wurde getrennt.", Severity.Success);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

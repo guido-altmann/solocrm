@@ -1,6 +1,7 @@
 @using SoloCrm.Application.Abstractions
 @using SoloCrm.Application.Features.Activities
 @using SoloCrm.Application.Features.Timeline
+@using SoloCrm.Domain.Activities
 @using SoloCrm.Domain.Common
 @inject IQueryHandler<GetTimeline.Query, GetTimeline.Result> TimelineHandler
 @inject ICommandHandler<DeleteActivity.Command, DeleteActivity.Result> DeleteActivityHandler
@@ -31,6 +32,10 @@
                 <div class="flex-grow-1" style="min-width: 0;">
                     <div class="d-flex align-center flex-wrap gap-x-2">
                         <MudText Typo="Typo.subtitle2" Class="timeline-title">@TitleOf(entry)</MudText>
+                        @if (entry.Direction is not null)
+                        {
+                            <MudText Typo="Typo.caption" Class="timeline-mail mud-text-secondary">aus dem Postfach</MudText>
+                        }
                         <MudText Typo="Typo.caption" Class="mud-text-secondary" title="@Formats.DateTime(Clock.ToLocal(entry.OccurredAt))">
                             @Formats.DateTime(Clock.ToLocal(entry.OccurredAt))
                         </MudText>
@@ -44,7 +49,10 @@
                         @if (entry.Kind == TimelineEntryKind.Activity)
                         {
                             <MudMenu Icon="@Icons.Material.Filled.MoreVert" Size="Size.Small" Dense="true" aria-label="Aktionen">
-                                <MudMenuItem Icon="@Icons.Material.Outlined.Edit" OnClick="() => EditAsync(entry)">Bearbeiten</MudMenuItem>
+                                @if (entry.Direction is null)
+                                {
+                                    <MudMenuItem Icon="@Icons.Material.Outlined.Edit" OnClick="() => EditAsync(entry)">Bearbeiten</MudMenuItem>
+                                }
                                 <MudMenuItem Icon="@Icons.Material.Outlined.Delete" OnClick="() => DeleteAsync(entry)">Löschen</MudMenuItem>
                             </MudMenu>
                         }
@@ -207,6 +215,8 @@
 
     private static string TitleOf(GetTimeline.Entry entry) => entry.Kind switch
     {
+        TimelineEntryKind.Activity when entry.Direction == ActivityDirection.Inbound => "E-Mail eingegangen",
+        TimelineEntryKind.Activity when entry.Direction == ActivityDirection.Outbound => "E-Mail gesendet",
         TimelineEntryKind.Activity => Labels.For(entry.ActivityType!.Value),
         TimelineEntryKind.TaskCreated => "Aufgabe angelegt",
         TimelineEntryKind.TaskCompleted => "Aufgabe erledigt",
@@ -218,6 +228,8 @@
 
     private static string IconOf(GetTimeline.Entry entry) => entry.Kind switch
     {
+        TimelineEntryKind.Activity when entry.Direction == ActivityDirection.Inbound => Icons.Material.Outlined.Inbox,
+        TimelineEntryKind.Activity when entry.Direction == ActivityDirection.Outbound => Icons.Material.Outlined.Send,
         TimelineEntryKind.Activity => Labels.IconFor(entry.ActivityType!.Value),
         TimelineEntryKind.TaskCreated => Icons.Material.Outlined.AddTask,
         TimelineEntryKind.TaskCompleted => Icons.Material.Outlined.TaskAlt,

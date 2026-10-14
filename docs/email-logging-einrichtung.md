@@ -1,6 +1,6 @@
 # E-Mail-Logging einrichten (Microsoft 365)
 
-> **Stand: Entwurf zu ADR-013.** Die Funktion ist noch nicht umgesetzt. Namen der Umgebungsvariablen und die Rückkehr-Adresse werden bei der Umsetzung (SOL-13) bestätigt und diese Anleitung dann angepasst.
+> Hintergrund und Entscheidungen: ADR-013. Der Austausch mit Microsoft ist bisher nur gegen simulierte Antworten getestet; die erste Verbindung mit einem echten Postfach ist der Praxistest.
 
 SoloCRM liest dein Microsoft-365-Postfach (Posteingang und Gesendet) **nur lesend** und legt zu bekannten Kontakten automatisch eine Activity an. Dazu brauchst du einmalig eine eigene App-Registrierung in Microsoft Entra ID. Es werden keine Daten an Dritte gesendet; die App spricht direkt mit Microsoft Graph.
 
@@ -8,7 +8,7 @@ SoloCRM liest dein Microsoft-365-Postfach (Posteingang und Gesendet) **nur lesen
 1. Im [Entra Admin Center](https://entra.microsoft.com) → **Identität → Anwendungen → App-Registrierungen → Neue Registrierung**.
 2. **Name:** z. B. „SoloCRM Mail“.
 3. **Unterstützte Kontotypen:** „Nur Konten in diesem Organisationsverzeichnis“ (einzelner Mandant).
-4. **Umleitungs-URI:** Plattform **Web**, Wert `https://<deine-domain>/mail/callback` (für lokale Tests zusätzlich `http://localhost:5000/mail/callback`; die Domain entspricht `App__BaseUrl`).
+4. **Umleitungs-URI:** Plattform **Web**, Wert `https://<deine-domain>/mail/callback`. Die Domain muss `App__BaseUrl` entsprechen (siehe `deploy/coolify.md`), sonst ist die Rückkehr-Adresse eine andere und Microsoft lehnt die Anmeldung ab. Für lokale Tests zusätzlich `http://localhost:<port>/mail/callback`.
 5. Registrieren. Auf der Übersicht stehen **Anwendungs-ID (Client)** und **Verzeichnis-ID (Mandant)**; beide brauchst du unten.
 
 ## 2. Berechtigungen
@@ -40,7 +40,8 @@ Ohne diese Variablen bleibt die Funktion abgeschaltet.
 ## 5. Postfach verbinden
 1. In SoloCRM unter **Einstellungen → E-Mail** auf „Mit Microsoft verbinden“ klicken.
 2. Bei Microsoft anmelden und die Berechtigungen bestätigen.
-3. Nach der Rückkehr erscheint das verbundene Konto. Der erste Abgleich lädt die letzten `Mail__BackfillDays` Tage nach, danach laufen nur noch Änderungen.
+3. Nach der Rückkehr erscheint das verbundene Konto mit Zeitpunkt und Status des letzten Abgleichs. Der erste Abgleich lädt die letzten `Mail__BackfillDays` Tage nach, danach laufen nur noch Änderungen.
+4. „Jetzt abgleichen“ startet einen Abgleich sofort, sonst läuft er im eingestellten Abstand von selbst. Schlägt ein Abgleich fehl (z. B. abgelaufene Anmeldung), steht die Meldung auf der Seite und der nächste Abgleich versucht es erneut.
 
 Das Refresh-Token wird per Data Protection verschlüsselt gespeichert. Das Volume `/app/keys` muss deshalb erhalten bleiben (siehe `deploy/coolify.md`); geht es verloren, musst du das Postfach neu verbinden.
 
@@ -48,6 +49,8 @@ Das Refresh-Token wird per Data Protection verschlüsselt gespeichert. Das Volum
 - Nur Mails, bei denen Absender oder ein Empfänger (An/Cc) die E-Mail-Adresse eines **nicht archivierten Kontakts** hat, werden gespeichert. Alles andere wird nicht übernommen.
 - Gespeichert werden der Betreff, der Zeitpunkt und der Text als Klartext, **ohne zitierte Vorgängermails und Signatur und ohne Anhänge**.
 - Pro Mail entsteht eine Activity vom Typ E-Mail mit dem Absender (eingehend) bzw. dem ersten bekannten Empfänger (ausgehend) als Hauptbezug.
+- In der Timeline erscheinen sie als „E-Mail eingegangen“ bzw. „E-Mail gesendet“ mit dem Hinweis „aus dem Postfach“. Importierte Mails lassen sich nicht bearbeiten, nur löschen.
+- Eine gelöschte importierte Mail kann wieder auftauchen, wenn sie sich im Postfach ändert (z. B. als gelesen markiert) oder wenn nach einem Neu-Verbinden erneut nachgeladen wird.
 - In Logs stehen nie Adressen, Betreff oder Text.
 - Die Mails gehören zu den Daten des Kontakts: DSGVO-Auskunft und -Löschung (`docs/datenschutz.md`) erfassen sie.
 

@@ -51,4 +51,7 @@ public static class ActivityErrors
 {
     public static Error NotFound { get; } =
         Error.NotFound("Activity.NotFound", "Die Aktivität wurde nicht gefunden.");
+
+    public static Error ImportedNotEditable { get; } =
+        Error.Conflict("Activity.ImportedNotEditable", "Aus dem Postfach importierte E-Mails lassen sich nicht bearbeiten.");
 }

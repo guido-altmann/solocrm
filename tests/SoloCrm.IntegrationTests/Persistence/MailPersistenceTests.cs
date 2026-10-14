@@ -157,4 +157,45 @@ public sealed class MailPersistenceTests(PostgresFixture postgres) : HandlerTest
 
         await act.Should().ThrowAsync<DbUpdateException>();
     }
+
+    [Fact]
+    public async Task UpdateActivity_ImportedMail_IsRejected()
+    {
+        var contact = Contact.Create("Max", "Mustermann");
+        var activity = MailActivity(contact.Id);
+        await using (var db = OpenDb())
+        {
+            db.Contacts.Add(contact);
+            db.Activities.Add(activity);
+            await db.SaveChangesAsync(Ct);
+        }
+
+        var result = await SendAsync<SoloCrm.Application.Features.Activities.UpdateActivity.Command, SoloCrm.Application.Features.Activities.UpdateActivity.Result>(
+            new SoloCrm.Application.Features.Activities.UpdateActivity.Command(activity.Id, ActivityType.Note, Start, "Neu", "Neu"));
+
+        result.Error.Code.Should().Be("Activity.ImportedNotEditable");
+        await using var verify = OpenDb();
+        (await verify.Activities.SingleAsync(Ct)).Body.Should().Be("Vertraulicher Text");
+    }
+
+    [Fact]
+    public async Task GetTimeline_ImportedMail_CarriesTheDirection()
+    {
+        var contact = Contact.Create("Max", "Mustermann");
+        var mail = MailActivity(contact.Id);
+        var note = Activity.Log(ActivityType.Note, Start.AddMinutes(-5), null, "Notiz", new LinkedRecords(ContactId: contact.Id));
+        await using (var db = OpenDb())
+        {
+            db.Contacts.Add(contact);
+            db.Activities.AddRange(mail, note);
+            await db.SaveChangesAsync(Ct);
+        }
+
+        var result = await QueryAsync<SoloCrm.Application.Features.Timeline.GetTimeline.Query, SoloCrm.Application.Features.Timeline.GetTimeline.Result>(
+            new SoloCrm.Application.Features.Timeline.GetTimeline.Query(SoloCrm.Application.Features.Timeline.TimelineRecordType.Contact, contact.Id));
+
+        var entries = result.Value.Entries.Where(e => e.Kind == SoloCrm.Application.Features.Timeline.TimelineEntryKind.Activity).ToList();
+        entries.Single(e => e.SourceId == mail.Id).Direction.Should().Be(ActivityDirection.Inbound);
+        entries.Single(e => e.SourceId == note.Id).Direction.Should().BeNull();
+    }
 }

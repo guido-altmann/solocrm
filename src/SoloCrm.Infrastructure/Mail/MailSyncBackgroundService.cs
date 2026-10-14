@@ -9,8 +9,8 @@ namespace SoloCrm.Infrastructure.Mail;
 
 /// <summary>
 /// Runs <see cref="SyncMail"/> on a <see cref="PeriodicTimer"/> while a mailbox is connected (ADR-013, ADR-008).
-/// Failures are noted on the connection for the status display and retried on the next tick; the log contains only
-/// counts and error codes.
+/// The handler notes the outcome on the connection for the status display; failures are retried on the next tick.
+/// The log contains only counts and error codes.
 /// </summary>
 internal sealed partial class MailSyncBackgroundService(
     IServiceProvider services,
@@ -52,7 +52,6 @@ internal sealed partial class MailSyncBackgroundService(
         var result = await handler.Handle(new SyncMail.Command(), cancellationToken);
         if (result.IsSuccess)
         {
-            await connector.RecordSyncAsync(null, cancellationToken);
             if (result.Value.Created > 0)
             {
                 LogSynced(logger, result.Value.Created, result.Value.Duplicates, result.Value.Unmatched);
@@ -61,7 +60,6 @@ internal sealed partial class MailSyncBackgroundService(
             return;
         }
 
-        await connector.RecordSyncAsync(result.Error.Message, cancellationToken);
         LogSyncFailed(logger, result.Error.Code);
     }
 
