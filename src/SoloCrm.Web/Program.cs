@@ -27,6 +27,7 @@ try
         .ReadFrom.Configuration(builder.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
+        .Filter.ByExcluding(CalendarFeedEndpoints.ContainsToken)
         .WriteTo.Console(new RenderedCompactJsonFormatter()));
 
     builder.Services.AddRazorComponents()
@@ -99,7 +100,7 @@ try
     // The API answers unhandled exceptions with Problem Details instead of the error page.
     app.UseWhen(context => context.Request.Path.StartsWithSegments(ApiEndpoints.BasePath), api => api.UseExceptionHandler());
 
-    // The feed token in /calendar/{token}.ics is a credential and must not end up in the logs.
+    // The feed token in /calendar/{token}.ics is a credential and must not end up in the logs (see also the filter above).
     app.UseSerilogRequestLogging(options => options.GetMessageTemplateProperties = (context, path, elapsed, statusCode) =>
     [
         new LogEventProperty("RequestMethod", new ScalarValue(context.Request.Method)),

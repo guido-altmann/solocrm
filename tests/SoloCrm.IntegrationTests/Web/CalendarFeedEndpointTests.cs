@@ -77,7 +77,7 @@ public sealed class CalendarFeedEndpointTests(PostgresFixture postgres) : IClass
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var handler = scope.ServiceProvider.GetRequiredService<ICommandHandler<CreateTask.Command, CreateTask.Result>>();
-        (await handler.Handle(new CreateTask.Command(title), Ct)).IsSuccess.Should().BeTrue();
+        (await handler.Handle(new CreateTask.Command(title, new DateOnly(2026, 10, 20)), Ct)).IsSuccess.Should().BeTrue();
     }
 
     private HttpClient CreateClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

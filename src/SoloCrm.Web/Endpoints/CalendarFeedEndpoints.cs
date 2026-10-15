@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.RateLimiting;
+using Serilog.Events;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.CalendarFeeds;
 
@@ -57,6 +58,18 @@ public static class CalendarFeedEndpoints
         path.StartsWith(PathPrefix, StringComparison.OrdinalIgnoreCase) && path.EndsWith(FileExtension, StringComparison.OrdinalIgnoreCase)
             ? PathPrefix + "{token}" + FileExtension
             : path;
+
+    /// <summary>
+    /// <c>true</c> for log events that carry the unmasked feed path as <c>RequestPath</c> (e.g. warnings of framework
+    /// middleware that log the request scope); such events are dropped, because the token is a credential.
+    /// </summary>
+    public static bool ContainsToken(LogEvent logEvent)
+    {
+        ArgumentNullException.ThrowIfNull(logEvent);
+        return logEvent.Properties.TryGetValue("RequestPath", out var value)
+            && value is ScalarValue { Value: string path }
+            && MaskPath(path) != path;
+    }
 }
 
 /// <summary>30 requests per minute and client IP; calendar apps poll at most hourly, the limit slows down token guessing.</summary>

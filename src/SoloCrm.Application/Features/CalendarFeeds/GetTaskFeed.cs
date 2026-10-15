@@ -9,8 +9,10 @@ using SoloCrm.Application.Abstractions;
 namespace SoloCrm.Application.Features.CalendarFeeds;
 
 /// <summary>
-/// Renders the tasks as an iCalendar feed (<c>VTODO</c>, read-only, SOL-6): all open tasks plus the ones completed in
-/// the last <see cref="CompletedRetentionDays"/> days, so that calendar apps show recent completions correctly.
+/// Renders the tasks as an iCalendar feed (read-only, SOL-6): all open tasks with a due date plus the ones completed
+/// in the last <see cref="CompletedRetentionDays"/> days, so that calendar apps show recent completions. Each task
+/// becomes an all-day <c>VEVENT</c> on its due date, because Apple and Google Calendar ignore <c>VTODO</c> in
+/// subscribed calendars. Tasks without a due date have no place in a calendar and are left out.
 /// The token from the feed URL is the only authentication; it is checked against the stored hash.
 /// </summary>
 public static class GetTaskFeed
@@ -18,6 +20,9 @@ public static class GetTaskFeed
     public const int CompletedRetentionDays = 30;
 
     public const string CalendarName = "SoloCRM Aufgaben";
+
+    /// <summary>Prefix of the title of completed tasks.</summary>
+    public const string CompletedMark = "✓";
 
     /// <param name="Token">Secret from the feed URL.</param>
     /// <param name="BaseUrl">Origin of the app without trailing slash, used for the links to the linked records.</param>
@@ -60,9 +65,8 @@ public static class GetTaskFeed
 
             var cutoff = now.AddDays(-CompletedRetentionDays);
             var tasks = await db.Tasks.AsNoTracking()
-                .Where(t => t.CompletedAt == null || t.CompletedAt >= cutoff)
-                .OrderBy(t => t.DueDate == null)
-                .ThenBy(t => t.DueDate)
+                .Where(t => t.DueDate != null && (t.CompletedAt == null || t.CompletedAt >= cutoff))
+                .OrderBy(t => t.DueDate)
                 .ThenBy(t => t.Id)
                 .Select(t => new FeedTask(t.Id, t.Title, t.DueDate, t.CompletedAt, t.CreatedAt, t.UpdatedAt, t.ContactId, t.OrganizationId, t.OpportunityId))
                 .ToListAsync(cancellationToken);
@@ -91,33 +95,27 @@ public static class GetTaskFeed
 
         foreach (var task in tasks)
         {
-            var todo = new Todo
+            var due = task.DueDate!.Value;
+            var next = due.AddDays(1);
+            var calendarEvent = new CalendarEvent
             {
                 Uid = $"{task.Id}@solocrm",
-                Summary = task.Title,
+                Summary = task.CompletedAt is null ? task.Title : $"{CompletedMark} {task.Title}",
                 DtStamp = ToUtc(now),
                 Created = ToUtc(task.CreatedAt),
                 LastModified = ToUtc(task.UpdatedAt),
-                Status = task.CompletedAt is null ? TodoStatus.NeedsAction : TodoStatus.Completed,
+                DtStart = new CalDateTime(due.Year, due.Month, due.Day),
+                DtEnd = new CalDateTime(next.Year, next.Month, next.Day),
+                Transparency = "TRANSPARENT",
             };
-
-            if (task.DueDate is { } due)
-            {
-                todo.Due = new CalDateTime(due.Year, due.Month, due.Day);
-            }
-
-            if (task.CompletedAt is { } completed)
-            {
-                todo.Completed = ToUtc(completed);
-            }
 
             if (LinkFor(task, baseUrl) is { } link)
             {
-                todo.Url = link;
-                todo.Description = link.AbsoluteUri;
+                calendarEvent.Url = link;
+                calendarEvent.Description = link.AbsoluteUri;
             }
 
-            calendar.Todos.Add(todo);
+            calendar.Events.Add(calendarEvent);
         }
 
         return new CalendarSerializer().SerializeToString(calendar) ?? string.Empty;

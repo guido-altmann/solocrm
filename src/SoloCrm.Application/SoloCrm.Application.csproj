@@ -12,7 +12,7 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <!-- CSV import (US-16); parsing is part of the use case, not of a technical adapter. -->
     <PackageReference Include="CsvHelper" />
-    <!-- iCalendar feed of the tasks (SOL-6); building VTODO by hand would mean re-implementing escaping and line folding. -->
+    <!-- iCalendar feed of the tasks (SOL-6); writing iCalendar by hand would mean re-implementing escaping and line folding. -->
     <PackageReference Include="Ical.Net" />
   </ItemGroup>
 

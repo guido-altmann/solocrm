@@ -94,18 +94,19 @@ public sealed class CalendarFeedHandlerTests(PostgresFixture postgres) : Handler
         var content = (await FeedAsync(generated.Token)).Value.Content;
 
         content.Should().Contain("BEGIN:VCALENDAR").And.Contain("X-WR-CALNAME:" + GetTaskFeed.CalendarName);
-        content.Should().Contain("SUMMARY:Angebot nachfassen").And.Contain("SUMMARY:Ohne Termin").And.Contain("SUMMARY:Kürzlich erledigt");
-        content.Should().NotContain("Lange erledigt");
-        content.Should().Contain("DUE;VALUE=DATE:20261020");
-        content.Should().Contain("STATUS:NEEDS-ACTION").And.Contain("STATUS:COMPLETED").And.Contain("COMPLETED:");
-        content.Split("BEGIN:VTODO").Length.Should().Be(4, "three tasks are in the feed");
+        content.Should().Contain("SUMMARY:Angebot nachfassen").And.Contain("SUMMARY:✓ Kürzlich erledigt");
+        content.Should().NotContain("Lange erledigt", "completed more than the retention period ago")
+            .And.NotContain("Ohne Termin", "a calendar needs a date");
+        content.Should().Contain("DTSTART;VALUE=DATE:20261020").And.Contain("DTEND;VALUE=DATE:20261021");
+        content.Should().Contain("TRANSP:TRANSPARENT").And.NotContain("VTODO");
+        content.Split("BEGIN:VEVENT").Length.Should().Be(3, "two tasks are in the feed");
     }
 
     [Fact]
     public async Task Feed_TaskWithSpecialCharacters_EscapesTitle()
     {
         var generated = await GenerateAsync();
-        await CreateTaskAsync("Angebot; Preis, Zeitplan", null);
+        await CreateTaskAsync("Angebot; Preis, Zeitplan", Due);
 
         var content = (await FeedAsync(generated.Token)).Value.Content;
 
