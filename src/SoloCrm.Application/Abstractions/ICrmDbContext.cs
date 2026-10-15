@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Domain.Activities;
 using SoloCrm.Domain.ApiKeys;
+using SoloCrm.Domain.CalendarFeeds;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Mail;
@@ -46,6 +47,8 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
     DbSet<WebhookDelivery> WebhookDeliveries { get; }
 
     DbSet<ApiKey> ApiKeys { get; }
+
+    DbSet<CalendarFeed> CalendarFeeds { get; }
 
     DbSet<MailMessage> MailMessages { get; }
 

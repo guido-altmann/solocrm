@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using MudBlazor.Services;
 using Serilog;
+using Serilog.Events;
 using Serilog.Formatting.Compact;
 using SoloCrm.Application;
 using SoloCrm.Infrastructure;
@@ -98,7 +99,14 @@ try
     // The API answers unhandled exceptions with Problem Details instead of the error page.
     app.UseWhen(context => context.Request.Path.StartsWithSegments(ApiEndpoints.BasePath), api => api.UseExceptionHandler());
 
-    app.UseSerilogRequestLogging();
+    // The feed token in /calendar/{token}.ics is a credential and must not end up in the logs.
+    app.UseSerilogRequestLogging(options => options.GetMessageTemplateProperties = (context, path, elapsed, statusCode) =>
+    [
+        new LogEventProperty("RequestMethod", new ScalarValue(context.Request.Method)),
+        new LogEventProperty("RequestPath", new ScalarValue(CalendarFeedEndpoints.MaskPath(path))),
+        new LogEventProperty("StatusCode", new ScalarValue(statusCode)),
+        new LogEventProperty("Elapsed", new ScalarValue(elapsed)),
+    ]);
     app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
     app.UseHttpsRedirection();
     // The rate limiter runs before authentication, so that requests over the limit cost no key lookup.
@@ -111,6 +119,7 @@ try
     app.MapCrmHealthChecks();
     app.MapCrmApi();
     app.MapMailConnect();
+    app.MapCalendarFeed();
     app.MapStaticAssets().AllowAnonymous();
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();

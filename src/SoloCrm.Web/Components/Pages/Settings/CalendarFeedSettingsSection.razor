@@ -1,0 +1,130 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.CalendarFeeds
+@using SoloCrm.Web.Endpoints
+@inject IQueryHandler<GetCalendarFeed.Query, GetCalendarFeed.Result> GetHandler
+@inject ICommandHandler<GenerateCalendarFeed.Command, GenerateCalendarFeed.Result> GenerateHandler
+@inject ICommandHandler<RevokeCalendarFeed.Command, RevokeCalendarFeed.Result> RevokeHandler
+@inject AppClock Clock
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+@* Subscribable ICS feed of the tasks (SOL-6, SPEC 3.3 S6): set up (link shown once), replace, switch off. *@
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="calendar-feed">
+    <MudText Typo="Typo.h6">Kalender-Feed</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Die Aufgaben als abonnierbarer Kalender (ICS, nur lesend) für Apple Kalender, Google Kalender, Nextcloud, Thunderbird u. a.
+        Enthalten sind alle offenen und die in den letzten @GetTaskFeed.CompletedRetentionDays Tagen erledigten Aufgaben.
+        Der Link enthält ein geheimes Token und wird nur einmal angezeigt; wer den Link kennt, sieht die Aufgabentitel.
+    </MudText>
+
+    @if (_state is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else if (!_state.IsEnabled)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">Kein Feed eingerichtet.</MudText>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.RssFeed"
+                   Disabled="_busy" OnClick="() => GenerateAsync(false)">
+            Feed einrichten
+        </MudButton>
+    }
+    else
+    {
+        <MudText Typo="Typo.body2" Class="mb-2" data-feed-status="enabled">
+            Feed aktiv seit @(_state.CreatedAt is { } created ? Formats.Date(Clock.ToLocal(created)) : "–"),
+            zuletzt abgerufen: @(_state.LastUsedAt is { } used ? Formats.DateTime(Clock.ToLocal(used)) : "nie").
+        </MudText>
+        <MudStack Row="true" Spacing="2">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Refresh"
+                       Disabled="_busy" OnClick="() => GenerateAsync(true)">
+                Neuen Link erzeugen
+            </MudButton>
+            <MudButton Variant="Variant.Text" Color="Color.Error" Disabled="_busy" OnClick="RevokeAsync">
+                Deaktivieren
+            </MudButton>
+        </MudStack>
+    }
+</MudPaper>
+
+@code {
+    private GetCalendarFeed.Result? _state;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await GetHandler.Handle(new GetCalendarFeed.Query(), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        _state = result.Value;
+    }
+
+    private async Task GenerateAsync(bool replace)
+    {
+        if (replace)
+        {
+            var confirmed = await DialogService.ShowMessageBoxAsync(
+                "Neuen Link erzeugen", "Der bisherige Feed-Link wird sofort ungültig. Abonnierte Kalender müssen mit dem neuen Link eingerichtet werden.",
+                yesText: "Erzeugen", cancelText: "Abbrechen", options: DialogDefaults.ExtraSmall);
+            if (confirmed != true)
+            {
+                return;
+            }
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await GenerateHandler.Handle(new GenerateCalendarFeed.Command(), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+                return;
+            }
+
+            await LoadAsync();
+            var parameters = new DialogParameters<SecretDialog>
+            {
+                { d => d.Secret, Navigation.ToAbsoluteUri(CalendarFeedEndpoints.FeedPath(result.Value.Token)).AbsoluteUri },
+                { d => d.Label, "Feed-Link" },
+                { d => d.Hint, "In der Kalender-App als abonnierten Kalender („Kalender abonnieren“ bzw. „Von URL“) hinzufügen." },
+            };
+            var dialog = await DialogService.ShowAsync<SecretDialog>("Kalender-Feed", parameters, DialogDefaults.Small);
+            await dialog.Result;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RevokeAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Feed deaktivieren", "Den Kalender-Feed wirklich deaktivieren? Der Feed-Link funktioniert danach nicht mehr.",
+            yesText: "Deaktivieren", cancelText: "Abbrechen", options: DialogDefaults.ExtraSmall);
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await RevokeHandler.Handle(new RevokeCalendarFeed.Command(), CancellationToken.None);
+            Snackbar.Add(result.IsSuccess ? "Kalender-Feed deaktiviert." : result.Error.Message, result.IsSuccess ? Severity.Success : Severity.Error);
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

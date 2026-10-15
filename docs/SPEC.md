@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** v1.2 · **Stand:** 2026-10-14 · **Owner:** Guido Altmann
+> **Status:** v1.3 · **Stand:** 2026-10-15 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, die abgeschlossenen MVP-Iterationen in `docs/iterations/`; der Backlog nach dem MVP liegt im Jira-Projekt `SOL` (siehe Kap. 8).
 
@@ -222,6 +222,7 @@ n:m-Beziehungen zu Contact, Organization und Opportunity über drei typisierte J
 | **MailMessage** | Verknüpft eine importierte E-Mail mit ihrer Activity und verhindert Dubletten (ADR-013); ohne Inhalt | ActivityId (FK, `ON DELETE CASCADE`), Provider, ExternalId, InternetMessageId (eindeutig je Provider), Folder (`Inbox`/`Sent`) |
 | **MailSyncState** | Fortsetzungspunkt des Mail-Abgleichs je Provider und Ordner | Provider, Folder, DeltaToken?, LastSyncedAt? |
 | **MailConnection** | Das verbundene Postfach (ADR-013): Provider (eindeutig), Account, `ProtectedRefreshToken` (per Data Protection verschlüsselt), ConnectedAt, LastSyncedAt?, LastError? | Provider, Account, ProtectedRefreshToken, ConnectedAt, LastSyncedAt?, LastError? |
+| **CalendarFeed** | Geheimes Token des abonnierbaren ICS-Feeds der Tasks (SOL-6); höchstens ein Eintrag, Neuerzeugen ersetzt ihn | TokenHash (SHA-256, eindeutig), LastUsedAt? (höchstens minütlich aktualisiert) |
 | **ApiKey** | Zugriff auf die REST-API | Name, Prefix (8 zufällige Zeichen, Key-Format `scrm_<prefix>_<64 hex>`), KeyHash (SHA-256), CreatedAt, LastUsedAt? (höchstens minütlich aktualisiert), RevokedAt? |
 
 ### 2.5 Timeline-Regeln
@@ -288,7 +289,7 @@ Außer `Ctrl/Cmd + K` wirken die Kürzel nur außerhalb von Eingabefeldern und D
 | S3 | **Kontakte** | `/contacts` | Tabelle mit Suche (dieselbe tippfehlertolerante Suche wie die Command Palette), Filter (Organisation, Tags ODER-verknüpft, Quelle), Sortierung, Paging (serverseitig) |
 | S4 | **Organisationen** | `/organizations` | analog S3, Filter nach Typ |
 | S5 | **Detailansicht** | `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}` | Links Stammdaten (inline editierbar ab It. 4; ersetzt dort den Bearbeiten-Dialog; bei Anfragen Preis und Laufzeit als Gruppe mit Live-Wert, Wechsel auf „Verloren“ fragt den Absagegrund ab; Archivieren im Kopf; bei Kontakten im Menü ⋮ „Daten exportieren (DSGVO)“ und „Endgültig löschen (DSGVO)“, getrennt vom Archivieren), Tags als Chip-Eingabe, verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe; `N` fokussiert die Eingabe |
-| S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Webhooks, Import, E-Mail (Microsoft-365-Postfach verbinden und trennen, Status und „Jetzt abgleichen“, ADR-013), Konto (Links zu Passwort, 2FA und Passkeys unter `/Account/Manage`, statisch gerendert) |
+| S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Kalender-Feed (ICS-Abo der Tasks, SOL-6), Webhooks, Import, E-Mail (Microsoft-365-Postfach verbinden und trennen, Status und „Jetzt abgleichen“, ADR-013), Konto (Links zu Passwort, 2FA und Passkeys unter `/Account/Manage`, statisch gerendert) |
 
 ### 3.4 Layout
 - Linke Navigation (einklappbar): Heute, Pipeline, Kontakte, Organisationen, Einstellungen
@@ -588,11 +589,13 @@ public static class CreateContact
 
 **Backlog nach MVP:** Die Iterationen sind mit dem MVP abgeschlossen. Offene Punkte werden seitdem im Jira-Projekt **SoloCRM** (Key `SOL`) auf einem Kanban-Board gepflegt: <https://guido-altmann-team.atlassian.net/browse/SOL>. Die Tickets verweisen auf die Abschnitte dieser Spec; fachliche Konzepte bleiben hier, Priorisierung und Status liegen im Board.
 
-**Konzeptentwurf Nextcloud-Synchronisation** (Epic SOL-2) über die Standardschnittstellen (nicht über die AppAPI, die für in Nextcloud eingebettete ExApps gedacht ist). Vorstufe ist ein ICS-Export der Tasks (abonnierbarer Feed, nur lesend).
+**Konzeptentwurf Nextcloud-Synchronisation** (Epic SOL-2) über die Standardschnittstellen (nicht über die AppAPI, die für in Nextcloud eingebettete ExApps gedacht ist). Vorstufe ist ein ICS-Export der Tasks (abonnierbarer Feed, nur lesend; umgesetzt mit SOL-6, siehe unten).
   - **Einweg SoloCRM → Nextcloud:** Kontakte per CardDAV in ein eigenes Adressbuch „SoloCRM“, Tasks per CalDAV (`VTODO`) in eine eigene Aufgabenliste; SoloCRM ist Master. Feldzuordnung vCard: Name, `EMAIL`, `TEL`, `ORG`, `TITLE`, `URL` (LinkedIn); `VTODO`: Titel, Fälligkeit, Status, Link zum Bezugsobjekt in der Beschreibung.
   - **Rückkanal nur für Tasks:** in Nextcloud bzw. auf dem Handy (z. B. DAVx5) abgehakte oder wieder geöffnete Aufgaben werden in SoloCRM erledigt bzw. geöffnet (über `CompleteTask`/`ReopenTask`, also mit Audit und Events); andere Änderungen an synchronisierten Einträgen werden beim nächsten Abgleich überschrieben.
   - **Technik:** Zuordnungstabelle (Datensatz-Id ↔ Remote-Href + ETag), Abgleich per Hintergrunddienst (ADR-008), Änderungserkennung über `UpdatedAt` bzw. `sync-token` (RFC 6578); Zugang per Nextcloud-App-Passwort, verschlüsselt per Data Protection; Pakete für vCard/iCalendar (z. B. `FolkerKinzel.VCards`, `Ical.Net`) vor der Umsetzung klären; Entscheidung als eigener ADR.
   - **Bewusst nicht im ersten Entwurf:** Zwei-Wege-Sync von Kontakten, Notizen/Activities (passen schlecht zum Modell der Nextcloud-Notes-App).
+
+**ICS-Feed der Tasks (SOL-6):** `GET /calendar/{token}.ics`, ohne Login, nur lesend. Das Token (32 Zufallsbytes, base64url) wird in den Einstellungen („Kalender-Feed“) erzeugt, der Link nur einmal im Klartext angezeigt; gespeichert wird der SHA-256-Hash. Es gibt höchstens einen Feed: „Neuen Link erzeugen“ macht den alten Link ungültig, „Deaktivieren“ schaltet den Feed ab. Unbekannte, ersetzte und fehlerhafte Tokens liefern dasselbe `404`; Rate-Limit 30 Anfragen/Minute und IP; `Cache-Control: no-store`. Inhalt: alle offenen Tasks und die in den letzten 30 Tagen erledigten als `VTODO` (`UID` = `<Task-Id>@solocrm`, `SUMMARY` = Titel, `DUE` als Datum ohne Uhrzeit, `STATUS` `NEEDS-ACTION`/`COMPLETED`, `COMPLETED`, `URL`/`DESCRIPTION` = Link zur Anfrage, sonst zum Kontakt, sonst zur Organisation); erzeugt mit Ical.Net. Da das Token Teil des Pfades ist, wird der Pfad in den Request-Logs maskiert (`/calendar/{token}.ics`); Access-Logs des Reverse Proxys (Traefik) sind davon nicht betroffen und sollten den Pfad nicht ausgeben.
 
 ---
 
@@ -672,6 +675,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
 | 1.0 | 2026-10-02 | Abschluss It. 6 (MVP): DSGVO-Auskunft und -Löschung mit Umsetzungsdetails (US-19/20, 2.6 `ContactDeleted`, 5 Export-Endpunkt), 2FA und Kontoseiten (US-21), Eingangsdatum `ReceivedOn` für Anfragen (2.3, US-06 AK6, S1, 5), Konto-Abschnitt in S6, Kontakt-Menü in S5, Testabdeckung gemessen (6); offene Fragen aus Kap. 10 in den Backlog verschoben; Datenschutz-Doku `docs/datenschutz.md` |
+| 1.3 | 2026-10-15 | ICS-Feed der Tasks (SOL-6): `CalendarFeed` (2.4), Einstellungsabschnitt „Kalender-Feed“ (S6), Endpoint und Regeln in Kap. 8 |
 | 1.2 | 2026-10-14 | E-Mail-Logging (SOL-13, ADR-013): `Origin`/`Direction` an Activity, `MailMessage`, `MailSyncState`, `MailConnection` (2.3, 2.4); Timeline-Darstellung importierter Mails (2.5); Einstellungsabschnitt „E-Mail“ (S6); Anleitung `docs/email-logging-einrichtung.md` |
 | 1.1 | 2026-10-02 | Backlog nach MVP ins Jira-Projekt `SOL` verlagert (8); Nextcloud-Entwurf bleibt als Konzept in Kap. 8; Verweise in Kap. 10 auf Tickets umgestellt |
 | 0.16 | 2026-10-01 | Erweiterung It. 5: Anschrift (`Address`) für Kontakte und Organisationen (2.3), Organisationsimport mit HubSpot-Vorlage und Verknüpfung per HubSpot-Firmen-ID (US-16) |

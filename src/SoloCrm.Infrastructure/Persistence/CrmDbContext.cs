@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Domain.Activities;
 using SoloCrm.Domain.ApiKeys;
+using SoloCrm.Domain.CalendarFeeds;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
@@ -48,6 +49,8 @@ public class CrmDbContext(DbContextOptions options)
     public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();
 
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
+
+    public DbSet<CalendarFeed> CalendarFeeds => Set<CalendarFeed>();
 
     public DbSet<MailMessage> MailMessages => Set<MailMessage>();
 

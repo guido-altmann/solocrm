@@ -18,7 +18,11 @@ public static class ApiEndpoints
     {
         services.AddProblemDetails();
         services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
-        services.AddRateLimiter(options => options.AddPolicy<string, ApiRateLimiting>(ApiRateLimiting.PolicyName));
+        services.AddRateLimiter(options =>
+        {
+            options.AddPolicy<string, ApiRateLimiting>(ApiRateLimiting.PolicyName);
+            options.AddPolicy<string, CalendarFeedRateLimiting>(CalendarFeedEndpoints.RateLimitPolicyName);
+        });
 
         services.AddOpenApi(DocumentName, options =>
         {
