@@ -200,7 +200,7 @@ public sealed class NextcloudDavClientTests(RadicaleFixture radicale) : IDisposa
     /// <summary>Plain HTTP access for arranging and verifying; never follows redirects, like production.</summary>
     private sealed class RealHttp : IHttpClientFactory, IDisposable
     {
-        private readonly SocketsHttpHandler _handler = new() { AllowAutoRedirect = false };
+        private readonly HttpMessageHandler _handler = RadicaleFixture.CreateHandler();
 
         public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
 

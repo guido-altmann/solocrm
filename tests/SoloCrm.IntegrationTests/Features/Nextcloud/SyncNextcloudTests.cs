@@ -17,7 +17,7 @@ namespace SoloCrm.IntegrationTests.Features.Nextcloud;
 [Collection(RadicaleTestGroup.Name)]
 public sealed class SyncNextcloudTests(PostgresFixture postgres, RadicaleFixture radicale) : HandlerTest(postgres)
 {
-    private readonly SocketsHttpHandler _handler = new() { AllowAutoRedirect = false };
+    private readonly HttpMessageHandler _handler = RadicaleFixture.CreateHandler();
 
     // Radicale accepts every user name; a fresh one isolates the test.
     private readonly string _user = $"user-{Guid.NewGuid():N}";
@@ -492,7 +492,7 @@ public sealed class SyncNextcloudTests(PostgresFixture postgres, RadicaleFixture
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    private sealed class SharedHandlerFactory(SocketsHttpHandler handler) : IHttpClientFactory
+    private sealed class SharedHandlerFactory(HttpMessageHandler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }

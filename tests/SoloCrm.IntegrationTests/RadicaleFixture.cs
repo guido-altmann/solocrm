@@ -21,9 +21,39 @@ public sealed class RadicaleFixture : IAsyncLifetime
 
     public string Host => _container.Hostname;
 
+    /// <summary>A handler for talking to Radicale that never follows redirects (like production) and rides out dropped connections.</summary>
+    public static HttpMessageHandler CreateHandler() =>
+        new DroppedConnectionRetryHandler { InnerHandler = new SocketsHttpHandler { AllowAutoRedirect = false } };
+
     public async ValueTask InitializeAsync() => await _container.StartAsync();
 
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
+
+    /// <summary>
+    /// Radicale answers with HTTP/1.0 and closes every connection, so each request opens a fresh one. Under the load of
+    /// the full suite the Docker port proxy occasionally accepts such a connection and closes it without a response
+    /// (<see cref="HttpRequestError.ResponseEnded"/>), locally and on the CI runner alike. The request never reached
+    /// Radicale (nothing in its log), so sending it again is safe.
+    /// </summary>
+    private sealed class DroppedConnectionRetryHandler : DelegatingHandler
+    {
+        private const int MaxAttempts = 3;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            for (var attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    return await base.SendAsync(request, cancellationToken);
+                }
+                catch (HttpRequestException ex) when (attempt < MaxAttempts && ex.HttpRequestError == HttpRequestError.ResponseEnded)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(100 * attempt), cancellationToken);
+                }
+            }
+        }
+    }
 }
 
 /// <summary>
