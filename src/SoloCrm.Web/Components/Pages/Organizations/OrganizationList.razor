@@ -12,7 +12,7 @@
 
 <PageTitle>Organisationen · SoloCRM</PageTitle>
 
-<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+<MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Organisationen</MudText>
     <MudSpacer />
     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddBusiness"
@@ -24,7 +24,7 @@
 <MudDataGrid @ref="_grid" T="GetOrganizations.Item" ServerData="LoadAsync" SortMode="SortMode.Single"
              RowsPerPage="Paging.DefaultPageSize" Hover="true" Dense="true" Elevation="1">
     <ToolBarContent>
-        <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="4" Class="flex-grow-1">
+        <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.End" Spacing="4" Class="flex-grow-1">
             <MudTextField T="string" Value="_search" ValueChanged="OnSearchChanged" Placeholder="Name, Ort oder Website suchen…"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                           Immediate="true" DebounceInterval="300" Clearable="true" Class="mt-0" Style="max-width: 360px;" />
@@ -36,7 +36,7 @@
                 }
             </MudSelect>
             <TagFilter Selected="_tagIds" SelectedChanged="OnTagsChanged" Style="min-width: 180px; max-width: 280px;" />
-            <MudSwitch T="bool" Value="_includeArchived" ValueChanged="OnIncludeArchivedChanged" Color="Color.Primary"
+            <MudSwitch T="bool" Value="_includeArchived" ValueChanged="OnIncludeArchivedChanged" Color="Color.Primary" Class="mb-n1"
                        Label="Archivierte anzeigen" />
         </MudStack>
     </ToolBarContent>

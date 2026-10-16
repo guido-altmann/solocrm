@@ -451,3 +451,11 @@ kbd {
 .import-mapping td:first-child {
     white-space: nowrap;
 }
+
+/* Data grid filter toolbars (SOL-26): MudDataGrid renders ToolBarContent in a fixed-height MudToolBar without
+   WrapContent, so wrapped filters overflowed onto the column headers on narrow screens. Let the toolbar grow. */
+.mud-toolbar.mud-table-toolbar {
+    height: auto;
+    min-height: var(--mud-internal-toolbar-height);
+    padding-block: 8px;
+}

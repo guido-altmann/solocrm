@@ -12,7 +12,7 @@
 
 <PageTitle>Kontakte · SoloCRM</PageTitle>
 
-<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+<MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Class="mb-4">
     <MudText Typo="Typo.h4">Kontakte</MudText>
     <MudSpacer />
     <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.PersonAdd"
@@ -24,11 +24,11 @@
 <MudDataGrid @ref="_grid" T="GetContacts.Item" ServerData="LoadAsync" SortMode="SortMode.Single"
              RowsPerPage="GetContacts.DefaultPageSize" Hover="true" Dense="true" Elevation="1">
     <ToolBarContent>
-        <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center" Spacing="4" Class="flex-grow-1">
+        <MudStack Row="true" Wrap="Wrap.Wrap" AlignItems="AlignItems.End" Spacing="4" Class="flex-grow-1">
             <MudTextField T="string" Value="_search" ValueChanged="OnSearchChanged" Placeholder="Name, E-Mail oder Firma suchen…"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search"
                           Immediate="true" DebounceInterval="300" Clearable="true" Class="mt-0" Style="max-width: 360px;" />
-            <OrganizationAutocomplete Value="_organization" ValueChanged="OnOrganizationChanged" Margin="Margin.Dense"
+            <OrganizationAutocomplete Value="_organization" ValueChanged="OnOrganizationChanged" Margin="Margin.None"
                                       Style="max-width: 260px;" />
             <TagFilter Selected="_tagIds" SelectedChanged="OnTagsChanged" Style="min-width: 180px; max-width: 280px;" />
             <MudSelect T="LeadSource?" Value="_source" ValueChanged="OnSourceChanged" Label="Quelle" Dense="true"
@@ -38,7 +38,7 @@
                     <MudSelectItem T="LeadSource?" Value="source">@Labels.For(source)</MudSelectItem>
                 }
             </MudSelect>
-            <MudSwitch T="bool" Value="_includeArchived" ValueChanged="OnIncludeArchivedChanged" Color="Color.Primary"
+            <MudSwitch T="bool" Value="_includeArchived" ValueChanged="OnIncludeArchivedChanged" Color="Color.Primary" Class="mb-n1"
                        Label="Archivierte anzeigen" />
         </MudStack>
     </ToolBarContent>
