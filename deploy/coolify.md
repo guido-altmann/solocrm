@@ -90,7 +90,7 @@ Anschließend **Backup Now** auslösen und prüfen, dass die Datei im Bucket ank
    | `Admin__Email` | eigene Adresse | nur relevant, solange noch kein User existiert |
    | `Admin__InitialPassword` | starkes Passwort | nach dem ersten Login ändern, danach kann die Variable entfernt werden |
    | `Serilog__MinimumLevel__Default` | `Information` | optional, zur Fehlersuche `Debug` |
-   | `App__BaseUrl` | `https://crm.example.de` | für spätere absolute Links (Webhooks, Mails) |
+   | `App__BaseUrl` | `https://crm.example.de` | für absolute Links: Umleitung der Microsoft-Anmeldung, Kalender-Feed und Aufgaben in Nextcloud (ohne die Variable haben die Aufgaben dort keinen Link) |
    | `App__TimeZone` | `Europe/Berlin` | optional (Default `Europe/Berlin`); IANA-Zeitzone für „Heute“, „überfällig“ und angezeigte Uhrzeiten. Ein ungültiger Wert verhindert den Start |
    | `Webhooks__AllowedHttpHosts` | `n8n` | optional; kommagetrennte Hosts, an die Webhooks per `http` gehen dürfen (z. B. n8n im selben Docker-Netz). Alle anderen Ziele brauchen `https` |
    | `Mail__Graph__TenantId`, `Mail__Graph__ClientId`, `Mail__Graph__ClientSecret` | Werte der Entra-App | optional; schaltet das E-Mail-Logging über Microsoft 365 ein. Die Umleitungs-URI der App ist `<App__BaseUrl>/mail/callback`. Einrichtung: `docs/email-logging-einrichtung.md`. Das Secret läuft ab: Ablaufdatum notieren |

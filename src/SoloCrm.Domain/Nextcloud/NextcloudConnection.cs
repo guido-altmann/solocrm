@@ -11,6 +11,7 @@ public sealed class NextcloudConnection : Entity
     public const int ServerUrlMaxLength = 500;
     public const int UserNameMaxLength = 200;
     public const int HrefMaxLength = 1000;
+    public const int SyncTokenMaxLength = 1000;
     public const int ErrorMaxLength = 500;
 
     // Required by EF Core.
@@ -40,6 +41,15 @@ public sealed class NextcloudConnection : Entity
     /// <summary>Path of the address book „SoloCRM“ on the server; <c>null</c> until it is found or created.</summary>
     public string? AddressBookHref { get; private set; }
 
+    /// <summary>Path of the task list „SoloCRM“ (only <c>VTODO</c>); <c>null</c> until it is found or created.</summary>
+    public string? TaskListHref { get; private set; }
+
+    /// <summary>
+    /// <c>sync-token</c> (RFC 6578) of the task list after the last incoming phase; <c>null</c> before the first one or
+    /// after the server rejected it, which makes the next run compare all ETags.
+    /// </summary>
+    public string? TaskSyncToken { get; private set; }
+
     public DateTimeOffset ConnectedAt { get; private set; }
 
     public DateTimeOffset? LastSyncedAt { get; private set; }
@@ -65,6 +75,8 @@ public sealed class NextcloudConnection : Entity
         {
             // The collections belong to the other account.
             AddressBookHref = null;
+            TaskListHref = null;
+            TaskSyncToken = null;
         }
 
         ServerUrl = RequiredServerUrl(serverUrl);
@@ -77,6 +89,22 @@ public sealed class NextcloudConnection : Entity
     }
 
     public void UseAddressBook(string href) => AddressBookHref = RequiredHref(href);
+
+    /// <summary>Sets the task list; a different list starts the incoming phase from scratch.</summary>
+    public void UseTaskList(string href)
+    {
+        var required = RequiredHref(href);
+        if (required != TaskListHref)
+        {
+            TaskSyncToken = null;
+        }
+
+        TaskListHref = required;
+    }
+
+    /// <summary>Notes where the next incoming phase continues; <c>null</c> forces a full comparison.</summary>
+    public void AdvanceTaskSyncToken(string? token) =>
+        TaskSyncToken = string.IsNullOrWhiteSpace(token) || token.Length > SyncTokenMaxLength ? null : token;
 
     public void RecordSuccess(DateTimeOffset syncedAt)
     {

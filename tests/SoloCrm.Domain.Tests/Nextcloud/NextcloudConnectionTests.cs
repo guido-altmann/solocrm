@@ -63,17 +63,48 @@ public sealed class NextcloudConnectionTests
     }
 
     [Fact]
-    public void Reconnect_OtherAccount_ForgetsTheCollections()
+    public void Reconnect_OtherAccount_ForgetsTheCollectionsAndTheToken()
     {
         var connection = Create();
         connection.UseAddressBook("/dav/guido/solocrm/");
+        connection.UseTaskList("/dav/calendars/guido/solocrm/");
+        connection.AdvanceTaskSyncToken("token-1");
         connection.RecordSuccess(Now);
 
         connection.Reconnect("https://cloud.example.test", "anna", "protected-2", Now.AddHours(1));
 
         connection.UserName.Should().Be("anna");
         connection.AddressBookHref.Should().BeNull();
+        connection.TaskListHref.Should().BeNull();
+        connection.TaskSyncToken.Should().BeNull();
         connection.LastSyncedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void UseTaskList_OtherList_StartsTheIncomingPhaseFromScratch()
+    {
+        var connection = Create();
+        connection.UseTaskList("/dav/calendars/guido/solocrm/");
+        connection.AdvanceTaskSyncToken("token-1");
+
+        connection.UseTaskList("/dav/calendars/guido/solocrm/");
+        connection.TaskSyncToken.Should().Be("token-1");
+
+        connection.UseTaskList("/dav/calendars/guido/solocrm-2/");
+        connection.TaskSyncToken.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    public void AdvanceTaskSyncToken_Missing_ForcesFullComparison(string? token)
+    {
+        var connection = Create();
+        connection.AdvanceTaskSyncToken("token-1");
+
+        connection.AdvanceTaskSyncToken(token);
+
+        connection.TaskSyncToken.Should().BeNull();
     }
 
     [Fact]

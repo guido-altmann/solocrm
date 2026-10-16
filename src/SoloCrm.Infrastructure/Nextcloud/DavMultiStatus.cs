@@ -27,6 +27,24 @@ internal static class Dav
                     new XElement(D + "resourcetype", new XElement(D + "collection"), new XElement(CardDav + "addressbook")),
                     new XElement(D + "displayname", displayName)))));
 
+    /// <summary>MKCALENDAR (RFC 4791) creating a calendar for tasks only.</summary>
+    public static string MkTaskList(string displayName) =>
+        Serialize(new XElement(CalDav + "mkcalendar",
+            new XAttribute(XNamespace.Xmlns + "d", D),
+            new XAttribute(XNamespace.Xmlns + "cal", CalDav),
+            new XElement(D + "set",
+                new XElement(D + "prop",
+                    new XElement(D + "displayname", displayName),
+                    new XElement(CalDav + "supported-calendar-component-set", new XElement(CalDav + "comp", new XAttribute("name", "VTODO")))))));
+
+    /// <summary><c>REPORT sync-collection</c> (RFC 6578) for the members' ETags; an empty token requests all members.</summary>
+    public static string SyncCollection(string? syncToken) =>
+        Serialize(new XElement(D + "sync-collection",
+            new XAttribute(XNamespace.Xmlns + "d", D),
+            new XElement(D + "sync-token", syncToken ?? ""),
+            new XElement(D + "sync-level", "1"),
+            new XElement(D + "prop", new XElement(D + "getetag"))));
+
     public static string Serialize(XElement root) =>
         new XDocument(new XDeclaration("1.0", "utf-8", null), root).Declaration + root.ToString(SaveOptions.DisableFormatting);
 }
@@ -48,7 +66,11 @@ internal sealed record DavResponse(string Href, IReadOnlyDictionary<XName, XElem
 internal static class DavMultiStatus
 {
     /// <exception cref="FormatException">The body is no multistatus document.</exception>
-    public static IReadOnlyList<DavResponse> Parse(string body)
+    public static IReadOnlyList<DavResponse> Parse(string body) => ParseWithSyncToken(body).Responses;
+
+    /// <summary>Like <see cref="Parse"/>, plus the <c>sync-token</c> of a <c>sync-collection</c> report.</summary>
+    /// <exception cref="FormatException">The body is no multistatus document.</exception>
+    public static (IReadOnlyList<DavResponse> Responses, string? SyncToken) ParseWithSyncToken(string body)
     {
         XDocument document;
         try
@@ -65,7 +87,7 @@ internal static class DavMultiStatus
             throw new FormatException("The body is no multistatus document.");
         }
 
-        return document.Root.Elements(Dav.D + "response")
+        var responses = document.Root.Elements(Dav.D + "response")
             .Select(response =>
             {
                 var href = ToPath(response.Element(Dav.D + "href")?.Value);
@@ -78,6 +100,8 @@ internal static class DavMultiStatus
             })
             .Where(r => r.Href.Length > 0)
             .ToList();
+        var syncToken = document.Root.Element(Dav.D + "sync-token")?.Value.Trim();
+        return (responses, string.IsNullOrEmpty(syncToken) ? null : syncToken);
     }
 
     /// <summary>Servers may answer with full URLs or paths; SoloCRM stores paths.</summary>

@@ -754,6 +754,16 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("server_url");
 
+                    b.Property<string>("TaskListHref")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("task_list_href");
+
+                    b.Property<string>("TaskSyncToken")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("task_sync_token");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -813,6 +823,9 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_nextcloud_sync_items");
+
+                    b.HasIndex("Href")
+                        .HasDatabaseName("ix_nextcloud_sync_items_href");
 
                     b.HasIndex("EntityType", "EntityId")
                         .IsUnique()

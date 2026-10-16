@@ -59,4 +59,16 @@ public sealed class NextcloudSyncItemTests
 
         act.Should().Throw<ArgumentException>();
     }
+
+    [Fact]
+    public void ChangedRemotely_NewETag_ForgetsTheHashSoTheNextRunWritesAgain()
+    {
+        var item = new NextcloudSyncItem(NextcloudItemType.Task, Guid.CreateVersion7(), "/x.ics");
+        item.Written("\"etag-1\"", Hash);
+
+        item.ChangedRemotely("\"etag-2\"");
+
+        item.ETag.Should().Be("\"etag-2\"");
+        item.ContentHash.Should().BeEmpty();
+    }
 }

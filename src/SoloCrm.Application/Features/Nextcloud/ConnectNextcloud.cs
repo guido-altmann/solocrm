@@ -7,8 +7,8 @@ namespace SoloCrm.Application.Features.Nextcloud;
 
 /// <summary>
 /// Saves the Nextcloud credentials (ADR-014). The connection is checked first: SoloCRM signs in, finds the address
-/// book „SoloCRM“ or creates it. Saving again resumes a sync paused after a rejected password; switching to another
-/// account (or a new address book) forgets what was mirrored before.
+/// book and the task list „SoloCRM“ or creates them. Saving again resumes a sync paused after a rejected password;
+/// switching to another account (or to new collections) forgets what was mirrored before.
 /// </summary>
 public static class ConnectNextcloud
 {
@@ -58,10 +58,11 @@ public static class ConnectNextcloud
             var userName = command.UserName!.Trim();
             var account = new DavAccount(new Uri(serverUrl), userName, command.AppPassword!);
 
-            string addressBook;
+            string addressBook, taskList;
             try
             {
                 addressBook = await target.EnsureAddressBookAsync(account, cancellationToken);
+                taskList = await target.EnsureTaskListAsync(account, cancellationToken);
             }
             catch (DavException ex)
             {
@@ -79,16 +80,23 @@ public static class ConnectNextcloud
             }
             else
             {
-                if (!connection.IsSameAccount(serverUrl, userName) || connection.AddressBookHref != addressBook)
+                // A mapping that points into another collection is dropped; the next sync writes everything anew.
+                var sameAccount = connection.IsSameAccount(serverUrl, userName);
+                if (!sameAccount || connection.AddressBookHref != addressBook)
                 {
-                    // The mapping points into another address book; the next sync writes everything anew.
                     await db.NextcloudSyncItems.Where(i => i.EntityType == NextcloudItemType.Contact).ExecuteDeleteAsync(cancellationToken);
+                }
+
+                if (!sameAccount || connection.TaskListHref != taskList)
+                {
+                    await db.NextcloudSyncItems.Where(i => i.EntityType == NextcloudItemType.Task).ExecuteDeleteAsync(cancellationToken);
                 }
 
                 connection.Reconnect(serverUrl, userName, protectedPassword, now);
             }
 
             connection.UseAddressBook(addressBook);
+            connection.UseTaskList(taskList);
             await db.SaveChangesAsync(cancellationToken);
             return new Result(connection.ServerUrl, connection.UserName);
         }

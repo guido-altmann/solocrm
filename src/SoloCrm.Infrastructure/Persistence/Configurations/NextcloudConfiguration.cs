@@ -14,6 +14,8 @@ internal sealed class NextcloudConnectionConfiguration : IEntityTypeConfiguratio
         builder.Property(c => c.UserName).HasMaxLength(NextcloudConnection.UserNameMaxLength);
         builder.Property(c => c.ProtectedAppPassword);
         builder.Property(c => c.AddressBookHref).HasMaxLength(NextcloudConnection.HrefMaxLength);
+        builder.Property(c => c.TaskListHref).HasMaxLength(NextcloudConnection.HrefMaxLength);
+        builder.Property(c => c.TaskSyncToken).HasMaxLength(NextcloudConnection.SyncTokenMaxLength);
         builder.Property(c => c.LastError).HasMaxLength(NextcloudConnection.ErrorMaxLength);
     }
 }
@@ -31,5 +33,8 @@ internal sealed class NextcloudSyncItemConfiguration : IEntityTypeConfiguration<
 
         // No foreign key to contacts or tasks (ADR-014): the row outlives a hard delete until the copy is removed.
         builder.HasIndex(i => new { i.EntityType, i.EntityId }).IsUnique();
+
+        // The incoming phase maps changed resources back by their path.
+        builder.HasIndex(i => i.Href);
     }
 }

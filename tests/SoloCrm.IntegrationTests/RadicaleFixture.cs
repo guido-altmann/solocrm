@@ -25,3 +25,13 @@ public sealed class RadicaleFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
 }
+
+/// <summary>
+/// The tests against Radicale share one server and run after the parallel tests: under the load of the full suite,
+/// connections to the container were occasionally dropped before reaching Radicale (nothing in its log).
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class RadicaleTestGroup : ICollectionFixture<RadicaleFixture>
+{
+    public const string Name = "Radicale";
+}

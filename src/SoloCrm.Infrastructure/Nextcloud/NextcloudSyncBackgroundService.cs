@@ -71,9 +71,10 @@ internal sealed partial class NextcloudSyncBackgroundService(
         var result = await handler.Handle(new SyncNextcloud.Command(), cancellationToken);
         if (result.IsSuccess)
         {
-            if (result.Value.Written > 0 || result.Value.Deleted > 0)
+            var r = result.Value;
+            if (r.Written > 0 || r.Deleted > 0 || r.Completed > 0 || r.Reopened > 0 || r.Skipped > 0)
             {
-                LogSynced(logger, result.Value.Written, result.Value.Deleted, result.Value.Unchanged);
+                LogSynced(logger, r.Written, r.Deleted, r.Unchanged, r.Completed, r.Reopened, r.Skipped);
             }
 
             return;
@@ -82,8 +83,8 @@ internal sealed partial class NextcloudSyncBackgroundService(
         LogSyncFailed(logger, result.Error.Code);
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Nextcloud sync wrote {Written} and deleted {Deleted} records ({Unchanged} unchanged)")]
-    private static partial void LogSynced(ILogger logger, int written, int deleted, int unchanged);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Nextcloud sync wrote {Written} and deleted {Deleted} records ({Unchanged} unchanged); took over {Completed} completed and {Reopened} reopened tasks, skipped {Skipped}")]
+    private static partial void LogSynced(ILogger logger, int written, int deleted, int unchanged, int completed, int reopened, int skipped);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Nextcloud sync failed: {Code}")]
     private static partial void LogSyncFailed(ILogger logger, string code);

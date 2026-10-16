@@ -9,7 +9,8 @@ namespace SoloCrm.IntegrationTests.Nextcloud;
 
 /// <summary>The DAV protocol against a real Radicale server (ADR-014).</summary>
 [Trait("Category", "Integration")]
-public sealed class NextcloudDavClientTests(RadicaleFixture radicale) : IClassFixture<RadicaleFixture>, IDisposable
+[Collection(RadicaleTestGroup.Name)]
+public sealed class NextcloudDavClientTests(RadicaleFixture radicale) : IDisposable
 {
     private static readonly DavContent Card = new("BEGIN:VCARD\r\nVERSION:3.0\r\nUID:1@solocrm\r\nFN:Max Mustermann\r\nN:Mustermann;Max;;;\r\nEND:VCARD\r\n", "text/vcard; charset=utf-8");
 
@@ -117,6 +118,83 @@ public sealed class NextcloudDavClientTests(RadicaleFixture radicale) : IClassFi
         await Client().DeleteAsync(_account, href, Ct);
 
         (await _http.StatusAsync(_account, "GET", href)).Should().Be(HttpStatusCode.NotFound);
+    }
+
+    private static readonly DavContent Todo = new(
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//test//EN\r\nBEGIN:VTODO\r\nUID:1@solocrm\r\nDTSTAMP:20261016T100000Z\r\nSUMMARY:Anrufen\r\nSTATUS:NEEDS-ACTION\r\nEND:VTODO\r\nEND:VCALENDAR\r\n",
+        "text/calendar; charset=utf-8");
+
+    [Fact]
+    public async Task EnsureTaskList_NewAccount_CreatesTaskOnlyCalendarAndReusesIt()
+    {
+        var href = await Client().EnsureTaskListAsync(_account, Ct);
+        var again = await Client().EnsureTaskListAsync(_account, Ct);
+
+        again.Should().Be(href);
+        var listing = await _http.SendAsync(_account, "PROPFIND", href,
+            "<d:propfind xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\"><d:prop><d:displayname/><d:resourcetype/><c:supported-calendar-component-set/></d:prop></d:propfind>", depth: "0");
+        listing.Should().Contain("<displayname>SoloCRM</displayname>").And.Contain("calendar").And.Contain("name=\"VTODO\"").And.NotContain("VEVENT");
+    }
+
+    [Fact]
+    public async Task EnsureTaskList_AddressBookExists_UsesAnotherPath()
+    {
+        var addressBook = await Client().EnsureAddressBookAsync(_account, Ct);
+
+        var taskList = await Client().EnsureTaskListAsync(_account, Ct);
+
+        taskList.Should().NotBe(addressBook);
+    }
+
+    [Fact]
+    public async Task GetChanges_WithoutToken_ListsAllEntriesAndReturnsAToken()
+    {
+        var list = await Client().EnsureTaskListAsync(_account, Ct);
+        var written = await Client().PutAsync(_account, list + "1.ics", Todo, null, false, Ct);
+
+        var changes = await Client().GetChangesAsync(_account, list, null, Ct);
+
+        changes.SyncToken.Should().NotBeNullOrEmpty();
+        changes.Changes.Should().ContainSingle().Which.Should().Be(new DavChange(list + "1.ics", written.ETag, Deleted: false));
+    }
+
+    [Fact]
+    public async Task GetChanges_WithToken_ReportsOnlyChangesAndDeletions()
+    {
+        var list = await Client().EnsureTaskListAsync(_account, Ct);
+        await Client().PutAsync(_account, list + "1.ics", Todo, null, false, Ct);
+        await Client().PutAsync(_account, list + "2.ics", Todo with { Body = Todo.Body.Replace("1@solocrm", "2@solocrm", StringComparison.Ordinal) }, null, false, Ct);
+        var token = (await Client().GetChangesAsync(_account, list, null, Ct)).SyncToken;
+
+        var changed = await Client().PutAsync(_account, list + "1.ics", Todo with { Body = Todo.Body.Replace("NEEDS-ACTION", "COMPLETED", StringComparison.Ordinal) }, null, unconditional: true, Ct);
+        await Client().DeleteAsync(_account, list + "2.ics", Ct);
+        var changes = await Client().GetChangesAsync(_account, list, token, Ct);
+
+        changes.Changes.Should().BeEquivalentTo([
+            new DavChange(list + "1.ics", changed.ETag, Deleted: false),
+            new DavChange(list + "2.ics", null, Deleted: true),
+        ]);
+        changes.SyncToken.Should().NotBe(token);
+    }
+
+    [Fact]
+    public async Task GetChanges_UnknownToken_ThrowsTokenExpired()
+    {
+        var list = await Client().EnsureTaskListAsync(_account, Ct);
+
+        var act = () => Client().GetChangesAsync(_account, list, "http://radicale.org/ns/sync/unknown", Ct);
+
+        await act.Should().ThrowAsync<DavSyncTokenExpiredException>();
+    }
+
+    [Fact]
+    public async Task Get_ExistingAndMissingResource_ReturnsBodyOrNull()
+    {
+        var list = await Client().EnsureTaskListAsync(_account, Ct);
+        await Client().PutAsync(_account, list + "1.ics", Todo, null, false, Ct);
+
+        (await Client().GetAsync(_account, list + "1.ics", Ct)).Should().Contain("SUMMARY:Anrufen");
+        (await Client().GetAsync(_account, list + "9.ics", Ct)).Should().BeNull();
     }
 
     /// <summary>Plain HTTP access for arranging and verifying; never follows redirects, like production.</summary>

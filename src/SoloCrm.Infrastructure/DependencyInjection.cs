@@ -128,6 +128,7 @@ public static class DependencyInjection
         var hostsSection = configuration.GetSection("Nextcloud:AllowedHttpHosts");
         var allowedHttpHosts = hostsSection.Value?.Split(',') ?? hostsSection.Get<string[]>() ?? [];
         services.AddSingleton(new NextcloudServers(allowedHttpHosts));
+        services.AddSingleton(new NextcloudSyncOptions { AppBaseUrl = configuration["App:BaseUrl"] });
 
         // Redirects are followed by the client itself, only within the origin of the server (credentials!).
         services.AddHttpClient(NextcloudDavClient.ClientName, client => client.Timeout = TimeSpan.FromSeconds(30))

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.Nextcloud;
+using SoloCrm.Application.Features.Tasks;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Nextcloud;
 using SoloCrm.Infrastructure.Nextcloud;
@@ -21,7 +22,14 @@ public sealed class NextcloudFailureTests(PostgresFixture postgres) : HandlerTes
     private ConnectNextcloud.Handler ConnectHandler() => new(
         Get<ICrmDbContextFactory>(), _target, Get<ISecretProtector>(), new ConnectNextcloud.Validator(NextcloudServers.HttpsOnly), Time);
 
-    private SyncNextcloud.Handler SyncHandler() => new(Get<ICrmDbContextFactory>(), _target, Get<ISecretProtector>(), Time);
+    private SyncNextcloud.Handler SyncHandler() => new(
+        Get<ICrmDbContextFactory>(),
+        _target,
+        Get<ISecretProtector>(),
+        Get<ICommandHandler<CompleteTask.Command, CompleteTask.Result>>(),
+        Get<ICommandHandler<ReopenTask.Command, ReopenTask.Result>>(),
+        new NextcloudSyncOptions { AppBaseUrl = "https://crm.example.test" },
+        Time);
 
     private Task<Result<ConnectNextcloud.Result>> ConnectAsync(string user = "guido") =>
         ConnectHandler().Handle(new ConnectNextcloud.Command(ServerUrl, user, "app-password"), Ct);
@@ -110,6 +118,40 @@ public sealed class NextcloudFailureTests(PostgresFixture postgres) : HandlerTes
     }
 
     [Fact]
+    public async Task Sync_TaskChangedRemotelyDuringTheRun_IsSkippedInsteadOfOverwritten()
+    {
+        await ConnectAsync();
+        await SendAsync<CreateTask.Command, CreateTask.Result>(new CreateTask.Command("Anrufen"));
+        _target.Conflicts = 1;
+
+        var result = await SyncAsync();
+
+        result.Value.Skipped.Should().Be(1);
+        result.Value.Written.Should().Be(0);
+        _target.UnconditionalPuts.Should().Be(0);
+        await using var db = OpenDb();
+        (await db.NextcloudSyncItems.AnyAsync(Ct)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Sync_ExistingConnectionWithoutTaskList_CreatesItOnTheNextRun()
+    {
+        await using (var db = OpenDb())
+        {
+            var connection = new NextcloudConnection(ServerUrl, "guido", Get<ISecretProtector>().Protect("app-password"), Start);
+            connection.UseAddressBook("/dav/guido/solocrm/");
+            db.NextcloudConnections.Add(connection);
+            await db.SaveChangesAsync(Ct);
+        }
+
+        (await SyncAsync()).IsSuccess.Should().BeTrue();
+
+        var stored = await ConnectionAsync();
+        stored.TaskListHref.Should().Be("/dav/guido/solocrm-tasks/");
+        stored.TaskSyncToken.Should().Be("token-1");
+    }
+
+    [Fact]
     public async Task Connect_OtherAccount_ForgetsWhatWasMirrored()
     {
         await ConnectAsync("guido");
@@ -190,7 +232,7 @@ public sealed class NextcloudFailureTests(PostgresFixture postgres) : HandlerTes
         public Task<Result<SyncNextcloud.Result>> Handle(SyncNextcloud.Command command, CancellationToken cancellationToken)
         {
             Calls++;
-            return Task.FromResult(error is null ? Result<SyncNextcloud.Result>.Success(new(0, 0, 0)) : Result<SyncNextcloud.Result>.Failure(error));
+            return Task.FromResult(error is null ? Result<SyncNextcloud.Result>.Success(new(0, 0, 0, 0, 0, 0)) : Result<SyncNextcloud.Result>.Failure(error));
         }
     }
 
@@ -209,6 +251,14 @@ public sealed class NextcloudFailureTests(PostgresFixture postgres) : HandlerTes
 
         public Task<string> EnsureAddressBookAsync(DavAccount account, CancellationToken cancellationToken) =>
             Task.FromResult(OnEnsure?.Invoke() ?? $"/dav/{account.UserName}/solocrm/");
+
+        public Task<string> EnsureTaskListAsync(DavAccount account, CancellationToken cancellationToken) =>
+            Task.FromResult($"/dav/{account.UserName}/solocrm-tasks/");
+
+        public Task<DavChanges> GetChangesAsync(DavAccount account, string collectionHref, string? syncToken, CancellationToken cancellationToken) =>
+            Task.FromResult(new DavChanges([], "token-1"));
+
+        public Task<string?> GetAsync(DavAccount account, string href, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
 
         public Task<DavWriteResult> PutAsync(
             DavAccount account, string href, DavContent content, string? ifMatch, bool unconditional, CancellationToken cancellationToken)

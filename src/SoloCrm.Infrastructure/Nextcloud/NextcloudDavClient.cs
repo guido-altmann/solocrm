@@ -24,6 +24,8 @@ internal sealed partial class NextcloudDavClient(IHttpClientFactory httpClientFa
 
     private static readonly HttpMethod PropFindMethod = new("PROPFIND");
     private static readonly HttpMethod MkColMethod = new("MKCOL");
+    private static readonly HttpMethod MkCalendarMethod = new("MKCALENDAR");
+    private static readonly HttpMethod ReportMethod = new("REPORT");
 
     public async Task<string> EnsureAddressBookAsync(DavAccount account, CancellationToken cancellationToken)
     {
@@ -40,6 +42,69 @@ internal sealed partial class NextcloudDavClient(IHttpClientFactory httpClientFa
         }
 
         return await CreateCollectionAsync(account, home, MkColMethod, Dav.MkAddressBook(CollectionDisplayName), cancellationToken);
+    }
+
+    public async Task<string> EnsureTaskListAsync(DavAccount account, CancellationToken cancellationToken)
+    {
+        var principal = await FindPrincipalAsync(account, cancellationToken);
+        var home = await FindHomeSetAsync(account, principal, Dav.CalDav + "calendar-home-set", cancellationToken)
+            ?? throw new DavException("Der Server bietet keine Kalender und Aufgaben (CalDAV) an.");
+
+        var collections = await PropFindAsync(
+            account, home, depth: 1, cancellationToken, Dav.D + "resourcetype", Dav.D + "displayname", Dav.CalDav + "supported-calendar-component-set");
+        var existing = collections.FirstOrDefault(c =>
+            c.HasResourceType(Dav.CalDav + "calendar") && c.Text(Dav.D + "displayname") == CollectionDisplayName && SupportsTasks(c));
+        if (existing is not null)
+        {
+            return existing.Href;
+        }
+
+        return await CreateCollectionAsync(account, home, MkCalendarMethod, Dav.MkTaskList(CollectionDisplayName), cancellationToken);
+    }
+
+    public async Task<DavChanges> GetChangesAsync(DavAccount account, string collectionHref, string? syncToken, CancellationToken cancellationToken)
+    {
+        var body = Dav.SyncCollection(syncToken);
+        using var response = await SendAsync(account, ReportMethod, collectionHref, () => XmlContent(body), r => r.Headers.Add("Depth", "0"), cancellationToken);
+        var content = await response.Content.ReadAsStringAsync(cancellationToken);
+        if (response.StatusCode != HttpStatusCode.MultiStatus)
+        {
+            // RFC 6578 3.2: an unknown or expired token is answered with the precondition valid-sync-token (Nextcloud: 403).
+            if (syncToken is not null && content.Contains("valid-sync-token", StringComparison.Ordinal))
+            {
+                throw new DavSyncTokenExpiredException();
+            }
+
+            EnsureSuccess(response, "REPORT");
+            throw new DavException("Nextcloud hat unerwartet geantwortet.");
+        }
+
+        try
+        {
+            var (responses, newToken) = DavMultiStatus.ParseWithSyncToken(content);
+            var collectionPath = DavMultiStatus.ToPath(collectionHref);
+            var changes = responses
+                .Where(r => !string.Equals(r.Href.TrimEnd('/'), collectionPath.TrimEnd('/'), StringComparison.Ordinal))
+                .Select(r => new DavChange(r.Href, r.Text(Dav.D + "getetag"), r.Status == (int)HttpStatusCode.NotFound))
+                .ToList();
+            return new DavChanges(changes, newToken);
+        }
+        catch (FormatException ex)
+        {
+            throw new DavException("Nextcloud hat eine unlesbare Antwort geschickt.", ex);
+        }
+    }
+
+    public async Task<string?> GetAsync(DavAccount account, string href, CancellationToken cancellationToken)
+    {
+        using var response = await SendAsync(account, HttpMethod.Get, href, body: null, configure: null, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Gone)
+        {
+            return null;
+        }
+
+        EnsureSuccess(response, "GET");
+        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
     public async Task<DavWriteResult> PutAsync(
@@ -229,6 +294,11 @@ internal sealed partial class NextcloudDavClient(IHttpClientFactory httpClientFa
             uri = next;
         }
     }
+
+    /// <summary>Without <c>supported-calendar-component-set</c> a calendar accepts every component (RFC 4791 5.2.3).</summary>
+    private static bool SupportsTasks(DavResponse collection) =>
+        collection[Dav.CalDav + "supported-calendar-component-set"] is not { } set
+        || set.Elements(Dav.CalDav + "comp").Any(c => (string?)c.Attribute("name") == "VTODO");
 
     private static Uri Resolve(DavAccount account, string target) =>
         Uri.TryCreate(target, UriKind.Absolute, out var absolute) && absolute.Scheme is "http" or "https"

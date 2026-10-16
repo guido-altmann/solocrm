@@ -5,6 +5,7 @@ using Ical.Net.DataTypes;
 using Ical.Net.Serialization;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Common;
 
 namespace SoloCrm.Application.Features.CalendarFeeds;
 
@@ -109,7 +110,7 @@ public static class GetTaskFeed
                 Transparency = "TRANSPARENT",
             };
 
-            if (LinkFor(task, baseUrl) is { } link)
+            if (RecordLinks.ForTask(baseUrl, task.OpportunityId, task.ContactId, task.OrganizationId) is { } link)
             {
                 calendarEvent.Url = link;
                 calendarEvent.Description = link.AbsoluteUri;
@@ -122,23 +123,4 @@ public static class GetTaskFeed
     }
 
     private static CalDateTime ToUtc(DateTimeOffset value) => new(value.UtcDateTime, "UTC");
-
-    /// <summary>Link to the most specific linked record: opportunity, then contact, then organization.</summary>
-    private static Uri? LinkFor(FeedTask task, string? baseUrl)
-    {
-        if (string.IsNullOrWhiteSpace(baseUrl))
-        {
-            return null;
-        }
-
-        var path = (task.OpportunityId, task.ContactId, task.OrganizationId) switch
-        {
-            ({ } id, _, _) => $"/opportunities/{id}",
-            (_, { } id, _) => $"/contacts/{id}",
-            (_, _, { } id) => $"/organizations/{id}",
-            _ => null,
-        };
-
-        return path is not null && Uri.TryCreate(baseUrl.TrimEnd('/') + path, UriKind.Absolute, out var uri) ? uri : null;
-    }
 }

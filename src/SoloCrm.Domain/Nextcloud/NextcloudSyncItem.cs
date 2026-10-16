@@ -59,6 +59,16 @@ public sealed class NextcloudSyncItem : Entity
             : throw new ArgumentException($"A hash of {ContentHashLength} hex characters is required.", nameof(contentHash));
     }
 
+    /// <summary>
+    /// The copy was changed in Nextcloud (its ETag is now <paramref name="etag"/>). Forgetting the hash makes the next
+    /// outgoing phase write the SoloCRM version again, which overwrites all fields except the ones taken over.
+    /// </summary>
+    public void ChangedRemotely(string? etag)
+    {
+        ETag = string.IsNullOrWhiteSpace(etag) || etag.Length > ETagMaxLength ? null : etag;
+        ContentHash = "";
+    }
+
     private static string RequiredHref(string href) =>
         string.IsNullOrWhiteSpace(href) || href.Length > NextcloudConnection.HrefMaxLength
             ? throw new ArgumentException($"A href of 1 to {NextcloudConnection.HrefMaxLength} characters is required.", nameof(href))

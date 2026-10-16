@@ -14,6 +14,7 @@ public static class GetNextcloudStatus
 
     /// <param name="IsCredentialRejected">The server rejected the app password; the sync is paused.</param>
     /// <param name="Contacts">Contacts currently mirrored to the address book.</param>
+    /// <param name="Tasks">Tasks currently mirrored to the task list.</param>
     public sealed record Connection(
         string ServerUrl,
         string UserName,
@@ -21,7 +22,8 @@ public static class GetNextcloudStatus
         DateTimeOffset? LastSyncedAt,
         string? LastError,
         bool IsCredentialRejected,
-        int Contacts);
+        int Contacts,
+        int Tasks);
 
     public sealed class Handler(ICrmDbContextFactory dbFactory) : IQueryHandler<Query, Result>
     {
@@ -34,7 +36,10 @@ public static class GetNextcloudStatus
                 return new Result(null);
             }
 
-            var contacts = await db.NextcloudSyncItems.CountAsync(i => i.EntityType == NextcloudItemType.Contact, cancellationToken);
+            var counts = await db.NextcloudSyncItems
+                .GroupBy(i => i.EntityType)
+                .Select(g => new { Type = g.Key, Count = g.Count() })
+                .ToDictionaryAsync(g => g.Type, g => g.Count, cancellationToken);
             return new Result(new Connection(
                 connection.ServerUrl,
                 connection.UserName,
@@ -42,7 +47,8 @@ public static class GetNextcloudStatus
                 connection.LastSyncedAt,
                 connection.LastError,
                 connection.IsCredentialRejected,
-                contacts));
+                counts.GetValueOrDefault(NextcloudItemType.Contact),
+                counts.GetValueOrDefault(NextcloudItemType.Task)));
         }
     }
 }

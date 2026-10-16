@@ -9,12 +9,14 @@
 @inject ISnackbar Snackbar
 @inject AppClock Clock
 
-@* Mirrors the contacts to an address book „SoloCRM“ in Nextcloud via CardDAV (ADR-014). *@
+@* Mirrors contacts (CardDAV) and tasks (CalDAV) to collections „SoloCRM“ in Nextcloud (ADR-014). *@
 <MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="nextcloud">
     <MudText Typo="Typo.h6">Nextcloud</MudText>
     <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
-        Überträgt alle nicht archivierten Kontakte in ein eigenes Adressbuch „SoloCRM“ in deiner Nextcloud, z. B. für das
-        Handy über DAVx5. SoloCRM ist dabei führend: Änderungen in Nextcloud werden beim nächsten Abgleich überschrieben.
+        Überträgt alle nicht archivierten Kontakte in ein eigenes Adressbuch „SoloCRM“ und alle offenen sowie in den letzten
+        30 Tagen erledigten Aufgaben in eine Aufgabenliste „SoloCRM“ deiner Nextcloud, z. B. für das Handy über DAVx5.
+        SoloCRM ist dabei führend: Aufgaben, die du in Nextcloud abhakst oder wieder öffnest, werden übernommen; alle anderen
+        Änderungen in Nextcloud werden beim nächsten Abgleich überschrieben.
     </MudText>
 
     @if (_status is null)
@@ -37,6 +39,7 @@
                         </td>
                     </tr>
                     <tr><th scope="row">Kontakte im Adressbuch</th><td data-testid="nextcloud-contacts">@connection.Contacts</td></tr>
+                    <tr><th scope="row">Aufgaben in der Liste</th><td data-testid="nextcloud-tasks">@connection.Tasks</td></tr>
                 </tbody>
             </MudSimpleTable>
 
@@ -76,7 +79,7 @@
             {
                 <MudText Typo="Typo.body2" Class="mb-2">
                     Lege in Nextcloud unter <em>Persönliche Einstellungen → Sicherheit</em> ein App-Passwort für SoloCRM an. Das
-                    Adressbuch „SoloCRM“ wird beim Verbinden automatisch angelegt.
+                    Adressbuch und die Aufgabenliste „SoloCRM“ werden beim Verbinden automatisch angelegt.
                 </MudText>
             }
 
@@ -209,8 +212,7 @@
             }
             else
             {
-                var changes = result.Value.Written + result.Value.Deleted;
-                Snackbar.Add(changes == 0 ? "Nextcloud ist auf dem neuesten Stand." : $"{changes} Änderung(en) an Nextcloud übertragen.", Severity.Success);
+                Snackbar.Add(SyncMessage(result.Value), Severity.Success);
             }
 
             await LoadAsync();
@@ -221,11 +223,27 @@
         }
     }
 
+    private static string SyncMessage(SyncNextcloud.Result result)
+    {
+        var parts = new List<string>();
+        if (result.Written + result.Deleted > 0)
+        {
+            parts.Add($"{result.Written + result.Deleted} Änderung(en) an Nextcloud übertragen");
+        }
+
+        if (result.Completed + result.Reopened > 0)
+        {
+            parts.Add($"{result.Completed + result.Reopened} Aufgabe(n) aus Nextcloud übernommen");
+        }
+
+        return parts.Count == 0 ? "Nextcloud ist auf dem neuesten Stand." : string.Join(", ", parts) + ".";
+    }
+
     private async Task DisconnectAsync()
     {
         var confirmed = await DialogService.ShowMessageBoxAsync(
             "Verbindung trennen",
-            "Der Zugang wird entfernt und der Abgleich gestoppt. Das Adressbuch „SoloCRM“ bleibt in Nextcloud bestehen; lösche es dort bei Bedarf selbst.",
+            "Der Zugang wird entfernt und der Abgleich gestoppt. Adressbuch und Aufgabenliste „SoloCRM“ bleiben in Nextcloud bestehen; lösche sie dort bei Bedarf selbst.",
             yesText: "Trennen",
             cancelText: "Abbrechen",
             options: DialogDefaults.ExtraSmall);

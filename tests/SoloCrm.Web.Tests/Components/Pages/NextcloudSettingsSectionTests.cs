@@ -32,11 +32,11 @@ public sealed class NextcloudSettingsSectionTests : BunitContext
         Services.AddSingleton(Substitute.For<ICommandHandler<DisconnectNextcloud.Command, DisconnectNextcloud.Result>>());
         Services.AddSingleton(new AppClock(new FakeTimeProvider(Now), TimeZoneInfo.FindSystemTimeZoneById("Europe/Berlin")));
         _sync.Handle(Arg.Any<SyncNextcloud.Command>(), Arg.Any<CancellationToken>())
-            .Returns(Result<SyncNextcloud.Result>.Success(new SyncNextcloud.Result(2, 0, 0)));
+            .Returns(Result<SyncNextcloud.Result>.Success(new SyncNextcloud.Result(2, 0, 0, 1, 0, 0)));
     }
 
     private static GetNextcloudStatus.Connection Connection(string? error = null, bool rejected = false) =>
-        new("https://cloud.example.test", "guido", Now.AddDays(-1), Now.AddMinutes(-5), error, rejected, 42);
+        new("https://cloud.example.test", "guido", Now.AddDays(-1), Now.AddMinutes(-5), error, rejected, 42, 7);
 
     private void Status(GetNextcloudStatus.Connection? connection) =>
         _status.Handle(Arg.Any<GetNextcloudStatus.Query>(), Arg.Any<CancellationToken>())
@@ -120,6 +120,7 @@ public sealed class NextcloudSettingsSectionTests : BunitContext
         section.Find("[data-testid=nextcloud-server]").TextContent.Should().Be("https://cloud.example.test");
         section.Find("[data-testid=nextcloud-last-sync]").TextContent.Trim().Should().Be("16.10.2026, 11:55");
         section.Find("[data-testid=nextcloud-contacts]").TextContent.Should().Be("42");
+        section.Find("[data-testid=nextcloud-tasks]").TextContent.Should().Be("7");
         section.Find("[data-testid=nextcloud-error]").TextContent.Should().Be("Nextcloud ist gerade nicht erreichbar.");
         section.FindAll("[data-testid=nextcloud-sync]").Should().HaveCount(1);
         section.FindAll("[data-testid=nextcloud-form]").Should().BeEmpty();
