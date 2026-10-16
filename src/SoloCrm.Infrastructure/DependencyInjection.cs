@@ -6,9 +6,11 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.Mail;
+using SoloCrm.Application.Features.Nextcloud;
 using SoloCrm.Application.Features.Webhooks;
 using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Mail;
+using SoloCrm.Infrastructure.Nextcloud;
 using SoloCrm.Infrastructure.Persistence;
 using SoloCrm.Infrastructure.Persistence.Interceptors;
 using SoloCrm.Infrastructure.Persistence.Outbox;
@@ -51,6 +53,7 @@ public static class DependencyInjection
         services.AddSingleton<IAppSettings, AppSettings>();
 
         services.AddWebhooks(configuration);
+        services.AddNextcloud(configuration);
 
         return services;
     }
@@ -103,6 +106,33 @@ public static class DependencyInjection
         }
 
         return services;
+    }
+
+    /// <summary>Starts the Nextcloud sync (ADR-014) unless <c>Nextcloud:Enabled</c> is <c>false</c>; only the web host calls this.</summary>
+    public static IServiceCollection AddNextcloudSync(this IServiceCollection services, IConfiguration configuration)
+    {
+        if (configuration.GetValue($"{NextcloudWorkerOptions.SectionName}:{nameof(NextcloudWorkerOptions.Enabled)}", true))
+        {
+            services.AddHostedService<NextcloudSyncBackgroundService>();
+        }
+
+        return services;
+    }
+
+    /// <summary>CardDAV/CalDAV access to Nextcloud (ADR-014); the account is entered in the settings.</summary>
+    private static void AddNextcloud(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<NextcloudWorkerOptions>(configuration.GetSection(NextcloudWorkerOptions.SectionName));
+
+        // Nextcloud:AllowedHttpHosts as a comma-separated value (environment variable) or as an array.
+        var hostsSection = configuration.GetSection("Nextcloud:AllowedHttpHosts");
+        var allowedHttpHosts = hostsSection.Value?.Split(',') ?? hostsSection.Get<string[]>() ?? [];
+        services.AddSingleton(new NextcloudServers(allowedHttpHosts));
+
+        // Redirects are followed by the client itself, only within the origin of the server (credentials!).
+        services.AddHttpClient(NextcloudDavClient.ClientName, client => client.Timeout = TimeSpan.FromSeconds(30))
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+        services.AddSingleton<IDavSyncTarget, NextcloudDavClient>();
     }
 
     private static void AddWebhooks(this IServiceCollection services, IConfiguration configuration)

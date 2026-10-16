@@ -1,0 +1,259 @@
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Nextcloud
+@using SoloCrm.Domain.Nextcloud
+@inject IQueryHandler<GetNextcloudStatus.Query, GetNextcloudStatus.Result> GetStatusHandler
+@inject ICommandHandler<ConnectNextcloud.Command, ConnectNextcloud.Result> ConnectHandler
+@inject ICommandHandler<SyncNextcloud.Command, SyncNextcloud.Result> SyncHandler
+@inject ICommandHandler<DisconnectNextcloud.Command, DisconnectNextcloud.Result> DisconnectHandler
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject AppClock Clock
+
+@* Mirrors the contacts to an address book „SoloCRM“ in Nextcloud via CardDAV (ADR-014). *@
+<MudPaper Outlined="true" Class="pa-4" Style="max-width: 800px;" data-section="nextcloud">
+    <MudText Typo="Typo.h6">Nextcloud</MudText>
+    <MudText Typo="Typo.body2" Class="mb-3 mud-text-secondary">
+        Überträgt alle nicht archivierten Kontakte in ein eigenes Adressbuch „SoloCRM“ in deiner Nextcloud, z. B. für das
+        Handy über DAVx5. SoloCRM ist dabei führend: Änderungen in Nextcloud werden beim nächsten Abgleich überschrieben.
+    </MudText>
+
+    @if (_status is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        @if (_status.Connection is { } connection)
+        {
+            <MudSimpleTable Dense="true" Hover="false" Elevation="0" Class="mb-3">
+                <tbody>
+                    <tr><th scope="row">Server</th><td data-testid="nextcloud-server">@connection.ServerUrl</td></tr>
+                    <tr><th scope="row">Benutzer</th><td data-testid="nextcloud-user">@connection.UserName</td></tr>
+                    <tr><th scope="row">Verbunden seit</th><td>@Formats.DateTime(Clock.ToLocal(connection.ConnectedAt))</td></tr>
+                    <tr>
+                        <th scope="row">Letzter Abgleich</th>
+                        <td data-testid="nextcloud-last-sync">
+                            @(connection.LastSyncedAt is { } last ? Formats.DateTime(Clock.ToLocal(last)) : "noch nicht")
+                        </td>
+                    </tr>
+                    <tr><th scope="row">Kontakte im Adressbuch</th><td data-testid="nextcloud-contacts">@connection.Contacts</td></tr>
+                </tbody>
+            </MudSimpleTable>
+
+            @if (connection.IsCredentialRejected)
+            {
+                <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3" data-testid="nextcloud-paused">
+                    Der Abgleich ist pausiert: @connection.LastError Speichere neue Zugangsdaten, um ihn fortzusetzen.
+                </MudAlert>
+            }
+            else if (connection.LastError is { } error)
+            {
+                <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="nextcloud-error">@error</MudAlert>
+            }
+
+            @if (!_editing && !connection.IsCredentialRejected)
+            {
+                <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+                    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Sync"
+                               OnClick="SyncAsync" Disabled="_busy" data-testid="nextcloud-sync">
+                        Jetzt abgleichen
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Outlined.Key"
+                               OnClick="() => Edit(connection)" Disabled="_busy" data-testid="nextcloud-edit">
+                        Zugangsdaten ändern
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Outlined.LinkOff"
+                               OnClick="DisconnectAsync" Disabled="_busy" data-testid="nextcloud-disconnect">
+                        Verbindung trennen
+                    </MudButton>
+                </MudStack>
+            }
+        }
+
+        @if (_status.Connection is null || _editing || _status.Connection.IsCredentialRejected)
+        {
+            @if (_status.Connection is null)
+            {
+                <MudText Typo="Typo.body2" Class="mb-2">
+                    Lege in Nextcloud unter <em>Persönliche Einstellungen → Sicherheit</em> ein App-Passwort für SoloCRM an. Das
+                    Adressbuch „SoloCRM“ wird beim Verbinden automatisch angelegt.
+                </MudText>
+            }
+
+            <form @onsubmit="ConnectAsync" data-testid="nextcloud-form">
+                <MudStack Spacing="2">
+                    <MudTextField @bind-Value="_serverUrl" Label="Server-Adresse" Placeholder="https://cloud.example.com"
+                                  MaxLength="@NextcloudConnection.ServerUrlMaxLength" InputType="InputType.Url" Immediate="true"
+                                  Error="@_errors.Has(nameof(ConnectNextcloud.Command.ServerUrl))"
+                                  ErrorText="@_errors.Text(nameof(ConnectNextcloud.Command.ServerUrl))"
+                                  data-testid="nextcloud-server-input" />
+                    <MudTextField @bind-Value="_userName" Label="Benutzername" MaxLength="@NextcloudConnection.UserNameMaxLength" Immediate="true"
+                                  Error="@_errors.Has(nameof(ConnectNextcloud.Command.UserName))"
+                                  ErrorText="@_errors.Text(nameof(ConnectNextcloud.Command.UserName))"
+                                  data-testid="nextcloud-user-input" />
+                    <MudTextField @bind-Value="_appPassword" Label="App-Passwort" InputType="InputType.Password" Immediate="true"
+                                  autocomplete="new-password"
+                                  Error="@_errors.Has(nameof(ConnectNextcloud.Command.AppPassword))"
+                                  ErrorText="@_errors.Text(nameof(ConnectNextcloud.Command.AppPassword))"
+                                  data-testid="nextcloud-password-input" />
+
+                    @if (_errors.General is not null)
+                    {
+                        <MudAlert Severity="Severity.Error" Dense="true" data-testid="nextcloud-connect-error">@_errors.General</MudAlert>
+                    }
+
+                    <MudStack Row="true" Spacing="2">
+                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Outlined.Link" Disabled="_busy" data-testid="nextcloud-connect">
+                            @(_status.Connection is null ? "Verbinden" : "Zugangsdaten speichern")
+                        </MudButton>
+                        @if (_status.Connection is not null)
+                        {
+                            @if (_editing)
+                            {
+                                <MudButton Variant="Variant.Text" OnClick="CancelEdit" Disabled="_busy">Abbrechen</MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Outlined.LinkOff"
+                                           OnClick="DisconnectAsync" Disabled="_busy" data-testid="nextcloud-disconnect">
+                                    Verbindung trennen
+                                </MudButton>
+                            }
+                        }
+                    </MudStack>
+                </MudStack>
+            </form>
+        }
+    }
+</MudPaper>
+
+@code {
+    private GetNextcloudStatus.Result? _status;
+    private readonly FormErrors _errors = new();
+    private string? _serverUrl;
+    private string? _userName;
+    private string? _appPassword;
+    private bool _editing;
+    private bool _busy;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        var result = await GetStatusHandler.Handle(new GetNextcloudStatus.Query(), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            return;
+        }
+
+        _status = result.Value;
+        if (_status.Connection is { } connection && _serverUrl is null)
+        {
+            _serverUrl = connection.ServerUrl;
+            _userName = connection.UserName;
+        }
+    }
+
+    private void Edit(GetNextcloudStatus.Connection connection)
+    {
+        _serverUrl = connection.ServerUrl;
+        _userName = connection.UserName;
+        _appPassword = null;
+        _errors.Clear();
+        _editing = true;
+    }
+
+    private void CancelEdit()
+    {
+        _appPassword = null;
+        _errors.Clear();
+        _editing = false;
+    }
+
+    private async Task ConnectAsync()
+    {
+        _busy = true;
+        _errors.Clear();
+        try
+        {
+            var result = await ConnectHandler.Handle(new ConnectNextcloud.Command(_serverUrl, _userName, _appPassword), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                _errors.Show(result.Error);
+                return;
+            }
+
+            _appPassword = null;
+            _editing = false;
+            Snackbar.Add("Nextcloud ist verbunden. Der erste Abgleich läuft.", Severity.Success);
+            await LoadAsync();
+            await SyncAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task SyncAsync()
+    {
+        _busy = true;
+        try
+        {
+            var result = await SyncHandler.Handle(new SyncNextcloud.Command(), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+            }
+            else
+            {
+                var changes = result.Value.Written + result.Value.Deleted;
+                Snackbar.Add(changes == 0 ? "Nextcloud ist auf dem neuesten Stand." : $"{changes} Änderung(en) an Nextcloud übertragen.", Severity.Success);
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DisconnectAsync()
+    {
+        var confirmed = await DialogService.ShowMessageBoxAsync(
+            "Verbindung trennen",
+            "Der Zugang wird entfernt und der Abgleich gestoppt. Das Adressbuch „SoloCRM“ bleibt in Nextcloud bestehen; lösche es dort bei Bedarf selbst.",
+            yesText: "Trennen",
+            cancelText: "Abbrechen",
+            options: DialogDefaults.ExtraSmall);
+        if (confirmed != true)
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await DisconnectHandler.Handle(new DisconnectNextcloud.Command(), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Error);
+                return;
+            }
+
+            Snackbar.Add("Die Verbindung wurde getrennt.", Severity.Success);
+            _serverUrl = null;
+            _userName = null;
+            _appPassword = null;
+            _editing = false;
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

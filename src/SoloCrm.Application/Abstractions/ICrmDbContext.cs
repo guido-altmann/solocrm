@@ -5,6 +5,7 @@ using SoloCrm.Domain.CalendarFeeds;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Mail;
+using SoloCrm.Domain.Nextcloud;
 using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Tags;
@@ -55,6 +56,10 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
     DbSet<MailSyncState> MailSyncStates { get; }
 
     DbSet<MailConnection> MailConnections { get; }
+
+    DbSet<NextcloudConnection> NextcloudConnections { get; }
+
+    DbSet<NextcloudSyncItem> NextcloudSyncItems { get; }
 
     /// <summary>
     /// Ids of the audited records of <paramref name="entityType"/> (e.g. <c>Activity</c>) whose foreign key

@@ -11,6 +11,9 @@ SoloCRM ist ein Single-User-System: Verantwortlicher und einziger Nutzer ist der
 | Postgres: `contacts` | Stammdaten (Name, E-Mail, Telefon, Rolle, LinkedIn, Anschrift, Quelle, Zusatzfelder wie `HubSpotRecordId`) | ja | bis zur Löschung (Archivieren blendet nur aus) |
 | Postgres: `activities`, `tasks` | Notizen, Anrufe, Meetings, E-Mails, Aufgaben mit Bezug zu Kontakt, Organisation oder Anfrage | ja (Freitext) | bis zur Löschung |
 | Postgres: `mail_messages`, `mail_sync_states` | Verknüpfung importierter E-Mails mit ihrer Activity (Provider-Id, Message-ID) bzw. Abgleich-Fortschritt; kein Mail-Inhalt (ADR-013, in Vorbereitung) | `mail_messages` über Message-ID | mit der Activity (`ON DELETE CASCADE`) |
+| Postgres: `nextcloud_connections` | verbundene Nextcloud des Betreibers: Server-Adresse, Benutzername, App-Passwort verschlüsselt (Data Protection), Pfad des Adressbuchs, Status des letzten Abgleichs (ADR-014) | Betreiber | bis zum Trennen |
+| Postgres: `nextcloud_sync_items` | Zuordnung Kontakt-Id ↔ Pfad der Kopie in Nextcloud, ETag und Hash der gesendeten vCard; keine Inhalte (ADR-014) | nur über die Id | bis die Kopie in Nextcloud gelöscht ist bzw. bis zum Trennen |
+| Nextcloud: Adressbuch „SoloCRM“ | Kopie aller nicht archivierten Kontakte als vCard (Name, E-Mail, Telefon, Organisation, Rolle, LinkedIn, Anschrift); weiter auf Geräte, die das Adressbuch abonnieren (z. B. DAVx5) | ja | bis zum nächsten Abgleich nach Archivierung oder Löschung; nach dem Trennen unbegrenzt (manuell löschen) |
 | Postgres: `mail_connections` | verbundenes Postfach des Betreibers: Adresse und verschlüsseltes Refresh-Token (Data Protection), Status des letzten Abgleichs (ADR-013, in Vorbereitung) | Betreiber | bis zum Trennen des Postfachs |
 | Postgres: `opportunities` | Anfragen; `primary_contact_id` verweist auf den Ansprechpartner | nur über die Id | bis zur Löschung (Archivieren als Normalfall) |
 | Postgres: `organizations` | Firmen (keine natürlichen Personen) | in der Regel nein | bis zur Löschung |
@@ -26,7 +29,7 @@ SoloCRM ist ein Single-User-System: Verantwortlicher und einziger Nutzer ist der
 
 Die DSGVO-Auskunft wird direkt im Browser erzeugt und heruntergeladen; auf dem Server wird keine Datei abgelegt.
 
-Externe Empfänger: nur die selbst konfigurierten Webhook-Ziele (z. B. n8n). Sie erhalten ausschließlich Ids und Status (SPEC 5); Details holt n8n bei Bedarf über die REST-API.
+Externe Empfänger: die selbst konfigurierten Webhook-Ziele (z. B. n8n). Sie erhalten ausschließlich Ids und Status (SPEC 5); Details holt n8n bei Bedarf über die REST-API. Ist Nextcloud verbunden (ADR-014), erhält die eigene Nextcloud-Instanz die Kontaktdaten als vCard (siehe Tabelle).
 
 ## Auskunft (Art. 15, US-19)
 
@@ -63,6 +66,7 @@ Nicht automatisch gelöscht wird:
 
 - **Backups:** Die Person bleibt bis zu 30 Tage in den täglichen Postgres-Backups enthalten und verschwindet mit deren Ablauf. Bei einem Restore innerhalb dieser Frist ist die Löschung erneut auszuführen (Datum der Löschung notieren).
 - **Quellsysteme:** Ist die Person auch in HubSpot oder in n8n-Workflows gespeichert, dort ebenfalls löschen. Ein Webhook mit dem Ereignis `contact.deleted` kann das in n8n anstoßen. Ein späterer HubSpot-Import würde den Kontakt sonst wieder anlegen; eine Sperrliste gibt es bewusst nicht, weil sie selbst ein personenbezogenes Datum wäre (Entscheidung 4).
+- **Nextcloud:** Die Kopie im Adressbuch „SoloCRM“ wird erst beim nächsten Abgleich gelöscht (Standard: spätestens nach 15 Minuten; sofort über **Einstellungen → Nextcloud → Jetzt abgleichen**). Ist die Verbindung getrennt oder pausiert, geschieht das nicht: dann den Eintrag in Nextcloud von Hand löschen. Geräte, die das Adressbuch abonnieren, übernehmen die Löschung bei ihrer nächsten Synchronisation.
 - **Logs:** enthalten nur Ids; der Löschvorgang wird mit Id und Anzahl der gelöschten Activities und Aufgaben protokolliert.
 
 Die Löschung ist bewusst nur in der Oberfläche möglich, nicht über die REST-API (Entscheidung 5).

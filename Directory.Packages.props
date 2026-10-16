@@ -30,6 +30,7 @@
     <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageVersion Include="CsvHelper" Version="33.1.0" />
     <PackageVersion Include="Ical.Net" Version="5.2.3" />
+    <PackageVersion Include="FolkerKinzel.VCards" Version="8.2.0" />
   </ItemGroup>
 
   <ItemGroup Label="Tests">

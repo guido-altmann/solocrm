@@ -8,6 +8,7 @@ using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Mail;
+using SoloCrm.Domain.Nextcloud;
 using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 using SoloCrm.Domain.Settings;
@@ -57,6 +58,10 @@ public class CrmDbContext(DbContextOptions options)
     public DbSet<MailSyncState> MailSyncStates => Set<MailSyncState>();
 
     public DbSet<MailConnection> MailConnections => Set<MailConnection>();
+
+    public DbSet<NextcloudConnection> NextcloudConnections => Set<NextcloudConnection>();
+
+    public DbSet<NextcloudSyncItem> NextcloudSyncItems => Set<NextcloudSyncItem>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 

@@ -3,7 +3,7 @@ using System.Text;
 
 namespace SoloCrm.IntegrationTests.Mail;
 
-/// <summary>A scripted HTTP server for the Graph tests: answers requests in order and records them.</summary>
+/// <summary>A scripted HTTP server for the Graph and DAV tests: answers requests in order and records them.</summary>
 internal sealed class StubHttp : HttpMessageHandler, IHttpClientFactory
 {
     private readonly Queue<Func<HttpRequestMessage, HttpResponseMessage>> _responses = new();
@@ -12,6 +12,8 @@ internal sealed class StubHttp : HttpMessageHandler, IHttpClientFactory
 
     public void Respond(HttpStatusCode status, string json) =>
         _responses.Enqueue(_ => new HttpResponseMessage(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") });
+
+    public void Respond(Func<HttpRequestMessage, HttpResponseMessage> respond) => _responses.Enqueue(respond);
 
     public void Throw(Exception exception) => _responses.Enqueue(_ => throw exception);
 

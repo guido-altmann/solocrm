@@ -41,6 +41,7 @@ try
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddOutboxProcessing(builder.Configuration);
     builder.Services.AddMailSync(builder.Configuration);
+    builder.Services.AddNextcloudSync(builder.Configuration);
 
     builder.Services.AddReverseProxySupport(builder.Configuration);
     builder.Services.AddPersistentDataProtection(builder.Configuration);
