@@ -15,7 +15,7 @@ namespace SoloCrm.Application.Features.Mail;
 public static class SyncMail
 {
     public const int SubjectMaxLength = Activity.SubjectMaxLength;
-    public const int BodyMaxLength = 100_000;
+    public const int BodyMaxLength = Activity.BodyMaxLength;
     public const string EmptyBodyText = "(Kein Text)";
 
     private static readonly MailFolder[] Folders = [MailFolder.Inbox, MailFolder.Sent];

@@ -12,6 +12,7 @@ namespace SoloCrm.Domain.Activities;
 public sealed class Activity : Entity, IAuditable, IAuditFieldExclusions
 {
     public const int SubjectMaxLength = 200;
+    public const int BodyMaxLength = 100_000;
 
     // Required by EF Core.
     private Activity()

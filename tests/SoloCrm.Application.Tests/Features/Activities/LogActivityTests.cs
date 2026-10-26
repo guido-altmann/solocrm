@@ -35,6 +35,15 @@ public sealed class LogActivityTests
     }
 
     [Fact]
+    public void Validator_BodyOverMaxLength_Fails()
+    {
+        var validation = new LogActivity.Validator(_clock).Validate(
+            new LogActivity.Command(ActivityType.Note, new string('x', Activity.BodyMaxLength + 1), ContactId: Guid.CreateVersion7()));
+
+        validation.Errors.Should().ContainSingle(e => e.PropertyName == "Body");
+    }
+
+    [Fact]
     public void Validator_SlightlyInTheFuture_IsTolerated()
     {
         var validation = new LogActivity.Validator(_clock).Validate(

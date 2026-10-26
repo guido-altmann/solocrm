@@ -28,7 +28,7 @@
                               Error="@_errors.Has(nameof(UpdateActivity.Command.Subject))"
                               ErrorText="@_errors.Text(nameof(UpdateActivity.Command.Subject))" />
                 <MudTextField T="string" @bind-Value="_body" Label="Text" Lines="6" MaxLines="20" Immediate="true"
-                              Variant="Variant.Outlined" AutoFocus="true" HelperText="Markdown möglich"
+                              Variant="Variant.Outlined" AutoFocus="true" HelperText="Markdown möglich" MaxLength="@Activity.BodyMaxLength"
                               Error="@_errors.Has(nameof(UpdateActivity.Command.Body))"
                               ErrorText="@_errors.Text(nameof(UpdateActivity.Command.Body))" />
                 @if (_errors.General is not null)

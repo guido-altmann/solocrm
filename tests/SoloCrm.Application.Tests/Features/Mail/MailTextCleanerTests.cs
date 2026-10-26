@@ -260,4 +260,38 @@ public sealed class MailTextCleanerTests
 
         stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5));
     }
+
+    // Unclosed tags made the backtracking regexes quadratic: 80 KB of "<script>" took about 5 s (SOL-31).
+    [Theory]
+    [InlineData("<script>", 120_000)]
+    [InlineData("<style ", 140_000)]
+    [InlineData("<!--", 250_000)]
+    [InlineData("<a href=\"https://example.test\">", 30_000)]
+    [InlineData("<div id=\"x\" ", 75_000)]
+    [InlineData("<", 1_000_000)]
+    public void Clean_UnclosedTagsUpToInputLimit_FinishesQuickly(string fragment, int count)
+    {
+        var html = string.Concat(Enumerable.Repeat(fragment, count));
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        MailTextCleaner.Clean(html, isHtml: true);
+
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
+    public void Clean_ContentOverInputLimit_IsCutBeforeCleanup()
+    {
+        var text = new string('a', MailTextCleaner.MaxInputLength) + "Ende";
+
+        MailTextCleaner.Clean(text, isHtml: false).Should().HaveLength(MailTextCleaner.MaxInputLength).And.NotContain("Ende");
+    }
+
+    [Fact]
+    public void Clean_HiddenBlocks_AreRemovedPerTagName()
+    {
+        const string html = "<style>p { }</style><p>Hallo</p><script>alert(1)</script><head><title>T</title></head><p>Welt</p>";
+
+        MailTextCleaner.Clean(html, isHtml: true).Should().Be("Hallo\n\nWelt");
+    }
 }

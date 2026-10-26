@@ -9,6 +9,7 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
 {
     public const int NameMaxLength = 200;
     public const int WebsiteMaxLength = 500;
+    public const int NotesMaxLength = 100_000;
 
     // Required by EF Core.
     private Organization()

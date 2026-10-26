@@ -83,7 +83,7 @@ erDiagram
 | Type | enum `OrganizationType` | ✅ | `Client`, `Agency`, `Partner`, `Other`; Default: `Other` |
 | Website | string(500) | | URL-Validierung |
 | Address | Value Object `Address`? | | Anschrift, siehe unten; `Address.City` ersetzt das frühere Feld `City` (Spalte `city`) |
-| Notes | text | | Freitext-Stammnotiz (Verlauf läuft über Activities) |
+| Notes | text | | Freitext-Stammnotiz (Verlauf läuft über Activities); höchstens 100.000 Zeichen |
 
 #### Contact
 | Feld | Typ | Pflicht | Hinweis |
@@ -183,7 +183,7 @@ Beim Löschen einer Stage mit zugeordneten Anfragen muss die Ziel-Stage denselbe
 | Type | enum `ActivityType` | `Note`, `Call`, `Meeting`, `Email`, `ApplicationSent` |
 | OccurredAt | DateTimeOffset | Default: jetzt; rückdatierbar, nicht in der Zukunft (5 min Toleranz) |
 | Subject | string(200)? | |
-| Body | text | Pflicht; Markdown erlaubt (gerendert mit Markdig, ohne Roh-HTML; Links nur http(s)/mailto) |
+| Body | text | Pflicht, höchstens 100.000 Zeichen; Markdown erlaubt (gerendert mit Markdig, ohne Roh-HTML; Links nur http(s)/mailto). Importierte E-Mails werden vor der Bereinigung auf 1 Mio. Zeichen und danach auf diese Länge gekürzt |
 | ContactId / OrganizationId / OpportunityId | Guid? | **mindestens einer** gesetzt |
 | Origin | enum `ActivityOrigin` | `Manual` (Default) oder `Mail` (aus dem verbundenen Postfach importiert, ADR-013) |
 | Direction | enum `ActivityDirection`? | `Inbound` / `Outbound`; nur bei `Origin = Mail` gesetzt (Check-Constraint) |
@@ -428,7 +428,7 @@ Basis: `/api/v1` · Auth: `X-Api-Key` · Format: JSON (camelCase, Enums als Name
 
 **Anschrift:** Kontakte und Organisationen tragen die Adresse als flache Felder `street`, `street2`, `postalCode`, `city`, `region`, `countryCode` (ISO 3166-1 Alpha-2); im `PATCH` gilt Merge-Patch je Feld.
 
-**Listen:** `page` beginnt bei 1, `pageSize` 1–200 (Default 50); Antwort `{ items, page, pageSize, totalCount }`. `search` ist dieselbe tippfehlertolerante Suche wie in der UI. `tag` (Name oder Id, mehrfach angebbar) filtert ODER-verknüpft; existiert keiner der Tags, ist die Liste leer. Archivierte Datensätze erscheinen nicht.
+**Listen:** `page` 1–10.000 (beginnt bei 1), `pageSize` 1–200 (Default 50); Antwort `{ items, page, pageSize, totalCount }`. `search` ist dieselbe tippfehlertolerante Suche wie in der UI. `tag` (Name oder Id, mehrfach angebbar) filtert ODER-verknüpft; existiert keiner der Tags, ist die Liste leer. Archivierte Datensätze erscheinen nicht.
 
 **Statuscodes:** `200`/`201` (mit `Location` und dem angelegten Datensatz), `400` Validierung (`errors` je Feld in camelCase; unbekannte Felder im `PATCH` sind ein Fehler), `401` ohne, mit ungültigem oder widerrufenem Key, `404` unbekannte Id oder unbekannter Endpunkt, `409` Konflikt (z. B. `Contact.DuplicateEmail`, `Opportunity.LostReasonRequired`), `422` übrige fachliche Fehler, `429` über 60 Anfragen pro Minute und Key (mit `Retry-After`). Fachliche Fehler tragen ihren Code in `code`.
 
@@ -674,19 +674,20 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 0.5 | 2026-09-28 | 7.6/Kap. 10: Image-Build via GitHub Actions → GHCR, Migrationen per Entrypoint, Repo öffentlich; Env-Variable `Serilog__MinimumLevel__Default` |
 | 0.6 | 2026-09-28 | Kap. 10: Projektname entschieden (SoloCRM), Domain bleibt privat; Abschluss Iteration 1 (ADR-009 Accepted) |
 | 0.7 | 2026-09-28 | Planung It. 2: Outbox-Schreiben nach It. 2 vorgezogen (Verarbeitung bleibt It. 5); Wiedereröffnen abgeschlossener Anfragen geregelt; Oberfläche für Preis-Defaults in It. 3 |
-| 0.9 | 2026-09-29 | Planung It. 3: Markdown per Markdig; Activities bearbeitbar/löschbar; Undo beim Erledigen per Wiederöffnen mit Event `TaskReopened` (2.6); Tasks ohne Termin auf „Heute“; Zeitzone `App__TimeZone`; „Angelegt“ in der Timeline |
 | 0.8 | 2026-09-29 | Abschluss It. 2: mindestens eine offene Stage bleibt erhalten; Ziel-Stage beim Löschen mit gleichem Status (2.3); Umsetzungsentscheidungen in `docs/iterations/02-kerndomaene.md` |
+| 0.9 | 2026-09-29 | Planung It. 3: Markdown per Markdig; Activities bearbeitbar/löschbar; Undo beim Erledigen per Wiederöffnen mit Event `TaskReopened` (2.6); Tasks ohne Termin auf „Heute“; Zeitzone `App__TimeZone`; „Angelegt“ in der Timeline |
 | 0.10 | 2026-09-29 | Abschluss It. 3: Activity-Body Pflicht, keine Zeitpunkte in der Zukunft, Bezüge beim Bearbeiten fest; Löschverhalten von Activities/Tasks (2.3); Präzisierung der Aggregation (2.5); Definition „eingeschlafen“ und „zuletzt bearbeitet“ (S1); Pipeline-Karte öffnet die Detailansicht (S2/S5); Umsetzungsentscheidungen in `docs/iterations/03-timeline-und-tasks.md` |
 | 0.11 | 2026-09-29 | Planung It. 4: einheitliche Suche in Palette, Listen und Autocompletes; Inline-Editing ersetzt den Dialog in der Detailansicht; Tag-Regeln (Palette, case-insensitive, Audit ohne Timeline); Tag-Filter ODER-verknüpft; Kürzel `?` |
-| 1.0 | 2026-10-02 | Abschluss It. 6 (MVP): DSGVO-Auskunft und -Löschung mit Umsetzungsdetails (US-19/20, 2.6 `ContactDeleted`, 5 Export-Endpunkt), 2FA und Kontoseiten (US-21), Eingangsdatum `ReceivedOn` für Anfragen (2.3, US-06 AK6, S1, 5), Konto-Abschnitt in S6, Kontakt-Menü in S5, Testabdeckung gemessen (6); offene Fragen aus Kap. 10 in den Backlog verschoben; Datenschutz-Doku `docs/datenschutz.md` |
-| 1.6 | 2026-10-16 | Task-Sync mit Rückkanal (SOL-9): `TaskListHref`, `TaskSyncToken` an `NextcloudConnection` (2.4), Aufgabenzähler im Abschnitt „Nextcloud“ (S6), Umsetzungsdetails in Kap. 8 |
-| 1.5 | 2026-10-16 | Kontakt-Sync nach Nextcloud umgesetzt (SOL-8): `NextcloudConnection`, `NextcloudSyncItem` (2.4), Einstellungsabschnitt „Nextcloud“ (S6), Umsetzungsdetails in Kap. 8 |
-| 1.4 | 2026-10-16 | Nextcloud-Synchronisation (SOL-7, ADR-014): Umfang (alle nicht archivierten Kontakte; offene und kürzlich erledigte Tasks), `ADR` in der vCard, Sammlungen automatisch angelegt, Änderungserkennung per Hash statt `UpdatedAt`, Pakete festgelegt (8) |
-| 1.3 | 2026-10-15 | ICS-Feed der Tasks (SOL-6): `CalendarFeed` (2.4), Einstellungsabschnitt „Kalender-Feed“ (S6), Endpoint und Regeln in Kap. 8 |
-| 1.2 | 2026-10-14 | E-Mail-Logging (SOL-13, ADR-013): `Origin`/`Direction` an Activity, `MailMessage`, `MailSyncState`, `MailConnection` (2.3, 2.4); Timeline-Darstellung importierter Mails (2.5); Einstellungsabschnitt „E-Mail“ (S6); Anleitung `docs/email-logging-einrichtung.md` |
-| 1.1 | 2026-10-02 | Backlog nach MVP ins Jira-Projekt `SOL` verlagert (8); Nextcloud-Entwurf bleibt als Konzept in Kap. 8; Verweise in Kap. 10 auf Tickets umgestellt |
-| 0.16 | 2026-10-01 | Erweiterung It. 5: Anschrift (`Address`) für Kontakte und Organisationen (2.3), Organisationsimport mit HubSpot-Vorlage und Verknüpfung per HubSpot-Firmen-ID (US-16) |
-| 0.15 | 2026-10-01 | Umsetzung It. 5: REST-API final (5: Listenparameter, Statuscodes, `organizationName`, Tasks per `PATCH` erledigen); Webhook-Header `X-SoloCrm-Event` und `webhook.ping`; `WebhookDelivery` mit `EventId`/`EventType` statt FK, `ProtectedSecret`, Key-Format `scrm_<prefix>_<secret>` (2.4); Outbox mit Lease (7.4) |
-| 0.14 | 2026-10-01 | Backlog: Nextcloud-Synchronisation (Einweg für Kontakte und Tasks, Rückkanal für erledigte Tasks); ICS-Export als Vorstufe |
-| 0.13 | 2026-09-30 | Planung It. 5: Outbox per eigenem `BackgroundService` (ADR-008); schlanke Webhook-Payloads, Zeitstempel in der Signatur, Aufbewahrung 30 Tage (5, 7.4); PATCH als JSON Merge Patch; OpenAPI/Scalar nur angemeldet; Umsetzungsentscheidungen in `docs/iterations/05-integration.md` |
 | 0.12 | 2026-09-30 | Abschluss It. 4: Tag-Felder und -Regeln (2.3); Tastenkürzel präzisiert (3.2, u. a. `Enter`/`F2` für Inline-Edit, 1-s-Fenster für `G`); Suchfeld öffnet die Palette per Klick statt Fokus (3.4); Tags auf Pipeline-Karten, Archivieren der Anfrage im Detailkopf (S2/S5); Such-Mechanik (7.4, ADR-007) |
+| 0.13 | 2026-09-30 | Planung It. 5: Outbox per eigenem `BackgroundService` (ADR-008); schlanke Webhook-Payloads, Zeitstempel in der Signatur, Aufbewahrung 30 Tage (5, 7.4); PATCH als JSON Merge Patch; OpenAPI/Scalar nur angemeldet; Umsetzungsentscheidungen in `docs/iterations/05-integration.md` |
+| 0.14 | 2026-10-01 | Backlog: Nextcloud-Synchronisation (Einweg für Kontakte und Tasks, Rückkanal für erledigte Tasks); ICS-Export als Vorstufe |
+| 0.15 | 2026-10-01 | Umsetzung It. 5: REST-API final (5: Listenparameter, Statuscodes, `organizationName`, Tasks per `PATCH` erledigen); Webhook-Header `X-SoloCrm-Event` und `webhook.ping`; `WebhookDelivery` mit `EventId`/`EventType` statt FK, `ProtectedSecret`, Key-Format `scrm_<prefix>_<secret>` (2.4); Outbox mit Lease (7.4) |
+| 0.16 | 2026-10-01 | Erweiterung It. 5: Anschrift (`Address`) für Kontakte und Organisationen (2.3), Organisationsimport mit HubSpot-Vorlage und Verknüpfung per HubSpot-Firmen-ID (US-16) |
+| 1.0 | 2026-10-02 | Abschluss It. 6 (MVP): DSGVO-Auskunft und -Löschung mit Umsetzungsdetails (US-19/20, 2.6 `ContactDeleted`, 5 Export-Endpunkt), 2FA und Kontoseiten (US-21), Eingangsdatum `ReceivedOn` für Anfragen (2.3, US-06 AK6, S1, 5), Konto-Abschnitt in S6, Kontakt-Menü in S5, Testabdeckung gemessen (6); offene Fragen aus Kap. 10 in den Backlog verschoben; Datenschutz-Doku `docs/datenschutz.md` |
+| 1.1 | 2026-10-02 | Backlog nach MVP ins Jira-Projekt `SOL` verlagert (8); Nextcloud-Entwurf bleibt als Konzept in Kap. 8; Verweise in Kap. 10 auf Tickets umgestellt |
+| 1.2 | 2026-10-14 | E-Mail-Logging (SOL-13, ADR-013): `Origin`/`Direction` an Activity, `MailMessage`, `MailSyncState`, `MailConnection` (2.3, 2.4); Timeline-Darstellung importierter Mails (2.5); Einstellungsabschnitt „E-Mail“ (S6); Anleitung `docs/email-logging-einrichtung.md` |
+| 1.3 | 2026-10-15 | ICS-Feed der Tasks (SOL-6): `CalendarFeed` (2.4), Einstellungsabschnitt „Kalender-Feed“ (S6), Endpoint und Regeln in Kap. 8 |
+| 1.4 | 2026-10-16 | Nextcloud-Synchronisation (SOL-7, ADR-014): Umfang (alle nicht archivierten Kontakte; offene und kürzlich erledigte Tasks), `ADR` in der vCard, Sammlungen automatisch angelegt, Änderungserkennung per Hash statt `UpdatedAt`, Pakete festgelegt (8) |
+| 1.5 | 2026-10-16 | Kontakt-Sync nach Nextcloud umgesetzt (SOL-8): `NextcloudConnection`, `NextcloudSyncItem` (2.4), Einstellungsabschnitt „Nextcloud“ (S6), Umsetzungsdetails in Kap. 8 |
+| 1.6 | 2026-10-16 | Task-Sync mit Rückkanal (SOL-9): `TaskListHref`, `TaskSyncToken` an `NextcloudConnection` (2.4), Aufgabenzähler im Abschnitt „Nextcloud“ (S6), Umsetzungsdetails in Kap. 8 |
+| 1.7 | 2026-10-26 | Eingabegrenzen nach externem Audit (SOL-31): `Activity.Body` und `Organization.Notes` höchstens 100.000 Zeichen (2.3), Mail-Text vor der Bereinigung auf 1 Mio. Zeichen begrenzt, `page` höchstens 10.000 (5) |

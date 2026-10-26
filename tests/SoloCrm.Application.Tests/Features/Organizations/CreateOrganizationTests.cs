@@ -61,4 +61,13 @@ public sealed class CreateOrganizationTests
 
         validation.Errors.Should().ContainSingle(e => e.PropertyName == "Website");
     }
+
+    [Fact]
+    public void Validator_NotesOverMaxLength_Fails()
+    {
+        var validation = new CreateOrganization.Validator().Validate(
+            new CreateOrganization.Command("Contoso", Notes: new string('x', Organization.NotesMaxLength + 1)));
+
+        validation.Errors.Should().ContainSingle(e => e.PropertyName == "Notes");
+    }
 }

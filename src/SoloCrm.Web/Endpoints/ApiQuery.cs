@@ -17,6 +17,10 @@ internal static class ApiQuery
         {
             errors["page"] = ["Die Seite beginnt bei 1."];
         }
+        else if (page > Paging.MaxPage)
+        {
+            errors["page"] = [$"Die Seite darf höchstens {Paging.MaxPage} sein."];
+        }
 
         if (size is < 1 or > Paging.MaxPageSize)
         {

@@ -53,6 +53,7 @@ else
                         </InlineText>
                         <InlineAddress Value="_organization.Address" Save="@(a => SaveAsync(o => o with { Address = a }))" />
                         <InlineText Label="Notizen" Field="@nameof(IOrganizationFields.Notes)" Value="@_organization.Notes" Multiline="true"
+                                    MaxLength="@Organization.NotesMaxLength"
                                     Save="@(v => SaveAsync(o => o with { Notes = v }))" />
                     </MudStack>
                 </MudPaper>

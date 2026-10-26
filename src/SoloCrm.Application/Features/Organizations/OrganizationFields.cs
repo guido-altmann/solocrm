@@ -40,6 +40,10 @@ public sealed class OrganizationFieldsValidator<T> : AbstractValidator<T>
             .WithMessage("Bitte eine gültige Website angeben (z. B. example.com).")
             .When(c => !string.IsNullOrWhiteSpace(c.Website));
 
+        RuleFor(c => c.Notes)
+            .MaximumLength(Organization.NotesMaxLength)
+            .WithMessage($"Die Notizen dürfen höchstens {Organization.NotesMaxLength} Zeichen lang sein.");
+
         RuleFor(c => c.Address!)
             .SetValidator(new AddressDataValidator())
             .When(c => c.Address is not null);

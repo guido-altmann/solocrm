@@ -6,6 +6,9 @@ public static class Paging
 {
     public const int DefaultPageSize = 50;
     public const int MaxPageSize = 200;
+
+    /// <summary>Highest 1-based page; keeps the offset (page × size) far below <see cref="int.MaxValue"/>.</summary>
+    public const int MaxPage = 10_000;
 }
 
 public interface IPagedQuery
@@ -24,7 +27,9 @@ public sealed class PagingValidator<T> : AbstractValidator<T>
     {
         RuleFor(q => q.PageIndex)
             .GreaterThanOrEqualTo(0)
-            .WithMessage("Die Seitenzahl darf nicht negativ sein.");
+            .WithMessage("Die Seitenzahl darf nicht negativ sein.")
+            .LessThan(Paging.MaxPage)
+            .WithMessage($"Die Seitenzahl darf höchstens {Paging.MaxPage} betragen.");
 
         RuleFor(q => q.PageSize)
             .InclusiveBetween(1, Paging.MaxPageSize)

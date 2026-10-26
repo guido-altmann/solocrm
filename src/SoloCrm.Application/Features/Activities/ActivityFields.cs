@@ -43,7 +43,9 @@ public sealed class ActivityFieldsValidator<T> : AbstractValidator<T>
 
         RuleFor(a => a.Body)
             .Must(body => !string.IsNullOrWhiteSpace(body))
-            .WithMessage("Bitte einen Text eingeben.");
+            .WithMessage("Bitte einen Text eingeben.")
+            .MaximumLength(Activity.BodyMaxLength)
+            .WithMessage($"Der Text darf höchstens {Activity.BodyMaxLength} Zeichen lang sein.");
     }
 }
 

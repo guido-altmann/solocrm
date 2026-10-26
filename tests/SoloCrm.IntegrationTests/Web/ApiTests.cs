@@ -270,6 +270,7 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
         var unknownTag = await ReadAsync(await client.GetAsync("/api/v1/contacts?tag=gibtsnicht", Ct));
         var paged = await ReadAsync(await client.GetAsync("/api/v1/contacts?page=2&pageSize=1", Ct));
         var invalid = await client.GetAsync("/api/v1/contacts?page=0&pageSize=500", Ct);
+        var overflow = await client.GetAsync("/api/v1/contacts?page=2147483647", Ct);
 
         typo.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("lastName").GetString()).Should().Equal("Schmidt");
         tagged.GetProperty("items").EnumerateArray().Single().GetProperty("tags")[0].GetProperty("name").GetString().Should().Be("Kunde");
@@ -279,6 +280,8 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
         paged.GetProperty("totalCount").GetInt32().Should().Be(2);
         invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await ReadAsync(invalid)).GetProperty("errors").EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo(["page", "pageSize"]);
+        overflow.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadAsync(overflow)).GetProperty("errors").EnumerateObject().Select(p => p.Name).Should().Equal("page");
     }
 
     [Fact]

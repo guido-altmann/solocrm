@@ -17,7 +17,7 @@
     </MudChipSet>
 
     <MudTextField @ref="_bodyField" T="string" @bind-Value="_body" Placeholder="@Placeholder" Lines="3" MaxLines="12"
-                  Variant="Variant.Outlined" Immediate="true" Class="mt-2" OnKeyDown="OnBodyKeyDown"
+                  Variant="Variant.Outlined" Immediate="true" Class="mt-2" OnKeyDown="OnBodyKeyDown" MaxLength="@Activity.BodyMaxLength"
                   HelperText="Markdown möglich · Strg+Enter speichert" aria-label="Text der Aktivität"
                   Error="@_errors.Has(nameof(LogActivity.Command.Body))"
                   ErrorText="@_errors.Text(nameof(LogActivity.Command.Body))" />

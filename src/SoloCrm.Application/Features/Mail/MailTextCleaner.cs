@@ -17,6 +17,16 @@ public static partial class MailTextCleaner
 {
     private const string QuoteMarker = "\u0001QUOTE\u0001";
 
+    /// <summary>
+    /// Longer bodies are cut before the cleanup; the stored text is limited much further anyway
+    /// (<see cref="SyncMail.BodyMaxLength"/>), and the cut keeps the work per mail bounded.
+    /// </summary>
+    public const int MaxInputLength = 1_000_000;
+
+    private const RegexOptions DocumentOptions = RegexOptions.NonBacktracking | RegexOptions.Singleline | RegexOptions.CultureInvariant;
+
+    private const int MatchTimeoutMilliseconds = 2_000;
+
     private static readonly string[] ForwardSubjectPrefixes = ["WG:", "FW:", "FWD:", "Weiterleitung:"];
 
     /// <param name="content">Body as delivered by the mail source.</param>
@@ -30,8 +40,23 @@ public static partial class MailTextCleaner
             return string.Empty;
         }
 
+        if (content.Length > MaxInputLength)
+        {
+            content = content[..MaxInputLength];
+        }
+
         var isForward = IsForward(subject);
-        var text = Normalize(isHtml ? HtmlToText(content, markQuotes: !isForward) : content);
+        string text;
+        try
+        {
+            text = Normalize(isHtml ? HtmlToText(content, markQuotes: !isForward) : content);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            // Safety net only: the mail is kept as plain text without any cut instead of blocking the sync.
+            return Normalize(isHtml ? WebUtility.HtmlDecode(StripTags(content)) : content);
+        }
+
         var full = Normalize(text.Replace(QuoteMarker, string.Empty, StringComparison.Ordinal));
         if (isForward || HasForwardMarker(text))
         {
@@ -158,6 +183,30 @@ public static partial class MailTextCleaner
         return WebUtility.HtmlDecode(text);
     }
 
+    /// <summary>Removes everything between <c>&lt;</c> and <c>&gt;</c> in one linear pass.</summary>
+    private static string StripTags(string html)
+    {
+        var builder = new StringBuilder(html.Length);
+        var inTag = false;
+        foreach (var c in html)
+        {
+            if (c == '<')
+            {
+                inTag = true;
+            }
+            else if (c == '>' && inTag)
+            {
+                inTag = false;
+            }
+            else if (!inTag)
+            {
+                builder.Append(c);
+            }
+        }
+
+        return builder.ToString();
+    }
+
     private static string LinkToText(Match match)
     {
         var url = WebUtility.HtmlDecode(match.Groups["url"].Value).Trim();
@@ -184,35 +233,38 @@ public static partial class MailTextCleaner
         return ManyBlankLines().Replace(builder.ToString(), "\n\n").Trim();
     }
 
-    [GeneratedRegex(@"<!--.*?-->", RegexOptions.Singleline)]
+    // The HTML patterns run over the whole document and use NonBacktracking: with ".*?" or "[^>]*" and unclosed tags
+    // the backtracking engine rescans the rest of the document from every start, which is quadratic (SOL-31).
+    [GeneratedRegex(@"<!--.*?-->", DocumentOptions, MatchTimeoutMilliseconds)]
     private static partial Regex HtmlComments();
 
-    [GeneratedRegex(@"<(head|style|script)\b.*?</\1\s*>", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"<head\b.*?</head\s*>|<style\b.*?</style\s*>|<script\b.*?</script\s*>", DocumentOptions | RegexOptions.IgnoreCase, MatchTimeoutMilliseconds)]
     private static partial Regex HtmlHiddenBlocks();
 
     // Start of the quoted earlier message in the HTML of the common mail clients: Outlook ("appendonsend",
     // "divRplyFwdMsg", old "border-top" header), Gmail, Thunderbird, Apple Mail, Yahoo and any <blockquote>.
     [GeneratedRegex(
         """<(div\b[^>]*\bid\s*=\s*["']?(appendonsend|divRplyFwdMsg)\b|hr\b[^>]*\bid\s*=\s*["']?stopSpelling|(div|span)\b[^>]*\bclass\s*=\s*["'][^"']*\b(gmail_quote|gmail_attr|moz-cite-prefix|yahoo_quoted)\b|blockquote\b|div\b[^>]*border-top:\s*solid\s*#(E1E1E1|B5C4DF))""",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+        DocumentOptions | RegexOptions.IgnoreCase,
+        MatchTimeoutMilliseconds)]
     private static partial Regex HtmlQuoteStart();
 
-    [GeneratedRegex("""<a\b[^>]*\bhref\s*=\s*["'](?<url>[^"']*)["'][^>]*>(?<label>.*?)</a\s*>""", RegexOptions.Singleline | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex("""<a\b[^>]*\bhref\s*=\s*["'](?<url>[^"']*)["'][^>]*>(?<label>.*?)</a\s*>""", DocumentOptions | RegexOptions.IgnoreCase, MatchTimeoutMilliseconds)]
     private static partial Regex HtmlLink();
 
-    [GeneratedRegex(@"<br\s*/?>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"<br\s*/?>", DocumentOptions | RegexOptions.IgnoreCase, MatchTimeoutMilliseconds)]
     private static partial Regex HtmlLineBreak();
 
-    [GeneratedRegex(@"<li\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"<li\b[^>]*>", DocumentOptions | RegexOptions.IgnoreCase, MatchTimeoutMilliseconds)]
     private static partial Regex HtmlListItem();
 
-    [GeneratedRegex(@"</?(p|div|tr|table|ul|ol|h[1-6]|blockquote|hr|pre|section|article|header|footer)\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"</?(p|div|tr|table|ul|ol|h[1-6]|blockquote|hr|pre|section|article|header|footer)\b[^>]*>", DocumentOptions | RegexOptions.IgnoreCase, MatchTimeoutMilliseconds)]
     private static partial Regex HtmlBlockBoundary();
 
-    [GeneratedRegex(@"</?(td|th)\b[^>]*>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"</?(td|th)\b[^>]*>", DocumentOptions | RegexOptions.IgnoreCase, MatchTimeoutMilliseconds)]
     private static partial Regex HtmlCellBoundary();
 
-    [GeneratedRegex(@"<[^>]*>", RegexOptions.Singleline)]
+    [GeneratedRegex(@"<[^>]*>", DocumentOptions, MatchTimeoutMilliseconds)]
     private static partial Regex HtmlTag();
 
     [GeneratedRegex("[​‌‍⁠﻿]")]
