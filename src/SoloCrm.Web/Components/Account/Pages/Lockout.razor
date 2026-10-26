@@ -1,8 +1,10 @@
 @page "/Account/Lockout"
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
+@using SoloCrm.Web.Hosting
 
 <PageTitle>Gesperrt · SoloCRM</PageTitle>
 
 <MudAlert Severity="Severity.Error" Class="mx-auto" Style="max-width: 440px;" role="alert">
-    Das Konto ist vorübergehend gesperrt. Bitte später erneut versuchen.
+    Zu viele fehlgeschlagene Anmeldeversuche: Das Konto ist für @((int)AccountSecurity.LockoutDuration.TotalMinutes) Minuten gesperrt.
+    Bitte danach erneut versuchen.
 </MudAlert>

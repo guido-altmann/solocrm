@@ -22,6 +22,13 @@ Genau ein Nutzer. Die UI braucht Login (optional 2FA), die API braucht maschinel
 - **Entfernte Template-Seiten:** E-Mail ändern (die Adresse kommt aus `Admin__Email`), „Personal Data“ herunterladen/löschen (würde den einzigen Admin löschen), Passwort setzen sowie alle Seiten, die auf E-Mail-Versand angewiesen sind (Passwort vergessen/zurücksetzen, E-Mail bestätigen). Es gibt keinen E-Mail-Versand; die Seiten hätten nie funktioniert. Wiederherstellung bei vergessenem Passwort oder verlorener 2FA: über die Datenbank (`deploy/coolify.md`, Fehlersuche).
 - **Kontoseiten** bleiben statisch gerendert (SSR), weil Anmelden und Passwortänderung das Cookie über den `HttpContext` schreiben. Sie nutzen das App-Theme und die MudBlazor-Komponenten, die reines HTML erzeugen (Layout, Buttons, Hinweise); Eingabefelder sind native Elemente im Stil der App, weil MudBlazor-Eingaben Interaktivität voraussetzen. Bootstrap ist entfernt. Texte und Identity-Fehlermeldungen sind deutsch (`GermanIdentityErrorDescriber`).
 
+## Härtung nach externem Audit (SOL-30, 2026-10-26)
+- **Kontosperre:** nach 10 Fehlversuchen für 15 Minuten. Bewusst kurz, weil sich nur der einzige Admin sperren lässt und Entsperren sonst nur per DB geht (`deploy/coolify.md`, Fehlersuche). Passwort, Authenticator-Code und Wiederherstellungscode zählen gemeinsam. Identity prüft und zählt die Sperre bei Wiederherstellungscodes nicht selbst; das übernimmt `LoginWithRecoveryCode`. Die Sperre ergänzt das Rate-Limit pro IP gegen verteilte Versuche.
+- **Passwortregeln:** mindestens 12 Zeichen und 4 verschiedene Zeichen, keine Pflicht-Zeichenklassen (NIST SP 800-63B). Gilt für neue Passwörter; das bestehende bleibt gültig.
+- **Cookies:** Alle Identity-Cookies explizit `HttpOnly` und `SameSite=Lax`, außerhalb von Development immer `Secure`; in Development folgt `Secure` dem Schema, weil lokal und in den Integrationstests `http` läuft. Anmelde-Cookie 14 Tage, gleitend.
+- **Rate-Limit auch für `PasskeyRequestOptions`:** Der anonyme Endpunkt teilt das Login-Budget.
+- **Security-Events** (Warning): `Failed sign-in attempt.`, `User account locked out.`, `Sign-in rate limit exceeded`, ohne E-Mail-Adresse und ohne Client-IP (Logs enthalten nur Ids, `docs/datenschutz.md`).
+
 ## Betrachtete Optionen
 ### A: Identity + API-Key (gewählt)
 **Pro:** keine externe Abhängigkeit, lehrreich (eigener Auth-Handler). **Contra:** kein SSO.

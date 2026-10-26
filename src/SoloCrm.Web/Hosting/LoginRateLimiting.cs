@@ -8,7 +8,7 @@ namespace SoloCrm.Web.Hosting;
 /// Only POSTs count, so rendering the login forms is never limited. All login forms
 /// (password, 2FA, recovery code) share one budget per IP.
 /// </summary>
-public static class LoginRateLimiting
+public static partial class LoginRateLimiting
 {
     public const string PolicyName = "login";
 
@@ -48,6 +48,7 @@ public static class LoginRateLimiting
     private static async ValueTask OnRejectedAsync(OnRejectedContext context, CancellationToken cancellationToken)
     {
         var response = context.HttpContext.Response;
+        LogRejected(context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(LoginRateLimiting)));
 
         if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
         {
@@ -57,4 +58,8 @@ public static class LoginRateLimiting
         response.ContentType = "text/plain; charset=utf-8";
         await response.WriteAsync("Zu viele Anmeldeversuche. Bitte in einer Minute erneut versuchen.", cancellationToken);
     }
+
+    // Security event (SOL-30); without client IP or user, like all logs (docs/datenschutz.md).
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Sign-in rate limit exceeded")]
+    private static partial void LogRejected(ILogger logger);
 }

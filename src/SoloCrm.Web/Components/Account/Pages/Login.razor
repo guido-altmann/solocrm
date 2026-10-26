@@ -88,9 +88,8 @@
                 return;
             }
 
-            // This doesn't count login failures towards account lockout
-            // To enable password failures to trigger account lockout, set lockoutOnFailure: true
-            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+            // Failures count towards the lockout (SOL-30, AccountSecurity).
+            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: true);
         }
 
         if (result.Succeeded)
@@ -111,6 +110,8 @@
         }
         else
         {
+            // Security event without the entered email address (no personal data in logs).
+            Logger.LogWarning("Failed sign-in attempt.");
             errorMessage = $"{StatusMessage.ErrorPrefix}E-Mail oder Passwort ist falsch.";
         }
     }

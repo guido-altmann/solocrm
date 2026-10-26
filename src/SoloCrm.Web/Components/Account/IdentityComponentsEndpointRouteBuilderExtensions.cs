@@ -62,7 +62,8 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             var optionsJson = await signInManager.MakePasskeyRequestOptionsAsync(user);
             return TypedResults.Content(optionsJson, contentType: "application/json");
         })
-        .AllowAnonymous(); // Used by the login page before the user is signed in.
+        .AllowAnonymous() // Used by the login page before the user is signed in.
+        .RequireRateLimiting(SoloCrm.Web.Hosting.LoginRateLimiting.PolicyName);
 
         return accountGroup;
     }

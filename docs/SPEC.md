@@ -405,7 +405,7 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 **US-21 · Login & 2FA** · It. 1 (Login) / It. 6 (2FA)
 - AK1: Ein einziger User, angelegt per Seed aus Umgebungsvariablen; keine Selbstregistrierung.
 - AK2: TOTP-2FA ist optional aktivierbar.
-- Umsetzung: Einrichtung mit QR-Code (serverseitig als SVG) und Schlüssel als Text, Wiederherstellungscodes, Deaktivieren und Zurücksetzen; Passkeys als Alternative; Login-Rate-Limit gilt auch für Code und Wiederherstellungscode. Kontoseiten deutsch im App-Theme; E-Mail ändern, „Personal Data“ und die auf E-Mail-Versand angewiesenen Seiten sind entfernt (ADR-004).
+- Umsetzung: Einrichtung mit QR-Code (serverseitig als SVG) und Schlüssel als Text, Wiederherstellungscodes, Deaktivieren und Zurücksetzen; Passkeys als Alternative; Login-Rate-Limit gilt auch für Code, Wiederherstellungscode und die Passkey-Optionen; nach 10 Fehlversuchen ist das Konto für 15 Minuten gesperrt; Passwörter mindestens 12 Zeichen (SOL-30, ADR-004). Kontoseiten deutsch im App-Theme; E-Mail ändern, „Personal Data“ und die auf E-Mail-Versand angewiesenen Seiten sind entfernt (ADR-004).
 
 ---
 
@@ -455,7 +455,7 @@ Die Endpoints rufen dieselben Handler wie die UI; Validierung, Audit und Domain 
 | Performance | Listen und Suche < 200 ms bei 10k Kontakten und 50k Activities; UI-Interaktion ohne spürbare Latenz |
 | Verfügbarkeit | Single-Instance; Ausfallzeiten beim Deployment < 1 min tolerierbar |
 | Backup | Tägliches Postgres-Backup über Coolify nach S3-kompatiblem Storage, 30 Tage Aufbewahrung; Restore einmal getestet und dokumentiert |
-| Sicherheit | HTTPS only (HSTS); Cookies Secure/HttpOnly/SameSite=Lax; API-Keys nur gehasht gespeichert; Rate-Limiting auf API und Login; Antiforgery; optionale 2FA; Secrets ausschließlich über Umgebungsvariablen |
+| Sicherheit | HTTPS only (HSTS); Cookies Secure/HttpOnly/SameSite=Lax; API-Keys nur gehasht gespeichert; Rate-Limiting auf API und Login; Kontosperre nach 10 Fehlversuchen für 15 Minuten; Passwörter mindestens 12 Zeichen; Antiforgery; optionale 2FA; Secrets ausschließlich über Umgebungsvariablen |
 | Datenschutz | Hosting in der EU; Auskunft und Löschung (US-19/20); keine externen Tracker; Logs ohne personenbezogene Inhalte (keine Bodies, E-Mails nur maskiert) |
 | Beobachtbarkeit | Strukturierte Logs (Serilog, JSON auf stdout); `/health/live` und `/health/ready` (inkl. DB-Check) |
 | Wartbarkeit | Warnings as Errors; Nullable aktiviert; Analyzer; Testabdeckung der Domain- und Application-Schicht ≥ 80 % (gemessen in der CI, Stand MVP: Domain 99,6 %, Application 98,5 % Zeilenabdeckung; noch kein hartes Gate) |
@@ -691,3 +691,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.5 | 2026-10-16 | Kontakt-Sync nach Nextcloud umgesetzt (SOL-8): `NextcloudConnection`, `NextcloudSyncItem` (2.4), Einstellungsabschnitt „Nextcloud“ (S6), Umsetzungsdetails in Kap. 8 |
 | 1.6 | 2026-10-16 | Task-Sync mit Rückkanal (SOL-9): `TaskListHref`, `TaskSyncToken` an `NextcloudConnection` (2.4), Aufgabenzähler im Abschnitt „Nextcloud“ (S6), Umsetzungsdetails in Kap. 8 |
 | 1.7 | 2026-10-26 | Eingabegrenzen nach externem Audit (SOL-31): `Activity.Body` und `Organization.Notes` höchstens 100.000 Zeichen (2.3), Mail-Text vor der Bereinigung auf 1 Mio. Zeichen begrenzt, `page` höchstens 10.000 (5) |
+| 1.8 | 2026-10-26 | Auth-Härtung nach externem Audit (SOL-30): Kontosperre, Passwortregeln, Rate-Limit für Passkey-Optionen (US-21, 6) |

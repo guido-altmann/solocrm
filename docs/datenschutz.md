@@ -75,5 +75,5 @@ Die Löschung ist bewusst nur in der Oberfläche möglich, nicht über die REST-
 ## Weitere Maßnahmen
 
 - Hosting in der EU, keine externen Tracker, keine externen Schriftarten oder CDNs.
-- Login mit optionaler Zwei-Faktor-Anmeldung (Authenticator-App) und Passkeys; Rate-Limit für Login, 2FA und Wiederherstellungscodes.
+- Login mit optionaler Zwei-Faktor-Anmeldung (Authenticator-App) und Passkeys; Rate-Limit für Login, 2FA und Wiederherstellungscodes; Kontosperre nach 10 Fehlversuchen für 15 Minuten.
 - API-Keys werden nur als Hash, Webhook-Secrets nur verschlüsselt gespeichert (ADR-010).

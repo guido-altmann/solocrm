@@ -52,11 +52,27 @@
 
     private async Task OnValidSubmitAsync()
     {
+        // Unlike the authenticator code, Identity neither checks nor counts the lockout for recovery codes (SOL-30).
+        if (await UserManager.IsLockedOutAsync(user))
+        {
+            Logger.LogWarning("User account locked out.");
+            RedirectManager.RedirectTo("Account/Lockout");
+            return;
+        }
+
         var recoveryCode = Input.RecoveryCode.Replace(" ", string.Empty);
 
         var result = await SignInManager.TwoFactorRecoveryCodeSignInAsync(recoveryCode);
 
         var userId = await UserManager.GetUserIdAsync(user);
+        if (!result.Succeeded && !result.IsLockedOut)
+        {
+            await UserManager.AccessFailedAsync(user);
+            if (await UserManager.IsLockedOutAsync(user))
+            {
+                result = SignInResult.LockedOut;
+            }
+        }
 
         if (result.Succeeded)
         {

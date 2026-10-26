@@ -241,6 +241,11 @@ Die `.enc`-Datei auf den lokalen Rechner holen (`scp user@server:/root/solocrm-k
 - Die Uhrzeit auf Smartphone und Server muss stimmen (TOTP verträgt nur wenige Sekunden Abweichung über das 30-s-Fenster hinaus). Auf dem Server `date -u` prüfen.
 - Kein Zugriff mehr auf App und Wiederherstellungscodes: Im Postgres-Terminal `psql -U solocrm -d solocrm -c 'update "AspNetUsers" set two_factor_enabled = false;'` deaktiviert 2FA; danach in der App neu einrichten.
 
+**Login meldet „Das Konto ist für 15 Minuten gesperrt“**
+- Nach 10 fehlgeschlagenen Versuchen (Passwort, Authenticator- oder Wiederherstellungscode) sperrt die App das Konto für 15 Minuten (SOL-30); danach ist die Anmeldung wieder möglich. Im Log steht dann `User account locked out.`, vorher je Fehlversuch `Failed sign-in attempt.` bzw. bei zu vielen Versuchen pro Minute `Sign-in rate limit exceeded`.
+- Sofort entsperren: im Postgres-Terminal `psql -U solocrm -d solocrm -c 'update "AspNetUsers" set lockout_end = null, access_failed_count = 0;'`.
+- Häufen sich die Ereignisse, ohne dass man selbst Anmeldeversuche gemacht hat, probiert jemand Passwörter aus: Passwort ändern und 2FA einrichten.
+
 **Login meldet „Invalid login attempt“, obwohl der Admin laut Log angelegt wurde**
 - Meist wurde das Passwort beim Weiterreichen verändert (siehe *Sonderzeichen in Werten*). Im Terminal des App-Containers `printenv Admin__InitialPassword` ausführen und genau diesen Wert zum Login verwenden, danach das Passwort in der App ändern.
 - Steht im Log `Admin seed skipped: a user already exists`, wurden `Admin__*` ignoriert, weil schon ein Benutzer existiert (z. B. nach nachträglich geänderten Env-Werten). Neu anlegen lassen: im Postgres-Terminal `psql -U solocrm -d solocrm -c 'delete from "AspNetUsers";'`, dann die App neu starten. Nur solange keine weiteren Benutzerdaten existieren.

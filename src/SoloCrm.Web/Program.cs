@@ -60,6 +60,7 @@ try
         })
         .AddApiKey()
         .AddIdentityCookies();
+    builder.Services.AddIdentityCookieHardening(builder.Environment);
 
     // Every endpoint requires a signed-in user unless it opts out with [AllowAnonymous].
     builder.Services.AddAuthorizationBuilder()
@@ -72,6 +73,7 @@ try
         {
             options.SignIn.RequireConfirmedAccount = true;
             options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
+            AccountSecurity.Configure(options);
         })
         .AddEntityFrameworkStores<CrmDbContext>()
         .AddSignInManager()
