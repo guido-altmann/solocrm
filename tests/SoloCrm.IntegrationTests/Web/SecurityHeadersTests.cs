@@ -30,7 +30,7 @@ public sealed partial class SecurityHeadersTests(PostgresFixture postgres) : ICl
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         Header(response, "X-Content-Type-Options").Should().Be("nosniff");
-        Header(response, "Referrer-Policy").Should().Be("no-referrer");
+        Header(response, "Referrer-Policy").Should().Be("strict-origin-when-cross-origin");
         Header(response, "Permissions-Policy").Should().Contain("camera=()").And.NotContain("publickey");
         Header(response, "Content-Security-Policy").Should()
             .Contain("default-src 'self'")

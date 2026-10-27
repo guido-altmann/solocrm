@@ -6,7 +6,8 @@ namespace SoloCrm.Web.Hosting;
 /// Security headers for every response (SOL-32, audit F-08). The CSP only allows same-origin resources; the one
 /// inline script of the app, Blazor's import map, carries a per-request nonce. Styles need 'unsafe-inline' because
 /// MudBlazor renders style attributes and a theme style element. Scalar renders an inline bootstrap script and
-/// gets its own, slightly weaker policy.
+/// gets its own, slightly weaker policy. 'unsafe-eval' stays off on purpose: the eval violation Scalar reports comes from
+/// a feature probe (try Function('')) of its bundled Zod, which then falls back to its jitless mode.
 /// </summary>
 public static class SecurityHeaders
 {
@@ -28,7 +29,8 @@ public static class SecurityHeaders
             {
                 var headers = context.Response.Headers;
                 headers.XContentTypeOptions = "nosniff";
-                headers["Referrer-Policy"] = "no-referrer";
+                // Not no-referrer: browsers then send "Origin: null" on same-origin POSTs and the passkey origin check fails.
+                headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
                 headers["Permissions-Policy"] = PermissionsPolicy;
                 headers.ContentSecurityPolicy = ContentSecurityPolicy(context.Request.Path, nonce);
                 return Task.CompletedTask;
