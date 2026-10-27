@@ -183,7 +183,7 @@ Beim Löschen einer Stage mit zugeordneten Anfragen muss die Ziel-Stage denselbe
 | Type | enum `ActivityType` | `Note`, `Call`, `Meeting`, `Email`, `ApplicationSent` |
 | OccurredAt | DateTimeOffset | Default: jetzt; rückdatierbar, nicht in der Zukunft (5 min Toleranz) |
 | Subject | string(200)? | |
-| Body | text | Pflicht, höchstens 100.000 Zeichen; Markdown erlaubt (gerendert mit Markdig, ohne Roh-HTML; Links nur http(s)/mailto). Importierte E-Mails werden vor der Bereinigung auf 1 Mio. Zeichen und danach auf diese Länge gekürzt |
+| Body | text | Pflicht, höchstens 100.000 Zeichen; Markdown erlaubt (gerendert mit Markdig, ohne Roh-HTML; Links nur http(s)/mailto; Bilder werden nicht geladen, sondern als Link mit Alt-Text angezeigt; sieht eine Link-Beschriftung wie eine andere URL aus, wird das Ziel dahinter angezeigt). Importierte E-Mails werden vor der Bereinigung auf 1 Mio. Zeichen und danach auf diese Länge gekürzt |
 | ContactId / OrganizationId / OpportunityId | Guid? | **mindestens einer** gesetzt |
 | Origin | enum `ActivityOrigin` | `Manual` (Default) oder `Mail` (aus dem verbundenen Postfach importiert, ADR-013) |
 | Direction | enum `ActivityDirection`? | `Inbound` / `Outbound`; nur bei `Origin = Mail` gesetzt (Check-Constraint) |
@@ -455,7 +455,7 @@ Die Endpoints rufen dieselben Handler wie die UI; Validierung, Audit und Domain 
 | Performance | Listen und Suche < 200 ms bei 10k Kontakten und 50k Activities; UI-Interaktion ohne spürbare Latenz |
 | Verfügbarkeit | Single-Instance; Ausfallzeiten beim Deployment < 1 min tolerierbar |
 | Backup | Tägliches Postgres-Backup über Coolify nach S3-kompatiblem Storage, 30 Tage Aufbewahrung; Restore einmal getestet und dokumentiert |
-| Sicherheit | HTTPS only (HSTS); Cookies Secure/HttpOnly/SameSite=Lax; API-Keys nur gehasht gespeichert; Rate-Limiting auf API und Login; Kontosperre nach 10 Fehlversuchen für 15 Minuten; Passwörter mindestens 12 Zeichen; Antiforgery; optionale 2FA; Secrets ausschließlich über Umgebungsvariablen |
+| Sicherheit | HTTPS only (HSTS); Security-Header (CSP nur mit eigenen Ressourcen, Inline-Skripte per Nonce, `frame-ancestors 'none'`; `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`), Scalar mit eigener CSP für sein Inline-Skript; Cookies Secure/HttpOnly/SameSite=Lax; API-Keys nur gehasht gespeichert; Rate-Limiting auf API und Login; Kontosperre nach 10 Fehlversuchen für 15 Minuten; Passwörter mindestens 12 Zeichen; Antiforgery; optionale 2FA; Secrets ausschließlich über Umgebungsvariablen |
 | Datenschutz | Hosting in der EU; Auskunft und Löschung (US-19/20); keine externen Tracker; Logs ohne personenbezogene Inhalte (keine Bodies, E-Mails nur maskiert) |
 | Beobachtbarkeit | Strukturierte Logs (Serilog, JSON auf stdout); `/health/live` und `/health/ready` (inkl. DB-Check) |
 | Wartbarkeit | Warnings as Errors; Nullable aktiviert; Analyzer; Testabdeckung der Domain- und Application-Schicht ≥ 80 % (gemessen in der CI, Stand MVP: Domain 99,6 %, Application 98,5 % Zeilenabdeckung; noch kein hartes Gate) |
@@ -692,3 +692,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.6 | 2026-10-16 | Task-Sync mit Rückkanal (SOL-9): `TaskListHref`, `TaskSyncToken` an `NextcloudConnection` (2.4), Aufgabenzähler im Abschnitt „Nextcloud“ (S6), Umsetzungsdetails in Kap. 8 |
 | 1.7 | 2026-10-26 | Eingabegrenzen nach externem Audit (SOL-31): `Activity.Body` und `Organization.Notes` höchstens 100.000 Zeichen (2.3), Mail-Text vor der Bereinigung auf 1 Mio. Zeichen begrenzt, `page` höchstens 10.000 (5) |
 | 1.8 | 2026-10-26 | Auth-Härtung nach externem Audit (SOL-30): Kontosperre, Passwortregeln, Rate-Limit für Passkey-Optionen (US-21, 6) |
+| 1.9 | 2026-10-27 | Darstellung und Header nach externem Audit (SOL-32): Bilder im Activity-Body als Link statt `<img>`, Ziel-URL bei irreführender Link-Beschriftung (2.3); Security-Header mit CSP (6) |

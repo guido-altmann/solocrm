@@ -89,6 +89,7 @@ try
 
     // Must run first so scheme, host and client IP reflect the original request behind Traefik.
     app.UseForwardedHeaders();
+    app.UseSecurityHeaders();
 
     if (app.Environment.IsDevelopment())
     {

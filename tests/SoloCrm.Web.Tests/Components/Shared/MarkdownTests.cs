@@ -44,6 +44,52 @@ public sealed class MarkdownTests
     }
 
     [Fact]
+    public void ToHtml_Image_RendersLinkInsteadOfImage()
+    {
+        var html = Markdown.ToHtml("![Logo](https://tracker.example/p.gif)").Value;
+
+        html.Should().NotContain("<img")
+            .And.Contain("<a href=\"https://tracker.example/p.gif\"")
+            .And.Contain(">Logo</a>")
+            .And.Contain("rel=\"noopener noreferrer\"");
+    }
+
+    [Fact]
+    public void ToHtml_ImageWithoutAltText_ShowsUrlAsLabel()
+    {
+        var html = Markdown.ToHtml("![](https://tracker.example/p.gif)").Value;
+
+        html.Should().NotContain("<img").And.Contain(">https://tracker.example/p.gif</a>");
+    }
+
+    [Fact]
+    public void ToHtml_UnsafeImage_DropsUrl()
+    {
+        var html = Markdown.ToHtml("![x](javascript:alert(1))").Value;
+
+        html.Should().NotContain("<img").And.NotContainEquivalentOf("javascript:");
+    }
+
+    [Fact]
+    public void ToHtml_LabelLooksLikeOtherUrl_ShowsTarget()
+    {
+        var html = Markdown.ToHtml("[https://bank.example](https://evil.example/login)").Value;
+
+        html.Should().Contain(">https://bank.example</a> (https://evil.example/login)");
+    }
+
+    [Theory]
+    [InlineData("[https://example.com](https://example.com)")]
+    [InlineData("[www.example.com](https://www.example.com/)")]
+    [InlineData("[Profil](https://example.com)")]
+    public void ToHtml_LabelMatchesTarget_ShowsNoTarget(string markdown)
+    {
+        var html = Markdown.ToHtml(markdown).Value;
+
+        html.Should().NotContain("</a> (");
+    }
+
+    [Fact]
     public void ToHtml_Blank_ReturnsEmpty()
     {
         Markdown.ToHtml("  ").Value.Should().BeNullOrEmpty();

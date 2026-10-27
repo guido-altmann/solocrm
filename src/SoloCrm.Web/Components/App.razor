@@ -1,4 +1,6 @@
-﻿<!DOCTYPE html>
+﻿@using SoloCrm.Web.Hosting
+
+<!DOCTYPE html>
 <html lang="de">
 
 <head>
@@ -9,7 +11,7 @@
     <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["SoloCrm.Web.styles.css"]" />
-    <ImportMap />
+    <ImportMap nonce="@HttpContext.GetCspNonce()" />
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="icon" type="image/png" sizes="196x196" href="@Assets["icon-196.png"]" />
     <link rel="apple-touch-icon" sizes="1024x1024" href="@Assets["icon-1024.png"]" />

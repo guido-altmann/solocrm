@@ -124,6 +124,8 @@ Ab jetzt stößt der Workflow **Docker** nach jedem erfolgreichen Push das Deplo
 - [ ] UI ist interaktiv: Hell-/Dunkelmodus-Umschalter reagiert (sonst siehe *Fehlersuche*)
 - [ ] `/contacts`: Kontakt per Quick-Add (`N`) anlegen, anschließend über die Suche finden
 - [ ] Response-Header enthält `Strict-Transport-Security`
+- [ ] Security-Header vorhanden (`curl -sI https://crm.example.de/Account/Login`): `Content-Security-Policy` mit `frame-ancestors 'none'` und `script-src 'self' 'nonce-…'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`
+- [ ] Browser-Konsole zeigt nach Login, Navigation und Aufruf von `/scalar/` keine CSP-Verstöße
 - [ ] Kein Redirect-Loop und Auth-Cookie mit Flag `Secure` (Forwarded Headers greifen, die App erkennt HTTPS hinter Traefik)
 - [ ] Container-Logs sind JSON und enthalten keine E-Mail-Adressen im Klartext
 
