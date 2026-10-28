@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text;
 using CsvHelper;
-using CsvHelper.Configuration;
 using SoloCrm.Application.Abstractions;
 
 namespace SoloCrm.Application.Features.Import;
@@ -51,24 +50,20 @@ public sealed class CsvDocument
         var (text, encodingName) = Decode(content.Span);
         var delimiter = DetectDelimiter(text);
 
-        var configuration = new CsvConfiguration(CultureInfo.InvariantCulture)
+        var options = new CsvReaderOptions
         {
-            Delimiter = delimiter.ToString(),
-            HasHeaderRecord = false,
-            IgnoreBlankLines = true,
-            BadDataFound = null,
-            MissingFieldFound = null,
-            DetectColumnCountChanges = false,
+            Separator = delimiter,
+            HasHeader = false,
+            SkipEmptyLines = true,
         };
 
-        using var reader = new StringReader(text);
-        using var parser = new CsvParser(reader, configuration);
+        using var reader = CsvReader.FromText(text, options);
 
         string[]? header = null;
         var rows = new List<CsvRow>();
-        while (parser.Read())
+        while (reader.Read())
         {
-            var record = parser.Record ?? [];
+            var record = reader.Current.ToArray();
             if (header is null)
             {
                 header = record;
@@ -85,7 +80,7 @@ public sealed class CsvDocument
                 return ImportErrors.TooManyRows;
             }
 
-            rows.Add(new CsvRow(parser.Row, record));
+            rows.Add(new CsvRow((int)reader.RowNumber, record));
         }
 
         if (header is null || header.All(string.IsNullOrWhiteSpace))
