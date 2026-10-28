@@ -1,0 +1,4 @@
+# False positives of the gitleaks secret scan (SOL-33). Format: <commit>:<file>:<rule>:<line>
+# Rule linkedin-client-id matches the PATCH field list of the contacts API (linkedInUrl next to organizationId).
+bbcd99000596283e4ba4fec4430cfa9bbf71ab2a:src/SoloCrm.Web/Endpoints/ContactEndpoints.cs:linkedin-client-id:17
+59e69f73ce5675662a07e9912ea8637a3cb7e27d:src/SoloCrm.Web/Endpoints/ContactEndpoints.cs:linkedin-client-id:18

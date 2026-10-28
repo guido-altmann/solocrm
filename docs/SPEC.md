@@ -479,7 +479,7 @@ Die Endpoints rufen dieselben Handler wie die UI; Validierung, Audit und Domain 
 | CSV | CsvHelper |
 | Markdown | Markdig (Activity-Body) |
 | Tests | xUnit, AwesomeAssertions (oder Shouldly), Testcontainers.PostgreSql, bUnit, NSubstitute |
-| CI/CD | GitHub Actions (Build, Test, Image-Build → GHCR), Deployment über Coolify |
+| CI/CD | GitHub Actions (Build, Test, Secret-Scan mit gitleaks, Image-Build → GHCR; Actions per SHA gepinnt), Dependabot für NuGet, Actions und Basis-Images, Deployment über Coolify (ADR-009) |
 
 ### 7.2 Solution-Struktur
 ```
@@ -694,3 +694,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.8 | 2026-10-26 | Auth-Härtung nach externem Audit (SOL-30): Kontosperre, Passwortregeln, Rate-Limit für Passkey-Optionen (US-21, 6) |
 | 1.9 | 2026-10-27 | Darstellung und Header nach externem Audit (SOL-32): Bilder im Activity-Body als Link statt `<img>`, Ziel-URL bei irreführender Link-Beschriftung (2.3); Security-Header mit CSP (6) |
 | 1.10 | 2026-10-28 | Eigenes Rate-Limit für die Passkey-Optionen, damit das Autofill der Login-Seite das Login-Budget nicht verbraucht (SOL-37, US-21) |
+| 1.11 | 2026-10-28 | CI-Lieferkette nach externem Audit (SOL-33): Actions per SHA gepinnt, Dependabot, Secret-Scan (7.1) |

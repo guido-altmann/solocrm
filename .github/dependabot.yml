@@ -1,0 +1,41 @@
+# Weekly dependency updates (SOL-33, audit F-19). Minor and patch updates arrive grouped in one PR per
+# ecosystem; major updates come as separate PRs because they may need code changes.
+version: 2
+updates:
+  # Central Package Management: Directory.Packages.props in the repository root.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      nuget-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: build
+      include: scope
+
+  # Keeps the pinned action SHAs and their version comments up to date.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: ci
+
+  # Base images in the Dockerfile (dotnet/sdk, dotnet/aspnet).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      docker-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: build
+      include: scope
