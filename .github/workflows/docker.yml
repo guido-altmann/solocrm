@@ -75,5 +75,5 @@ jobs:
             echo "Coolify secrets not set, skipping deployment trigger."
             exit 0
           fi
-          curl --fail --silent --show-error --request GET "$COOLIFY_WEBHOOK_URL" \
+          curl --fail --silent --show-error --request POST "$COOLIFY_WEBHOOK_URL" \
             --header "Authorization: Bearer $COOLIFY_API_TOKEN"
