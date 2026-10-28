@@ -71,6 +71,9 @@ dotnet user-secrets set "Admin:InitialPassword" "<secure>" --project src/SoloCrm
 dotnet watch --project src/SoloCrm.Web
 ```
 
+## Versionierung
+Die Version wird beim Build von [GitVersion](https://gitversion.net) aus den Git-Tags (`1.11.0`, ohne Präfix) berechnet und im Drawer angezeigt. Dafür braucht der Checkout die volle Historie mit Tags (`git fetch --tags`). Der Docker-Build hat kein `.git`; CI übergibt die Version als `--build-arg APP_VERSION=…` (ohne Argument: `dev`). Konfiguration: `GitVersion.yml`.
+
 ## Tests
 ```bash
 dotnet test                                            # alle Tests (Integrationstests brauchen Docker)
