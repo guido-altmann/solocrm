@@ -26,7 +26,7 @@ Genau ein Nutzer. Die UI braucht Login (optional 2FA), die API braucht maschinel
 - **Kontosperre:** nach 10 Fehlversuchen für 15 Minuten. Bewusst kurz, weil sich nur der einzige Admin sperren lässt und Entsperren sonst nur per DB geht (`deploy/coolify.md`, Fehlersuche). Passwort, Authenticator-Code und Wiederherstellungscode zählen gemeinsam. Identity prüft und zählt die Sperre bei Wiederherstellungscodes nicht selbst; das übernimmt `LoginWithRecoveryCode`. Die Sperre ergänzt das Rate-Limit pro IP gegen verteilte Versuche.
 - **Passwortregeln:** mindestens 12 Zeichen und 4 verschiedene Zeichen, keine Pflicht-Zeichenklassen (NIST SP 800-63B). Gilt für neue Passwörter; das bestehende bleibt gültig.
 - **Cookies:** Alle Identity-Cookies explizit `HttpOnly` und `SameSite=Lax`, außerhalb von Development immer `Secure`; in Development folgt `Secure` dem Schema, weil lokal und in den Integrationstests `http` läuft. Anmelde-Cookie 14 Tage, gleitend.
-- **Rate-Limit auch für `PasskeyRequestOptions`:** Der anonyme Endpunkt teilt das Login-Budget.
+- **Rate-Limit auch für `PasskeyRequestOptions`:** Der anonyme Endpunkt ist pro IP auf 20 Anfragen pro Minute begrenzt, mit eigenem Budget (SOL-37). Ursprünglich teilte er das Login-Budget; da die Login-Seite die Optionen bei jedem Laden für das Passkey-Autofill abruft, landete man so schon nach zwei Fehleingaben bei 429.
 - **Security-Events** (Warning): `Failed sign-in attempt.`, `User account locked out.`, `Sign-in rate limit exceeded`, ohne E-Mail-Adresse und ohne Client-IP (Logs enthalten nur Ids, `docs/datenschutz.md`).
 
 ## Betrachtete Optionen

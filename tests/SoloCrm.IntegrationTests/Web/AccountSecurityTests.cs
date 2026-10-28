@@ -134,21 +134,35 @@ public sealed partial class AccountSecurityTests(PostgresFixture postgres) : ICl
     }
 
     [Fact]
-    public async Task PasskeyRequestOptions_TooManyRequests_AreRateLimitedLikeTheLogin()
+    public async Task PasskeyRequestOptions_TooManyRequests_AreRateLimited()
     {
         var client = CreateClient();
-        var token = AntiforgeryTokenRegex().Match(await client.GetStringAsync("/Account/Login", Ct)).Groups[1].Value;
+        var token = await LoginAntiforgeryTokenAsync(client);
 
-        HttpResponseMessage? last = null;
-        for (var i = 0; i <= LoginRateLimiting.PermitLimit; i++)
+        for (var i = 0; i < LoginRateLimiting.PasskeyOptionsPermitLimit; i++)
         {
-            last = await client.PostAsync(
-                $"/Account/PasskeyRequestOptions?username={Uri.EscapeDataString(AdminEmail)}",
-                new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = token }),
-                Ct);
+            (await PostPasskeyRequestOptionsAsync(client, token)).StatusCode.Should().Be(HttpStatusCode.OK);
         }
 
-        last!.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        (await PostPasskeyRequestOptionsAsync(client, token)).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task PasskeyRequestOptions_AutofillOnEveryLoginPage_DoesNotUseLoginBudget()
+    {
+        var client = CreateClient();
+
+        // Each failed attempt re-renders the login page, whose passkey autofill fetches the options again.
+        for (var i = 0; i < LoginRateLimiting.PermitLimit - 1; i++)
+        {
+            (await PostPasskeyRequestOptionsAsync(client, await LoginAntiforgeryTokenAsync(client))).StatusCode.Should().Be(HttpStatusCode.OK);
+            (await WebLogin.PostAsync(client, AdminEmail, "wrong-password", Ct)).StatusCode.Should().NotBe(HttpStatusCode.TooManyRequests);
+        }
+
+        (await PostPasskeyRequestOptionsAsync(client, await LoginAntiforgeryTokenAsync(client))).StatusCode.Should().Be(HttpStatusCode.OK);
+        var login = await WebLogin.PostAsync(client, AdminEmail, AdminPassword, Ct);
+
+        login.StatusCode.Should().Be(HttpStatusCode.Redirect);
     }
 
     [Fact]
@@ -233,6 +247,15 @@ public sealed partial class AccountSecurityTests(PostgresFixture postgres) : ICl
         fields["__RequestVerificationToken"] = AntiforgeryTokenRegex().Match(page).Groups[1].Value;
         return await client.PostAsync(path, new FormUrlEncodedContent(fields), Ct);
     }
+
+    private static async Task<string> LoginAntiforgeryTokenAsync(HttpClient client) =>
+        AntiforgeryTokenRegex().Match(await client.GetStringAsync("/Account/Login", Ct)).Groups[1].Value;
+
+    private static Task<HttpResponseMessage> PostPasskeyRequestOptionsAsync(HttpClient client, string token) =>
+        client.PostAsync(
+            $"/Account/PasskeyRequestOptions?username={Uri.EscapeDataString(AdminEmail)}",
+            new FormUrlEncodedContent(new Dictionary<string, string> { ["__RequestVerificationToken"] = token }),
+            Ct);
 
     private HttpClient CreateClient() => _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 

@@ -6,13 +6,18 @@ namespace SoloCrm.Web.Hosting;
 /// <summary>
 /// Throttles sign-in attempts per client IP (SPEC 6: rate limiting on login).
 /// Only POSTs count, so rendering the login forms is never limited. All login forms
-/// (password, 2FA, recovery code) share one budget per IP.
+/// (password, 2FA, recovery code) share one budget per IP. The passkey request options have a separate, larger
+/// budget: the login page fetches them on every load for passkey autofill (SOL-37).
 /// </summary>
 public static partial class LoginRateLimiting
 {
     public const string PolicyName = "login";
 
     public const int PermitLimit = 5;
+
+    public const string PasskeyOptionsPolicyName = "passkey-options";
+
+    public const int PasskeyOptionsPermitLimit = 20;
 
     public static readonly TimeSpan Window = TimeSpan.FromMinutes(1);
 
@@ -23,26 +28,29 @@ public static partial class LoginRateLimiting
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = OnRejectedAsync;
 
-            options.AddPolicy(PolicyName, context =>
-            {
-                if (!HttpMethods.IsPost(context.Request.Method))
-                {
-                    return RateLimitPartition.GetNoLimiter(string.Empty);
-                }
-
-                // Real client IP: UseForwardedHeaders runs before the rate limiter.
-                var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-
-                return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = PermitLimit,
-                    Window = Window,
-                    QueueLimit = 0,
-                });
-            });
+            options.AddPolicy(PolicyName, context => PerClientIp(context, PermitLimit));
+            options.AddPolicy(PasskeyOptionsPolicyName, context => PerClientIp(context, PasskeyOptionsPermitLimit));
         });
 
         return services;
+    }
+
+    private static RateLimitPartition<string> PerClientIp(HttpContext context, int permitLimit)
+    {
+        if (!HttpMethods.IsPost(context.Request.Method))
+        {
+            return RateLimitPartition.GetNoLimiter(string.Empty);
+        }
+
+        // Real client IP: UseForwardedHeaders runs before the rate limiter.
+        var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = permitLimit,
+            Window = Window,
+            QueueLimit = 0,
+        });
     }
 
     private static async ValueTask OnRejectedAsync(OnRejectedContext context, CancellationToken cancellationToken)

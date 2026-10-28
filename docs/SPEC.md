@@ -405,7 +405,7 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 **US-21 · Login & 2FA** · It. 1 (Login) / It. 6 (2FA)
 - AK1: Ein einziger User, angelegt per Seed aus Umgebungsvariablen; keine Selbstregistrierung.
 - AK2: TOTP-2FA ist optional aktivierbar.
-- Umsetzung: Einrichtung mit QR-Code (serverseitig als SVG) und Schlüssel als Text, Wiederherstellungscodes, Deaktivieren und Zurücksetzen; Passkeys als Alternative; Login-Rate-Limit gilt auch für Code, Wiederherstellungscode und die Passkey-Optionen; nach 10 Fehlversuchen ist das Konto für 15 Minuten gesperrt; Passwörter mindestens 12 Zeichen (SOL-30, ADR-004). Kontoseiten deutsch im App-Theme; E-Mail ändern, „Personal Data“ und die auf E-Mail-Versand angewiesenen Seiten sind entfernt (ADR-004).
+- Umsetzung: Einrichtung mit QR-Code (serverseitig als SVG) und Schlüssel als Text, Wiederherstellungscodes, Deaktivieren und Zurücksetzen; Passkeys als Alternative; Login-Rate-Limit gilt auch für Code und Wiederherstellungscode, die Passkey-Optionen haben ein eigenes Limit (20 pro Minute und IP, SOL-37); nach 10 Fehlversuchen ist das Konto für 15 Minuten gesperrt; Passwörter mindestens 12 Zeichen (SOL-30, ADR-004). Kontoseiten deutsch im App-Theme; E-Mail ändern, „Personal Data“ und die auf E-Mail-Versand angewiesenen Seiten sind entfernt (ADR-004).
 
 ---
 
@@ -693,3 +693,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.7 | 2026-10-26 | Eingabegrenzen nach externem Audit (SOL-31): `Activity.Body` und `Organization.Notes` höchstens 100.000 Zeichen (2.3), Mail-Text vor der Bereinigung auf 1 Mio. Zeichen begrenzt, `page` höchstens 10.000 (5) |
 | 1.8 | 2026-10-26 | Auth-Härtung nach externem Audit (SOL-30): Kontosperre, Passwortregeln, Rate-Limit für Passkey-Optionen (US-21, 6) |
 | 1.9 | 2026-10-27 | Darstellung und Header nach externem Audit (SOL-32): Bilder im Activity-Body als Link statt `<img>`, Ziel-URL bei irreführender Link-Beschriftung (2.3); Security-Header mit CSP (6) |
+| 1.10 | 2026-10-28 | Eigenes Rate-Limit für die Passkey-Optionen, damit das Autofill der Login-Seite das Login-Budget nicht verbraucht (SOL-37, US-21) |

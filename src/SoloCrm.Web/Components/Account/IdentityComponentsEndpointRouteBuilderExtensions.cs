@@ -63,7 +63,7 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             return TypedResults.Content(optionsJson, contentType: "application/json");
         })
         .AllowAnonymous() // Used by the login page before the user is signed in.
-        .RequireRateLimiting(SoloCrm.Web.Hosting.LoginRateLimiting.PolicyName);
+        .RequireRateLimiting(SoloCrm.Web.Hosting.LoginRateLimiting.PasskeyOptionsPolicyName);
 
         return accountGroup;
     }
