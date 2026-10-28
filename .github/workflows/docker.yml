@@ -47,8 +47,10 @@ jobs:
       - id: version
         run: |
           dotnet restore src/SoloCrm.Web/SoloCrm.Web.csproj
-          version=$(dotnet msbuild src/SoloCrm.Web/SoloCrm.Web.csproj -t:GetVersion -getProperty:GitVersion_FullSemVer \
-            | python3 -c 'import json,sys; print(json.load(sys.stdin)["Properties"]["GitVersion_FullSemVer"])')
+          # With a single -getProperty MSBuild prints the bare value, not JSON.
+          version=$(dotnet msbuild src/SoloCrm.Web/SoloCrm.Web.csproj -t:GetVersion -getProperty:GitVersion_FullSemVer | tail -n 1)
+          if [ -z "$version" ]; then echo "GitVersion returned no version" >&2; exit 1; fi
+          echo "Version: $version"
           echo "full=$version" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
