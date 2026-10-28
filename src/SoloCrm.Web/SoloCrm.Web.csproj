@@ -20,6 +20,11 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <!-- Derives the app version from git tags; shown in the drawer (see AppVersion). -->
+    <PackageReference Include="GitVersion.MsBuild">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="MudBlazor" />
     <PackageReference Include="Markdig" />
     <!-- QR code for setting up the authenticator app, rendered as SVG on the server (iteration 6 decision 7). -->

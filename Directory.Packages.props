@@ -33,6 +33,10 @@
     <PackageVersion Include="FolkerKinzel.VCards" Version="8.2.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Build">
+    <PackageVersion Include="GitVersion.MsBuild" Version="6.8.2" />
+  </ItemGroup>
+
   <ItemGroup Label="Tests">
     <PackageVersion Include="xunit.v3" Version="4.0.2" />
     <PackageVersion Include="AwesomeAssertions" Version="9.6.0" />

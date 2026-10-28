@@ -34,9 +34,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0 # GitVersion needs the full history and tags
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
 
       - id: rev
         run: echo "short=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_OUTPUT"
+
+      # The Docker build context has no .git, so the version is computed here and passed as build arg.
+      - id: version
+        run: |
+          dotnet restore src/SoloCrm.Web/SoloCrm.Web.csproj
+          version=$(dotnet msbuild src/SoloCrm.Web/SoloCrm.Web.csproj -t:GetVersion -getProperty:GitVersion_FullSemVer \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["Properties"]["GitVersion_FullSemVer"])')
+          echo "full=$version" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -60,6 +73,7 @@ jobs:
         with:
           context: .
           push: true
+          build-args: APP_VERSION=${{ steps.version.outputs.full }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
