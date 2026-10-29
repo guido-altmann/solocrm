@@ -3,11 +3,12 @@
 
 <AuthorizeView>
     <Authorized>
-        <MudMenu Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit"
+        <MudMenu @ref="_menu" Icon="@Icons.Material.Filled.AccountCircle" Color="Color.Inherit"
                  AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
                  aria-label="Benutzermenü">
             <MudMenuItem Disabled="true">@context.User.Identity?.Name</MudMenuItem>
-            <MudMenuItem Href="Account/Manage" ForceLoad="true" Icon="@Icons.Material.Filled.ManageAccounts">Konto</MudMenuItem>
+            <MudMenuItem AutoClose="false" OnClick="OpenAccountAsync" Icon="@Icons.Material.Filled.ManageAccounts"
+                         data-testid="user-menu-account">Konto</MudMenuItem>
             <MudDivider />
             <form action="Account/Logout" method="post">
                 <AntiforgeryToken />
@@ -26,6 +27,7 @@
 </AuthorizeView>
 
 @code {
+    private MudMenu? _menu;
     private string? _currentUrl;
 
     protected override void OnInitialized()
@@ -38,6 +40,21 @@
     {
         _currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// Closes the menu while the circuit is still connected, then navigates with a full reload.
+    /// A <c>Href</c> + <c>ForceLoad</c> menu item navigates first and closes afterwards, which fails
+    /// with a JSDisconnectedException once the reload has dropped the circuit.
+    /// </summary>
+    private async Task OpenAccountAsync()
+    {
+        if (_menu is not null)
+        {
+            await _menu.CloseMenuAsync();
+        }
+
+        NavigationManager.NavigateTo("Account/Manage", forceLoad: true);
     }
 
     public void Dispose() => NavigationManager.LocationChanged -= OnLocationChanged;
