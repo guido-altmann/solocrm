@@ -48,8 +48,7 @@ internal static class TagRules
     public static async Task<string> NextColorAsync(ICrmDbContext db, CancellationToken cancellationToken)
     {
         var previous = await db.Tags
-            .OrderByDescending(t => t.CreatedAt)
-            .ThenByDescending(t => t.Id)
+            .OrderByDescending(t => t.Sequence)
             .Select(t => t.Color)
             .FirstOrDefaultAsync(cancellationToken);
         return TagPalette.Next(previous);

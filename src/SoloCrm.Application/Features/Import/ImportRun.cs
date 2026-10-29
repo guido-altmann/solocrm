@@ -134,14 +134,17 @@ internal static class ImportRun
     /// <summary>The color for the next new tag; new tags get the palette colors in turn (iteration 4 decision 7).</summary>
     public static Task<string?> LastTagColorAsync(ICrmDbContext db, CancellationToken cancellationToken) =>
         db.Tags
-            .OrderByDescending(t => t.CreatedAt)
-            .ThenByDescending(t => t.Id)
+            .OrderByDescending(t => t.Sequence)
             .Select(t => t.Color)
             .FirstOrDefaultAsync(cancellationToken);
 
-    /// <summary>An existing tag with this name (case-insensitive, citext) or a new one with the next palette color.</summary>
+    /// <summary>
+    /// An existing tag with this name (case-insensitive, citext) or a new one with the next palette color. A new tag is saved
+    /// at once in its own context: tags of one <c>SaveChanges</c> are not inserted in the order they were added, so only
+    /// this keeps <see cref="Tag.Sequence"/> in creation order. The tag survives a block that fails later; a retry reuses it.
+    /// </summary>
     public static async Task<Tag> ResolveTagAsync(
-        ICrmDbContext db, Dictionary<string, Tag> cache, string name, Func<string?> lastColor, Action<string> useColor, CancellationToken cancellationToken)
+        ICrmDbContext db, ICrmDbContextFactory dbFactory, Dictionary<string, Tag> cache, string name, Func<string?> lastColor, Action<string> useColor, CancellationToken cancellationToken)
     {
         var normalized = Tag.NormalizeName(name);
         if (cache.TryGetValue(normalized, out var tag))
@@ -153,8 +156,13 @@ internal static class ImportRun
         if (tag is null)
         {
             var color = TagPalette.Next(lastColor());
-            tag = Tag.Create(normalized, color);
-            db.Tags.Add(tag);
+            await using (var tagDb = await dbFactory.CreateDbContextAsync(cancellationToken))
+            {
+                tagDb.Tags.Add(Tag.Create(normalized, color));
+                await tagDb.SaveChangesAsync(cancellationToken);
+            }
+
+            tag = await db.Tags.FirstAsync(t => t.Name == normalized, cancellationToken);
             useColor(color);
         }
 

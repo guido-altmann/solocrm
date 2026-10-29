@@ -16,6 +16,7 @@ internal sealed class TagConfiguration : IEntityTypeConfiguration<Tag>
         builder.Property(t => t.Name).HasColumnType("citext");
         builder.HasIndex(t => t.Name).IsUnique();
         builder.Property(t => t.Color).HasMaxLength(7);
+        builder.Property(t => t.Sequence).UseIdentityByDefaultColumn().ValueGeneratedOnAdd();
     }
 }
 
