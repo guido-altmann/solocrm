@@ -296,6 +296,7 @@ Außer `Ctrl/Cmd + K` wirken die Kürzel nur außerhalb von Eingabefeldern und D
 ### 3.4 Layout
 - Linke Navigation (einklappbar): Heute, Pipeline, Kontakte, Organisationen, Einstellungen
 - Obere Leiste: Suchfeld (öffnet per Klick oder `Enter` die Command Palette; bewusst nicht schon beim Fokus, damit Tab-Navigation keinen Dialog öffnet, WCAG 3.2.1), Quick-Add-Button, Theme-Toggle
+- Fuß der Navigation: Versionsnummer der App (aus den Git-Tags, siehe 7.6) über dem Copyright-Link
 - Responsive: Unter 960 px wird die Navigation zum Drawer und die Detailansicht einspaltig.
 
 ---
@@ -569,6 +570,7 @@ public static class CreateContact
 
 ### 7.6 Deployment (Coolify)
 - **Image:** Multi-Stage-Dockerfile (`sdk` → `aspnet`, non-root, Port 8080), gebaut in GitHub Actions (nur nach grünem CI auf `main`) und nach GHCR gepusht; Coolify zieht das Image, ausgelöst per Deploy-Webhook.
+- **Versionierung:** `GitVersion.MsBuild` berechnet die Version aus den Git-Tags (Format `1.12.0`, ohne Präfix; `GitVersion.yml`). Der Docker-Build hat kein `.git`: `docker.yml` berechnet die Version und übergibt sie als Build-Arg `APP_VERSION` (ohne Argument: `dev`); die GitVersion-Task ist im Image abgeschaltet. CI-Jobs mit GitVersion checken mit `fetch-depth: 0` aus (ADR-015).
 - **Datenbank:** Postgres als Coolify-Ressource mit aktivierten, geplanten S3-Backups.
 - **Persistente Volumes:** `/app/keys` für ASP.NET Data-Protection-Keys (kritisch: sonst Logout bei jedem Deploy).
 - **Reverse Proxy:** Traefik (Coolify); `UseForwardedHeaders` mit `KnownNetworks` bzw. `KnownProxies` passend konfiguriert; WebSockets für SignalR aktiv.
@@ -695,3 +697,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.9 | 2026-10-27 | Darstellung und Header nach externem Audit (SOL-32): Bilder im Activity-Body als Link statt `<img>`, Ziel-URL bei irreführender Link-Beschriftung (2.3); Security-Header mit CSP (6) |
 | 1.10 | 2026-10-28 | Eigenes Rate-Limit für die Passkey-Optionen, damit das Autofill der Login-Seite das Login-Budget nicht verbraucht (SOL-37, US-21) |
 | 1.11 | 2026-10-28 | CI-Lieferkette nach externem Audit (SOL-33): Actions per SHA gepinnt, Dependabot, Secret-Scan (7.1) |
+| 1.12 | 2026-10-29 | Versionierung mit GitVersion (SOL-39, ADR-015): Version aus Git-Tags, Anzeige im Navigations-Drawer (3.4), Build-Arg `APP_VERSION` für den Docker-Build (7.6) |
