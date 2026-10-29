@@ -85,6 +85,8 @@ public static class ImportContacts
 
         public string? LastTagColor { get; set; }
 
+        public required ICrmDbContextFactory DbFactory { get; init; }
+
         public static string EmailKey(string email) => "email:" + email.Trim().ToUpperInvariant();
 
         public static string HubSpotKey(string id) => "hubspot:" + id.Trim();
@@ -96,7 +98,7 @@ public static class ImportContacts
         public static async Task<ImportState> LoadAsync(ICrmDbContextFactory dbFactory, CancellationToken cancellationToken)
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var state = new ImportState();
+            var state = new ImportState { DbFactory = dbFactory };
 
             var contacts = await db.Contacts.AsNoTracking()
                 .Select(c => new { c.Id, c.Email, c.ExtraFields })
@@ -336,7 +338,7 @@ public static class ImportContacts
 
         private async Task AssignTagAsync(Guid contactId, string name, bool isNew, CancellationToken cancellationToken)
         {
-            var tag = await ImportRun.ResolveTagAsync(db, _tags, name, () => state.LastTagColor, c => state.LastTagColor = c, cancellationToken);
+            var tag = await ImportRun.ResolveTagAsync(db, state.DbFactory, _tags, name, () => state.LastTagColor, c => state.LastTagColor = c, cancellationToken);
             if (isNew || !await db.ContactTags.AnyAsync(t => t.ContactId == contactId && t.TagId == tag.Id, cancellationToken))
             {
                 db.ContactTags.Add(new ContactTag(contactId, tag));

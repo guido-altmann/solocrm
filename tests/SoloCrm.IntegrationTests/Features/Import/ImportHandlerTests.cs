@@ -242,8 +242,15 @@ public sealed class ImportHandlerTests(PostgresFixture postgres) : HandlerTest(p
         await ImportAsync(Csv("Nachname,Tag", ["Lovelace,Kunde", "Hopper,Partner"]), DuplicateHandling.Skip);
 
         await using var db = OpenDb();
-        (await db.Tags.OrderBy(t => t.CreatedAt).ThenBy(t => t.Id).Select(t => t.Color).ToListAsync(Ct))
-            .Should().Equal(TagPalette.Colors[0], TagPalette.Colors[1], TagPalette.Colors[2]);
+        var colors = await db.Tags.ToDictionaryAsync(t => t.Name, t => t.Color, Ct);
+        colors.Should().Contain(new Dictionary<string, string>
+        {
+            ["Bestand"] = TagPalette.Colors[0],
+            ["Kunde"] = TagPalette.Colors[1],
+            ["Partner"] = TagPalette.Colors[2],
+        });
+        (await SendAsync<CreateTag.Command, CreateTag.Result>(new CreateTag.Command("Danach"))).Value.Color
+            .Should().Be(TagPalette.Next(colors["Partner"]));
     }
 
     [Fact]

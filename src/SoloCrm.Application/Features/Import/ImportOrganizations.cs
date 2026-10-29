@@ -77,6 +77,8 @@ public static class ImportOrganizations
 
         public string? LastTagColor { get; set; }
 
+        public required ICrmDbContextFactory DbFactory { get; init; }
+
         public static string NameKey(string name) => "name:" + name.Trim().ToUpperInvariant();
 
         public static string HubSpotKey(string id) => "hubspot:" + id.Trim();
@@ -84,7 +86,7 @@ public static class ImportOrganizations
         public static async Task<ImportState> LoadAsync(ICrmDbContextFactory dbFactory, CancellationToken cancellationToken)
         {
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
-            var state = new ImportState();
+            var state = new ImportState { DbFactory = dbFactory };
 
             // Active before archived, oldest first: the first entry per name wins (like FindOrganizationByName).
             var organizations = await db.Organizations.AsNoTracking()
@@ -244,7 +246,7 @@ public static class ImportOrganizations
 
         private async Task AssignTagAsync(Guid organizationId, string name, bool isNew, CancellationToken cancellationToken)
         {
-            var tag = await ImportRun.ResolveTagAsync(db, _tags, name, () => state.LastTagColor, c => state.LastTagColor = c, cancellationToken);
+            var tag = await ImportRun.ResolveTagAsync(db, state.DbFactory, _tags, name, () => state.LastTagColor, c => state.LastTagColor = c, cancellationToken);
             if (isNew || !await db.OrganizationTags.AnyAsync(t => t.OrganizationId == organizationId && t.TagId == tag.Id, cancellationToken))
             {
                 db.OrganizationTags.Add(new OrganizationTag(organizationId, tag));

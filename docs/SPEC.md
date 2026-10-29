@@ -208,6 +208,7 @@ Titel und Fälligkeit sind bearbeitbar; Tasks lassen sich hart löschen (AuditEn
 |---|---|---|
 | Name | citext(50) | ✅ eindeutig (case-insensitive); Leerraum wird normalisiert („ Kunde   A “ → „Kunde A“) |
 | Color | string(7) | Hex aus einer festen Palette von 12 Farben; weiße Schrift hat auf jeder Farbe einen Kontrast ≥ 4,5:1 (hell und dunkel); neue Tags bekommen reihum die Farbe nach der des zuletzt angelegten Tags |
+| Sequence | long | fortlaufende Nummer, von der Datenbank vergeben (Identity); bestimmt „zuletzt angelegt“, weil `CreatedAt` und UUIDv7 bei Tags derselben Millisekunde nicht ordnen. Der Import speichert neue Tags einzeln, damit die Nummer der Anlagereihenfolge folgt |
 
 n:m-Beziehungen zu Contact, Organization und Opportunity über drei typisierte Join-Tabellen (`contact_tags`, `organization_tags`, `opportunity_tags`, `ON DELETE CASCADE`). Neue Tags entstehen inline in der Chip-Eingabe („Neu anlegen: …“); ein Name, der sich nur in Groß-/Kleinschreibung unterscheidet, verwendet den bestehenden Tag. Zuordnungen werden als `Updated` des Datensatzes mit dem Feld `Tags` auditiert (alter bzw. neuer Wert = Tag-Name), erscheinen aber nicht in der Timeline (2.5). Beim Löschen eines Tags werden seine Zuordnungen einzeln entfernt, sodass jeder betroffene Datensatz seinen AuditEntry erhält.
 
@@ -698,3 +699,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.10 | 2026-10-28 | Eigenes Rate-Limit für die Passkey-Optionen, damit das Autofill der Login-Seite das Login-Budget nicht verbraucht (SOL-37, US-21) |
 | 1.11 | 2026-10-28 | CI-Lieferkette nach externem Audit (SOL-33): Actions per SHA gepinnt, Dependabot, Secret-Scan (7.1) |
 | 1.12 | 2026-10-29 | Versionierung mit GitVersion (SOL-39, ADR-015): Version aus Git-Tags, Anzeige im Navigations-Drawer (3.4), Build-Arg `APP_VERSION` für den Docker-Build (7.6) |
+| 1.13 | 2026-10-29 | Tag-Farbe „reihum“ deterministisch (SOL-36): `Sequence` am Tag (2.3), Import speichert neue Tags einzeln |

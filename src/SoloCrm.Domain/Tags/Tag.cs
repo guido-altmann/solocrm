@@ -25,6 +25,12 @@ public sealed class Tag : Entity, IAuditable
 
     public string Name { get; private set; }
 
+    /// <summary>
+    /// Creation order, assigned by the database. <c>CreatedAt</c> and the UUIDv7 id are not monotonic for tags
+    /// created in the same millisecond (e.g. one import), so only this decides which tag is the latest.
+    /// </summary>
+    public long Sequence { get; private set; }
+
     /// <summary>Hex color from <see cref="TagPalette"/>, e.g. <c>#1D4ED8</c>.</summary>
     public string Color { get; private set; }
 
