@@ -1,9 +1,21 @@
 name: Build & Test
 
+# Feature branches are built via their PR only; a push trigger for all branches would build every PR commit twice.
+# Changes that affect neither build, tests nor image (docs, editor settings, dev compose) do not trigger a run.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
+    paths-ignore: &non-build-paths
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".gitignore"
+      - ".vscode/**"
+      - ".idea/**"
+      - ".github/dependabot.yml"
+      - "deploy/docker-compose.dev.yml"
   pull_request:
+    paths-ignore: *non-build-paths
   workflow_dispatch:
 
 concurrency:
