@@ -222,7 +222,7 @@ n:m-Beziehungen zu Contact, Organization und Opportunity über drei typisierte J
 | **AppSetting** | Anwenderseitige Einstellungen (Key/Value, typisiert gelesen über `IAppSettings`) | Key, Value (jsonb), UpdatedAt – z. B. `HoursPerDay`, `RetainerValuationMonths`, `DefaultPricingModel`, `DefaultCurrency`, `StaleOpportunityDays` |
 | **MailMessage** | Verknüpft eine importierte E-Mail mit ihrer Activity und verhindert Dubletten (ADR-013); ohne Inhalt | ActivityId (FK, `ON DELETE CASCADE`), Provider, ExternalId, InternetMessageId (eindeutig je Provider), Folder (`Inbox`/`Sent`) |
 | **MailSyncState** | Fortsetzungspunkt des Mail-Abgleichs je Provider und Ordner | Provider, Folder, DeltaToken?, LastSyncedAt? |
-| **MailConnection** | Das verbundene Postfach (ADR-013): Provider (eindeutig), Account, `ProtectedRefreshToken` (per Data Protection verschlüsselt), ConnectedAt, LastSyncedAt?, LastError? | Provider, Account, ProtectedRefreshToken, ConnectedAt, LastSyncedAt?, LastError? |
+| **MailConnection** | Das verbundene Postfach (ADR-013): Provider (eindeutig), Account, `ProtectedRefreshToken` (per Data Protection verschlüsselt), ConnectedAt, LastSyncedAt?, LastError?, IsReconnectRequired | Provider, Account, ProtectedRefreshToken, ConnectedAt, LastSyncedAt?, LastError?, IsReconnectRequired (Anmeldung abgelehnt; Abgleich pausiert bis zum erneuten Verbinden, SOL-34) |
 | **CalendarFeed** | Geheimes Token des abonnierbaren ICS-Feeds der Tasks (SOL-6); höchstens ein Eintrag, Neuerzeugen ersetzt ihn | TokenHash (SHA-256, eindeutig), LastUsedAt? (höchstens minütlich aktualisiert) |
 | **NextcloudConnection** | Die verbundene Nextcloud (ADR-014), höchstens ein Eintrag | ServerUrl, UserName, ProtectedAppPassword (per Data Protection verschlüsselt), AddressBookHref?, TaskListHref?, TaskSyncToken? (RFC 6578, Fortsetzungspunkt der Eingangsphase), ConnectedAt, LastSyncedAt?, LastError?, IsCredentialRejected (nach `401` pausiert, bis neue Zugangsdaten gespeichert werden) |
 | **NextcloudSyncItem** | Zuordnung eines Datensatzes zu seiner Kopie in Nextcloud (ADR-014); **ohne** FK, damit die Zeile ein hartes Löschen überdauert, bis die Kopie entfernt ist | EntityType (`Contact`/`Task`), EntityId (eindeutig je Typ), Href, ETag?, ContentHash (SHA-256 der zuletzt gesendeten Payload) |
@@ -292,7 +292,7 @@ Außer `Ctrl/Cmd + K` wirken die Kürzel nur außerhalb von Eingabefeldern und D
 | S3 | **Kontakte** | `/contacts` | Tabelle mit Suche (dieselbe tippfehlertolerante Suche wie die Command Palette), Filter (Organisation, Tags ODER-verknüpft, Quelle), Sortierung, Paging (serverseitig) |
 | S4 | **Organisationen** | `/organizations` | analog S3, Filter nach Typ |
 | S5 | **Detailansicht** | `/contacts/{id}`, `/organizations/{id}`, `/opportunities/{id}` | Links Stammdaten (inline editierbar ab It. 4; ersetzt dort den Bearbeiten-Dialog; bei Anfragen Preis und Laufzeit als Gruppe mit Live-Wert, Wechsel auf „Verloren“ fragt den Absagegrund ab; Archivieren im Kopf; bei Kontakten im Menü ⋮ „Daten exportieren (DSGVO)“ und „Endgültig löschen (DSGVO)“, getrennt vom Archivieren), Tags als Chip-Eingabe, verknüpfte Objekte, offene Tasks; rechts die Timeline mit Eingabe; `N` fokussiert die Eingabe |
-| S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Kalender-Feed (ICS-Abo der Tasks, SOL-6), Webhooks, Import, E-Mail (Microsoft-365-Postfach verbinden und trennen, Status und „Jetzt abgleichen“, ADR-013), Nextcloud (Server-Adresse, Benutzername und App-Passwort; Status mit Anzahl der Kontakte im Adressbuch und der Aufgaben in der Liste, „Jetzt abgleichen“, „Zugangsdaten ändern“, „Verbindung trennen“ mit Hinweis, dass die Sammlungen in Nextcloud bleiben, ADR-014), Konto (Links zu Passwort, 2FA und Passkeys unter `/Account/Manage`, statisch gerendert) |
+| S6 | **Einstellungen** | `/settings` | Stages (Reihenfolge, Name), Tags, Preis-Defaults (Modell, Währung, Stunden/Tag, Retainer-Bewertungszeitraum), API-Keys, Kalender-Feed (ICS-Abo der Tasks, SOL-6), Webhooks, Import, E-Mail (Microsoft-365-Postfach verbinden und trennen, Status und „Jetzt abgleichen“; bei abgelaufener Anmeldung Hinweis „pausiert“ und „Neu verbinden“, ADR-013), Nextcloud (Server-Adresse, Benutzername und App-Passwort; Status mit Anzahl der Kontakte im Adressbuch und der Aufgaben in der Liste, „Jetzt abgleichen“, „Zugangsdaten ändern“, „Verbindung trennen“ mit Hinweis, dass die Sammlungen in Nextcloud bleiben, ADR-014), Konto (Links zu Passwort, 2FA und Passkeys unter `/Account/Manage`, statisch gerendert) |
 
 ### 3.4 Layout
 - Linke Navigation (einklappbar): Heute, Pipeline, Kontakte, Organisationen, Einstellungen
@@ -386,7 +386,7 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 
 **US-17 · REST-API mit API-Key** · It. 5
 - AK1: Der Key wird in den Einstellungen erzeugt und nur einmal im Klartext angezeigt; gespeichert wird der Hash.
-- AK2: Header `X-Api-Key`; Rate-Limit 60 Requests/Minute.
+- AK2: Header `X-Api-Key`; Rate-Limit 60 Requests/Minute (je Key; zusätzlich 300 je Client-IP, SOL-34).
 - AK3: OpenAPI-Dokument unter `/openapi/v1.json`, UI via Scalar.
 
 **US-18 · Webhooks** · It. 5
@@ -407,7 +407,7 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 **US-21 · Login & 2FA** · It. 1 (Login) / It. 6 (2FA)
 - AK1: Ein einziger User, angelegt per Seed aus Umgebungsvariablen; keine Selbstregistrierung.
 - AK2: TOTP-2FA ist optional aktivierbar.
-- Umsetzung: Einrichtung mit QR-Code (serverseitig als SVG) und Schlüssel als Text, Wiederherstellungscodes, Deaktivieren und Zurücksetzen; Passkeys als Alternative; Login-Rate-Limit gilt auch für Code und Wiederherstellungscode, die Passkey-Optionen haben ein eigenes Limit (20 pro Minute und IP, SOL-37); nach 10 Fehlversuchen ist das Konto für 15 Minuten gesperrt; Passwörter mindestens 12 Zeichen (SOL-30, ADR-004). Kontoseiten deutsch im App-Theme; E-Mail ändern, „Personal Data“ und die auf E-Mail-Versand angewiesenen Seiten sind entfernt (ADR-004).
+- Umsetzung: Einrichtung mit QR-Code (serverseitig als SVG) und Schlüssel als Text, Wiederherstellungscodes, Deaktivieren und Zurücksetzen; Passkeys als Alternative; Login-Rate-Limit gilt auch für Code und Wiederherstellungscode, die Passkey-Optionen haben ein eigenes Limit (20 pro Minute und IP, SOL-37); nach 10 Fehlversuchen ist das Konto für 15 Minuten gesperrt; Passwörter mindestens 12 Zeichen (SOL-30, ADR-004). Passkeys, Authenticator-App, 2FA-Deaktivierung und Wiederherstellungscodes nur nach Passwortbestätigung (gilt 10 Minuten); danach neuer Security-Stamp und Security-Event (SOL-34, ADR-004). Kontoseiten deutsch im App-Theme; E-Mail ändern, „Personal Data“ und die auf E-Mail-Versand angewiesenen Seiten sind entfernt (ADR-004).
 
 ---
 
@@ -432,7 +432,7 @@ Basis: `/api/v1` · Auth: `X-Api-Key` · Format: JSON (camelCase, Enums als Name
 
 **Listen:** `page` 1–10.000 (beginnt bei 1), `pageSize` 1–200 (Default 50); Antwort `{ items, page, pageSize, totalCount }`. `search` ist dieselbe tippfehlertolerante Suche wie in der UI. `tag` (Name oder Id, mehrfach angebbar) filtert ODER-verknüpft; existiert keiner der Tags, ist die Liste leer. Archivierte Datensätze erscheinen nicht.
 
-**Statuscodes:** `200`/`201` (mit `Location` und dem angelegten Datensatz), `400` Validierung (`errors` je Feld in camelCase; unbekannte Felder im `PATCH` sind ein Fehler), `401` ohne, mit ungültigem oder widerrufenem Key, `404` unbekannte Id oder unbekannter Endpunkt, `409` Konflikt (z. B. `Contact.DuplicateEmail`, `Opportunity.LostReasonRequired`), `422` übrige fachliche Fehler, `429` über 60 Anfragen pro Minute und Key (mit `Retry-After`). Fachliche Fehler tragen ihren Code in `code`.
+**Statuscodes:** `200`/`201` (mit `Location` und dem angelegten Datensatz), `400` Validierung (`errors` je Feld in camelCase; unbekannte Felder im `PATCH` sind ein Fehler), `401` ohne, mit ungültigem oder widerrufenem Key, `404` unbekannte Id oder unbekannter Endpunkt, `409` Konflikt (z. B. `Contact.DuplicateEmail`, `Opportunity.LostReasonRequired`), `422` übrige fachliche Fehler, `429` über 60 Anfragen pro Minute und Key bzw. 300 pro Client-IP (mit `Retry-After`). Fachliche Fehler tragen ihren Code in `code`.
 
 Die Endpoints rufen dieselben Handler wie die UI; Validierung, Audit und Domain Events sind identisch. Beispiel-Workflows für n8n: `docs/n8n-integration.md`.
 
@@ -574,7 +574,7 @@ public static class CreateContact
 - **Versionierung:** `GitVersion.MsBuild` berechnet die Version aus den Git-Tags (Format `1.12.0`, ohne Präfix; `GitVersion.yml`). Der Docker-Build hat kein `.git`: `docker.yml` berechnet die Version und übergibt sie als Build-Arg `APP_VERSION` (ohne Argument: `dev`); die GitVersion-Task ist im Image abgeschaltet. CI-Jobs mit GitVersion checken mit `fetch-depth: 0` aus (ADR-015).
 - **Datenbank:** Postgres als Coolify-Ressource mit aktivierten, geplanten S3-Backups.
 - **Persistente Volumes:** `/app/keys` für ASP.NET Data-Protection-Keys (kritisch: sonst Logout bei jedem Deploy).
-- **Reverse Proxy:** Traefik (Coolify); `UseForwardedHeaders` mit `KnownNetworks` bzw. `KnownProxies` passend konfiguriert; WebSockets für SignalR aktiv.
+- **Reverse Proxy:** Traefik (Coolify); `UseForwardedHeaders` mit `KnownNetworks` bzw. `KnownProxies` passend konfiguriert (Liste auch kommagetrennt; ohne Angabe die privaten Netze), `ForwardLimit = 1`; WebSockets für SignalR aktiv. In Produktion `AllowedHosts` = eigene Domain und `localhost` (Healthcheck); `X-Forwarded-Host` wird nur für diese Hosts übernommen, bei `*` warnt die App beim Start (SOL-34).
 - **Migrationen:** `efbundle` im Image; Ausführung vor dem App-Start durch `deploy/entrypoint.sh` (siehe ADR-009).
 - **Health Checks:** Coolify-Healthcheck auf `/health/ready`.
 - **Konfiguration (Env):** `ConnectionStrings__Crm`, `Admin__Email`, `Admin__InitialPassword`, `Serilog__MinimumLevel__Default`, `App__BaseUrl`, `App__TimeZone` (Default `Europe/Berlin`). Anleitung: `deploy/coolify.md`.
@@ -700,3 +700,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.11 | 2026-10-28 | CI-Lieferkette nach externem Audit (SOL-33): Actions per SHA gepinnt, Dependabot, Secret-Scan (7.1) |
 | 1.12 | 2026-10-29 | Versionierung mit GitVersion (SOL-39, ADR-015): Version aus Git-Tags, Anzeige im Navigations-Drawer (3.4), Build-Arg `APP_VERSION` für den Docker-Build (7.6) |
 | 1.13 | 2026-10-29 | Tag-Farbe „reihum“ deterministisch (SOL-36): `Sequence` am Tag (2.3), Import speichert neue Tags einzeln |
+| 1.14 | 2026-11-02 | Backlog-Härtung nach externem Audit (SOL-34): Passwortbestätigung vor Faktoränderungen (US-21), API-Limit zusätzlich pro Client-IP (US-17, 5), `MailConnection.IsReconnectRequired` (2.4, S6), `AllowedHosts` und Proxy-Netze (7.6) |

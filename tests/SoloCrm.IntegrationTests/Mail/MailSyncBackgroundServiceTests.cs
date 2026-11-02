@@ -46,6 +46,17 @@ public sealed class MailSyncBackgroundServiceTests
     }
 
     [Fact]
+    public async Task SyncOnce_ReconnectRequired_DoesNotSync()
+    {
+        var connector = new FakeConnector(connected: true, reconnectRequired: true);
+        var handler = new FakeHandler(new SyncMail.Result(0, 0, 0));
+
+        await CreateService(connector, handler).SyncOnceAsync(Ct);
+
+        handler.Calls.Should().Be(0);
+    }
+
+    [Fact]
     public async Task SyncOnce_SyncFails_DoesNotThrowAndTriesAgainNextTime()
     {
         var connector = new FakeConnector(connected: true);
@@ -74,7 +85,7 @@ public sealed class MailSyncBackgroundServiceTests
         }
     }
 
-    private sealed class FakeConnector(bool connected) : IMailConnector
+    private sealed class FakeConnector(bool connected, bool reconnectRequired = false) : IMailConnector
     {
         public bool IsConfigured => true;
 
@@ -85,8 +96,10 @@ public sealed class MailSyncBackgroundServiceTests
         public Task DisconnectAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task<MailConnectionInfo?> GetConnectionAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(connected ? new MailConnectionInfo("Graph", "guido@example.test", DateTimeOffset.UnixEpoch, null, null) : null);
+            Task.FromResult(connected ? new MailConnectionInfo("Graph", "guido@example.test", DateTimeOffset.UnixEpoch, null, null, reconnectRequired) : null);
 
         public Task RecordSyncAsync(string? error, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task RequireReconnectAsync(string error, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

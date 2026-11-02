@@ -6,7 +6,7 @@
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IdentityRedirectManager RedirectManager
-@inject ILogger<EnableAuthenticator> Logger
+@inject FactorChanges FactorChanges
 
 <PageTitle>Authenticator-App einrichten · SoloCRM</PageTitle>
 
@@ -45,6 +45,7 @@ else
 @code {
     private string? message;
     private ApplicationUser? user;
+    private bool confirmed;
     private string? sharedKey;
     private string? authenticatorUri;
     private string? qrCodeSvg;
@@ -67,6 +68,12 @@ else
             return;
         }
 
+        confirmed = FactorChanges.EnsureConfirmed(HttpContext, user);
+        if (!confirmed)
+        {
+            return;
+        }
+
         await LoadSharedKeyAndQrCodeAsync(user);
     }
 
@@ -75,6 +82,11 @@ else
         if (user is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        if (!confirmed)
+        {
             return;
         }
 
@@ -91,8 +103,7 @@ else
         }
 
         await UserManager.SetTwoFactorEnabledAsync(user, true);
-        var userId = await UserManager.GetUserIdAsync(user);
-        Logger.LogInformation("User with ID '{UserId}' has enabled 2FA with an authenticator app.", userId);
+        await FactorChanges.CompleteAsync(user, "2FA enabled");
 
         message = "Die Authenticator-App ist eingerichtet, die Zwei-Faktor-Anmeldung ist aktiv.";
 

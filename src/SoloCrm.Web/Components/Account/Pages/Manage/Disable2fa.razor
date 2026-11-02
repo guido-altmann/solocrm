@@ -5,7 +5,7 @@
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IdentityRedirectManager RedirectManager
-@inject ILogger<Disable2fa> Logger
+@inject FactorChanges FactorChanges
 
 <PageTitle>Zwei-Faktor-Anmeldung deaktivieren · SoloCRM</PageTitle>
 
@@ -23,6 +23,7 @@
 
 @code {
     private ApplicationUser? user;
+    private bool confirmed;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -33,6 +34,12 @@
         if (user is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        confirmed = FactorChanges.EnsureConfirmed(HttpContext, user);
+        if (!confirmed)
+        {
             return;
         }
 
@@ -51,14 +58,18 @@
             return;
         }
 
+        if (!confirmed)
+        {
+            return;
+        }
+
         var disable2faResult = await UserManager.SetTwoFactorEnabledAsync(user, false);
         if (!disable2faResult.Succeeded)
         {
             throw new InvalidOperationException("Unexpected error occurred disabling 2FA.");
         }
 
-        var userId = await UserManager.GetUserIdAsync(user);
-        Logger.LogInformation("User with ID '{UserId}' has disabled 2fa.", userId);
+        await FactorChanges.CompleteAsync(user, "2FA disabled");
         RedirectManager.RedirectToWithStatus(
             "Account/Manage/TwoFactorAuthentication",
             "Die Zwei-Faktor-Anmeldung ist deaktiviert.",

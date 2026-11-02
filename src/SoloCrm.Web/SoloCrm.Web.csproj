@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SoloCrm.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\SoloCrm.Application\SoloCrm.Application.csproj" />
     <ProjectReference Include="..\SoloCrm.Infrastructure\SoloCrm.Infrastructure.csproj" />
   </ItemGroup>

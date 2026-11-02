@@ -5,7 +5,7 @@
 
 @inject UserManager<ApplicationUser> UserManager
 @inject IdentityRedirectManager RedirectManager
-@inject ILogger<GenerateRecoveryCodes> Logger
+@inject FactorChanges FactorChanges
 
 <PageTitle>Neue Wiederherstellungscodes · SoloCRM</PageTitle>
 
@@ -30,6 +30,7 @@ else
 @code {
     private string? message;
     private ApplicationUser? user;
+    private bool confirmed;
     private IEnumerable<string>? recoveryCodes;
 
     [CascadingParameter]
@@ -41,6 +42,12 @@ else
         if (user is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        confirmed = FactorChanges.EnsureConfirmed(HttpContext, user);
+        if (!confirmed)
+        {
             return;
         }
 
@@ -59,10 +66,14 @@ else
             return;
         }
 
-        var userId = await UserManager.GetUserIdAsync(user);
+        if (!confirmed)
+        {
+            return;
+        }
+
         recoveryCodes = await UserManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
         message = "Neue Wiederherstellungscodes erzeugt.";
 
-        Logger.LogInformation("User with ID '{UserId}' has generated new 2FA recovery codes.", userId);
+        await FactorChanges.CompleteAsync(user, "recovery codes regenerated");
     }
 }

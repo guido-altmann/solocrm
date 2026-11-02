@@ -122,6 +122,7 @@ public sealed partial class AccountTests(PostgresFixture postgres) : IClassFixtu
     public async Task EnableAuthenticator_SignedIn_ShowsQrCodeWithOtpAuthUriAndKey()
     {
         var client = await SignedInClientAsync();
+        await ConfirmPasswordAsync(client);
 
         var page = await client.GetStringAsync("/Account/Manage/EnableAuthenticator", Ct);
 
@@ -136,6 +137,7 @@ public sealed partial class AccountTests(PostgresFixture postgres) : IClassFixtu
     public async Task EnableAuthenticator_ValidCode_EnablesTwoFactorAndShowsRecoveryCodes()
     {
         var client = await SignedInClientAsync();
+        await ConfirmPasswordAsync(client);
         var page = await client.GetStringAsync("/Account/Manage/EnableAuthenticator", Ct);
         var key = KeyRegex().Match(page).Groups[1].Value;
 
@@ -221,6 +223,13 @@ public sealed partial class AccountTests(PostgresFixture postgres) : IClassFixtu
     }
 
     /// <summary>Posts a statically rendered form with the antiforgery token of the page.</summary>
+    /// <summary>Factor pages require a recently confirmed password (SOL-34).</summary>
+    private static async Task ConfirmPasswordAsync(HttpClient client)
+    {
+        var confirm = await PostFormAsync(client, "/Account/Manage/ConfirmPassword", "confirm-password", new() { ["Input.Password"] = AdminPassword });
+        confirm.StatusCode.Should().Be(HttpStatusCode.Redirect);
+    }
+
     private static async Task<HttpResponseMessage> PostFormAsync(HttpClient client, string path, string formName, Dictionary<string, string> fields)
     {
         var page = await client.GetStringAsync(path, Ct);

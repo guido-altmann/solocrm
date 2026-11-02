@@ -85,7 +85,7 @@ public sealed class MailSettingsSectionTests : BunitContext
     {
         Status(
             configured: true,
-            new MailConnectionInfo("Graph", "guido@example.test", Now.AddDays(-2), Now.AddMinutes(-5), "Die Anmeldung ist abgelaufen."));
+            new MailConnectionInfo("Graph", "guido@example.test", Now.AddDays(-2), Now.AddMinutes(-5), "Die Anmeldung ist abgelaufen.", false));
 
         var section = Render<MailSettingsSection>();
 
@@ -97,9 +97,25 @@ public sealed class MailSettingsSectionTests : BunitContext
     }
 
     [Fact]
+    public void Render_ReconnectRequired_ShowsPausedHintAndReconnectInsteadOfSync()
+    {
+        Status(
+            configured: true,
+            new MailConnectionInfo("Graph", "guido@example.test", Now, Now, "Die Anmeldung bei Microsoft ist abgelaufen.", IsReconnectRequired: true));
+
+        var section = Render<MailSettingsSection>();
+
+        section.Find("[data-testid=mail-paused]").TextContent.Should().Contain("pausiert").And.Contain("abgelaufen");
+        section.FindAll("[data-testid=mail-error]").Should().BeEmpty();
+        section.FindAll("[data-testid=mail-sync]").Should().BeEmpty();
+        section.Find("[data-testid=mail-reconnect]").TextContent.Should().Contain("Neu verbinden");
+        section.FindAll("[data-testid=mail-disconnect]").Should().HaveCount(1);
+    }
+
+    [Fact]
     public void Render_ConnectedButNeverSynced_SaysNotYet()
     {
-        Status(configured: true, new MailConnectionInfo("Graph", "guido@example.test", Now, null, null));
+        Status(configured: true, new MailConnectionInfo("Graph", "guido@example.test", Now, null, null, false));
 
         var section = Render<MailSettingsSection>();
 
@@ -110,7 +126,7 @@ public sealed class MailSettingsSectionTests : BunitContext
     [Fact]
     public async Task Click_SyncNow_RunsTheSyncAndReloadsTheStatus()
     {
-        Status(configured: true, new MailConnectionInfo("Graph", "guido@example.test", Now, null, null));
+        Status(configured: true, new MailConnectionInfo("Graph", "guido@example.test", Now, null, null, false));
         _sync.Handle(Arg.Any<SyncMail.Command>(), Arg.Any<CancellationToken>())
             .Returns(Result<SyncMail.Result>.Success(new SyncMail.Result(3, 0, 1)));
         var section = Render<MailSettingsSection>();

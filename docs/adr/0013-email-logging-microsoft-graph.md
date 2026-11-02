@@ -53,5 +53,6 @@ Randbedingungen: Mail-Inhalte sind personenbezogen und gehören nicht in Logs. A
 - **Ein Abgleich zugleich:** Ein Prozess-Gate verhindert, dass Hintergrunddienst und „Jetzt abgleichen“ dieselben Mails doppelt importieren.
 - **Webhooks:** Importierte Mails lösen `ActivityLogged` nur aus, wenn `Mail__RaiseActivityLoggedEvents` gesetzt ist (Default aus).
 - **Importierte Mails** sind nicht bearbeitbar (`Activity.ImportedNotEditable`); Löschen ist möglich. Da Graph auch geänderte Mails liefert (z. B. gelesen markiert), kann eine gelöschte Mail wieder auftauchen. Gegenmaßnahme bei Bedarf: Löschvermerke je Message-ID.
+- **Pause bei abgelaufener Anmeldung (SOL-34, Audit F-20):** Lehnt Microsoft das Refresh-Token ab (`invalid_grant`, `interaction_required`) oder ist es nicht mehr lesbar, wird die Verbindung als „Neu verbinden nötig“ markiert (`IsReconnectRequired`). Der Hintergrunddienst überspringt sie dann, „Jetzt abgleichen“ meldet „pausiert“; erst erneutes Verbinden setzt die Markierung zurück. Andere Fehler (Netz, Graph nicht erreichbar) werden weiter beim nächsten Intervall erneut versucht.
 - **Offen bis zum ersten Praxistest:** der echte Austausch mit Microsoft (Berechtigungen, Zustimmung, Umleitungs-URI).
 

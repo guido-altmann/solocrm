@@ -6,7 +6,7 @@ namespace SoloCrm.Application.Tests.Features.Mail;
 
 public sealed class MailConnectionHandlerTests
 {
-    private static readonly MailConnectionInfo Connected = new("Graph", "guido@example.test", new DateTimeOffset(2026, 10, 14, 12, 0, 0, TimeSpan.Zero), null, "Fehler");
+    private static readonly MailConnectionInfo Connected = new("Graph", "guido@example.test", new DateTimeOffset(2026, 10, 14, 12, 0, 0, TimeSpan.Zero), null, "Fehler", false);
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -132,5 +132,7 @@ public sealed class MailConnectionHandlerTests
         public Task<MailConnectionInfo?> GetConnectionAsync(CancellationToken cancellationToken) => Task.FromResult(Connection);
 
         public Task RecordSyncAsync(string? error, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task RequireReconnectAsync(string error, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

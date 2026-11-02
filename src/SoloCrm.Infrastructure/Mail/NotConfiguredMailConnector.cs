@@ -18,4 +18,6 @@ internal sealed class NotConfiguredMailConnector : IMailConnector
     public Task<MailConnectionInfo?> GetConnectionAsync(CancellationToken cancellationToken) => Task.FromResult<MailConnectionInfo?>(null);
 
     public Task RecordSyncAsync(string? error, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task RequireReconnectAsync(string error, CancellationToken cancellationToken) => Task.CompletedTask;
 }

@@ -108,5 +108,5 @@ Weitere Endpunkte (Organisationen, Anfragen mit Phasenwechsel per `PATCH`, Aufga
 
 ## Grenzen
 
-- 60 Anfragen pro Minute und API-Key. Darüber antwortet die API mit `429` und `Retry-After`; in n8n hilft „Retry On Fail“ mit Wartezeit.
+- 60 Anfragen pro Minute und API-Key, zusammen höchstens 300 pro Minute von derselben IP-Adresse. Darüber antwortet die API mit `429` und `Retry-After`; in n8n hilft „Retry On Fail“ mit Wartezeit.
 - Geht das Data-Protection-Volume `/app/keys` verloren, sind die Webhook-Secrets nicht mehr lesbar. Die Zustellung schlägt dann mit „Secret nicht lesbar“ fehl. Abhilfe: *Secret neu erzeugen* und in n8n eintragen.

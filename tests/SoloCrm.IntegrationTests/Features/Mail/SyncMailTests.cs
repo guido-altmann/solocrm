@@ -264,6 +264,31 @@ public sealed class SyncMailTests(PostgresFixture postgres) : HandlerTest(postgr
     }
 
     [Fact]
+    public async Task Handle_SignInRejected_RequiresReconnectInsteadOfRecordingFailure()
+    {
+        _source.Throw(MailFolder.Inbox, new MailReconnectRequiredException());
+
+        var result = await CreateHandler().Handle(new SyncMail.Command(), Ct);
+
+        result.Error.Code.Should().Be(SyncMail.ReconnectRequiredCode);
+        result.Error.Message.Should().Contain("neu verbinden");
+        _connector.ReconnectRequired.Should().ContainSingle().Which.Should().Contain("neu verbinden");
+        _connector.Recorded.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Handle_ReconnectRequired_ReturnsPausedWithoutReadingTheMailbox()
+    {
+        _connector.Connection = new MailConnectionInfo("Fake", "guido@example.test", Received, null, "Abgelaufen.", IsReconnectRequired: true);
+
+        var result = await CreateHandler().Handle(new SyncMail.Command(), Ct);
+
+        result.Error.Should().Be(SyncMail.Paused);
+        _source.Calls.Should().BeEmpty();
+        _connector.Recorded.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Handle_LastPageWithoutDeltaToken_ReturnsError()
     {
         _source.Respond(MailFolder.Inbox, new MailBatch([], null, null));
@@ -331,6 +356,10 @@ public sealed class SyncMailTests(PostgresFixture postgres) : HandlerTest(postgr
     {
         public List<string?> Recorded { get; } = [];
 
+        public List<string> ReconnectRequired { get; } = [];
+
+        public MailConnectionInfo? Connection { get; set; }
+
         public bool IsConfigured => true;
 
         public Uri BuildAuthorizationUri(string redirectUri, string state, string codeChallenge) => throw new NotSupportedException();
@@ -339,11 +368,17 @@ public sealed class SyncMailTests(PostgresFixture postgres) : HandlerTest(postgr
 
         public Task DisconnectAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task<MailConnectionInfo?> GetConnectionAsync(CancellationToken cancellationToken) => Task.FromResult<MailConnectionInfo?>(null);
+        public Task<MailConnectionInfo?> GetConnectionAsync(CancellationToken cancellationToken) => Task.FromResult(Connection);
 
         public Task RecordSyncAsync(string? error, CancellationToken cancellationToken)
         {
             Recorded.Add(error);
+            return Task.CompletedTask;
+        }
+
+        public Task RequireReconnectAsync(string error, CancellationToken cancellationToken)
+        {
+            ReconnectRequired.Add(error);
             return Task.CompletedTask;
         }
     }
