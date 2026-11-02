@@ -2,5 +2,6 @@
 # Rule linkedin-client-id matches the PATCH field list of the contacts API (linkedInUrl next to organizationId).
 bbcd99000596283e4ba4fec4430cfa9bbf71ab2a:src/SoloCrm.Web/Endpoints/ContactEndpoints.cs:linkedin-client-id:17
 59e69f73ce5675662a07e9912ea8637a3cb7e27d:src/SoloCrm.Web/Endpoints/ContactEndpoints.cs:linkedin-client-id:18
-# Rule generic-api-key matches the list of sign-in factors in US-21 ("Passkeys, Authenticator-App, 2FA-Deaktivierung").
+# Rule generic-api-key matches the enumeration of sign-in factors in US-21 of the spec (and an earlier wording of this comment).
 267d1916add968ed6a4b1ff247c5436b1d72b10f:docs/SPEC.md:generic-api-key:410
+dc76a8214c44197edab0158f44ffe48e703f0ce1:.gitleaksignore:generic-api-key:5
