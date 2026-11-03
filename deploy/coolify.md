@@ -122,6 +122,12 @@ Anschließend **Backup Now** auslösen und prüfen, dass die Datei im Bucket ank
 
 WebSockets (für die Blazor-SignalR-Verbindung) leitet Traefik ohne weitere Konfiguration durch.
 
+**Access-Logs von Traefik:** Zwei URLs enthalten ein Geheimnis: der Kalender-Feed (`/calendar/<token>.ics`, das Token gibt alle Task-Titel frei) und die Rückkehr der Microsoft-Anmeldung (`/mail/callback?code=…`). Die App maskiert sie in ihren eigenen Logs, Traefik nicht (Audit F-21). Deshalb in Coolify unter *Servers → Proxy* die Traefik-Konfiguration prüfen:
+
+- Steht dort kein `--accesslog`, ist nichts zu tun. So lassen.
+- Werden Access-Logs gebraucht, den Pfad nicht mitschreiben: `--accesslog.format=json` und `--accesslog.fields.names.RequestPath=drop` (oder `=redact`). Danach den Proxy neu starten.
+- Bereits geschriebene Logs mit solchen Pfaden löschen und im Zweifel unter *Einstellungen → Kalender-Feed* einen neuen Link erzeugen.
+
 ## 5. Automatisches Deployment per Webhook
 
 1. In Coolify unter *Keys & Tokens → API Tokens* einen Token mit Berechtigung **deploy** erzeugen.
