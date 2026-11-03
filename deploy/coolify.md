@@ -101,7 +101,23 @@ Anschließend **Backup Now** auslösen und prüfen, dass die Datei im Bucket ank
    **Sonderzeichen in Werten:** Coolify reicht die Variablen über eine Docker-Compose-`.env`-Datei weiter. Dabei werden `$` (Variablen-Interpolation) und `\` (Escape-Zeichen, wird z. B. verdoppelt) verändert, Anführungszeichen (`"`, `'`, `` ` ``) und Leerzeichen am Rand können mit in den Wert geraten. Diese Zeichen in Passwörtern vermeiden oder die Variable als **Is Literal** markieren. Was tatsächlich ankommt, zeigt `printenv <Variable>` im Terminal des App-Containers (siehe unten).
 
    `ASPNETCORE_ENVIRONMENT` nicht setzen (Default `Production`: HSTS, keine Developer-Exception-Page).
-   `ForwardedHeaders__KnownNetworks` ist per Default auf die privaten Netze (u. a. `10.0.0.0/8` des Coolify-Netzwerks) gesetzt und muss nur angepasst werden, wenn Traefik in einem anderen Netz läuft.
+   **Host- und Proxy-Trust eingrenzen** (SOL-34, beide empfohlen):
+
+   | Variable | Wert | Hinweis |
+   |---|---|---|
+   | `AllowedHosts` | `crm.example.de;localhost` | die eigene Domain und **`localhost`** (mit `;` getrennt). `localhost` ist nötig, weil der Healthcheck `http://localhost:8080` aufruft; ohne ihn bleibt der Container *unhealthy*. Anfragen mit anderem `Host` beantwortet die App mit `400`, ein anderer `X-Forwarded-Host` wird ignoriert. Ohne die Variable (Default `*`) warnt die App beim Start |
+   | `ForwardedHeaders__KnownNetworks` | z. B. `10.0.1.0/24` | Netz, aus dem Traefik die Anfragen weiterleitet; mehrere kommagetrennt. Nur von dort werden `X-Forwarded-For/-Proto/-Host` übernommen (ein Hop). Ohne die Variable gelten alle privaten Netze (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) |
+
+   Das Netz ermitteln (Server-Shell): Traefik läuft als Container `coolify-proxy`. Zuerst zeigen, in welchen Netzen er hängt und mit welcher IP:
+   ```sh
+   docker inspect coolify-proxy --format '{{range $n, $c := .NetworkSettings.Networks}}{{$n}} {{$c.IPAddress}}{{println}}{{end}}'
+   ```
+   Dann das Subnetz des Netzes, das Traefik mit dem App-Container teilt (meist `coolify`; die Netze der App zeigt derselbe Befehl mit dem App-Container-Namen):
+   ```sh
+   docker network inspect coolify --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}'
+   ```
+   Dieses Subnetz eintragen, nicht die einzelne IP von Traefik (sie kann sich beim Neustart ändern). Statt eines Netzes geht auch `ForwardedHeaders__KnownProxies` mit festen IPs; ist nur diese Variable gesetzt, gilt kein privates Netz mehr als vertrauenswürdig.
+   Ein falsches Netz merkt man sofort: Die App hält dann jede Anfrage für `http`, es kommt zu einem Redirect-Loop bzw. das Auth-Cookie fehlt (Verifikation unten).
 7. **Deploy**. In den Logs des Containers sollten zuerst `Applying database migrations...` und danach die JSON-Logs der App erscheinen.
 
 WebSockets (für die Blazor-SignalR-Verbindung) leitet Traefik ohne weitere Konfiguration durch.
@@ -127,6 +143,8 @@ Ab jetzt stößt der Workflow **Docker** nach jedem erfolgreichen Push das Deplo
 - [ ] Security-Header vorhanden (`curl -sI https://crm.example.de/Account/Login`): `Content-Security-Policy` mit `frame-ancestors 'none'` und `script-src 'self' 'nonce-…'`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`
 - [ ] Browser-Konsole zeigt nach Login, Navigation und Aufruf von `/scalar/` keine CSP-Verstöße
 - [ ] Kein Redirect-Loop und Auth-Cookie mit Flag `Secure` (Forwarded Headers greifen, die App erkennt HTTPS hinter Traefik)
+- [ ] Fremder Host wird abgewiesen (Container-Terminal der App): `curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: evil.example' http://localhost:8080/health/live` liefert `400`, ohne `-H …` `200`
+- [ ] Container-Logs enthalten beim Start keine Warnung `AllowedHosts is not restricted`
 - [ ] Container-Logs sind JSON und enthalten keine E-Mail-Adressen im Klartext
 
 ### Integration (ab Iteration 5)

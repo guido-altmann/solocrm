@@ -25,6 +25,16 @@ public interface IMailConnector
 
     /// <summary>Notes the outcome of a sync for the status display; <paramref name="error"/> is <c>null</c> on success.</summary>
     Task RecordSyncAsync(string? error, CancellationToken cancellationToken);
+
+    /// <summary>Notes that the sign-in is no longer accepted; the sync pauses until the mailbox is connected again.</summary>
+    Task RequireReconnectAsync(string error, CancellationToken cancellationToken);
 }
 
-public sealed record MailConnectionInfo(string Provider, string Account, DateTimeOffset ConnectedAt, DateTimeOffset? LastSyncedAt, string? LastError);
+/// <param name="IsReconnectRequired">The provider rejected the stored sign-in; the sync is paused until reconnecting.</param>
+public sealed record MailConnectionInfo(
+    string Provider,
+    string Account,
+    DateTimeOffset ConnectedAt,
+    DateTimeOffset? LastSyncedAt,
+    string? LastError,
+    bool IsReconnectRequired);

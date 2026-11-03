@@ -9,7 +9,8 @@ namespace SoloCrm.Infrastructure.Mail;
 
 /// <summary>
 /// Runs <see cref="SyncMail"/> on a <see cref="PeriodicTimer"/> while a mailbox is connected (ADR-013, ADR-008).
-/// The handler notes the outcome on the connection for the status display; failures are retried on the next tick.
+/// The handler notes the outcome on the connection for the status display; failures are retried on the next tick,
+/// except a rejected sign-in: then the service waits until the mailbox is connected again (SOL-34).
 /// The log contains only counts and error codes.
 /// </summary>
 internal sealed partial class MailSyncBackgroundService(
@@ -43,7 +44,7 @@ internal sealed partial class MailSyncBackgroundService(
 
     internal async Task SyncOnceAsync(CancellationToken cancellationToken)
     {
-        if (await connector.GetConnectionAsync(cancellationToken) is null)
+        if (await connector.GetConnectionAsync(cancellationToken) is null or { IsReconnectRequired: true })
         {
             return;
         }

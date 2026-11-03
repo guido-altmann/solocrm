@@ -82,6 +82,20 @@ public sealed class MailConnectionTests
     }
 
     [Fact]
+    public void RequireReconnect_PausesUntilReconnect()
+    {
+        var connection = Create();
+
+        connection.RequireReconnect("Anmeldung widerrufen.");
+        connection.IsReconnectRequired.Should().BeTrue();
+        connection.LastError.Should().Be("Anmeldung widerrufen.");
+        connection.Reconnect("guido@example.test", "protected-2", Now.AddDays(1));
+
+        connection.IsReconnectRequired.Should().BeFalse();
+        connection.LastError.Should().BeNull();
+    }
+
+    [Fact]
     public void ReplaceRefreshToken_BlankToken_Throws()
     {
         var act = () => Create().ReplaceRefreshToken(" ");

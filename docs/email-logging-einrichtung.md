@@ -41,7 +41,7 @@ Ohne diese Variablen bleibt die Funktion abgeschaltet.
 1. In SoloCRM unter **Einstellungen → E-Mail** auf „Mit Microsoft verbinden“ klicken.
 2. Bei Microsoft anmelden und die Berechtigungen bestätigen.
 3. Nach der Rückkehr erscheint das verbundene Konto mit Zeitpunkt und Status des letzten Abgleichs. Der erste Abgleich lädt die letzten `Mail__BackfillDays` Tage nach, danach laufen nur noch Änderungen.
-4. „Jetzt abgleichen“ startet einen Abgleich sofort, sonst läuft er im eingestellten Abstand von selbst. Schlägt ein Abgleich fehl (z. B. abgelaufene Anmeldung), steht die Meldung auf der Seite und der nächste Abgleich versucht es erneut.
+4. „Jetzt abgleichen“ startet einen Abgleich sofort, sonst läuft er im eingestellten Abstand von selbst. Schlägt ein Abgleich fehl (z. B. Microsoft nicht erreichbar), steht die Meldung auf der Seite und der nächste Abgleich versucht es erneut. Ist die Anmeldung abgelaufen oder widerrufen, pausiert der Abgleich, bis du das Postfach mit „Neu verbinden“ erneut verbindest.
 
 Das Refresh-Token wird per Data Protection verschlüsselt gespeichert. Das Volume `/app/keys` muss deshalb erhalten bleiben (siehe `deploy/coolify.md`); geht es verloren, musst du das Postfach neu verbinden.
 
@@ -63,5 +63,5 @@ Das Refresh-Token wird per Data Protection verschlüsselt gespeichert. Das Volum
 |---|---|
 | „Verbinden“ endet mit `AADSTS50011` | Umleitungs-URI in Entra stimmt nicht mit `App__BaseUrl` + `/mail/callback` überein |
 | `AADSTS65001` / fehlende Zustimmung | Berechtigungen nicht bestätigt; Administratorzustimmung erteilen |
-| Abgleich meldet „Token nicht lesbar“ | Data-Protection-Keys gewechselt: Postfach neu verbinden |
+| Abgleich ist pausiert, „Neu verbinden“ wird angezeigt | Anmeldung abgelaufen, widerrufen oder Token nicht lesbar (Data-Protection-Keys gewechselt): „Neu verbinden“ |
 | Keine Mails erscheinen | Kein Kontakt mit passender E-Mail-Adresse, Kontakt archiviert oder Abgleich noch nicht gelaufen |

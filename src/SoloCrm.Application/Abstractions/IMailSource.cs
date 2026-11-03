@@ -64,6 +64,28 @@ public class MailSourceException : Exception
     }
 }
 
+/// <summary>
+/// The provider no longer accepts the stored sign-in (revoked, expired or unreadable); only connecting the mailbox
+/// again helps, so the sync pauses (SOL-34).
+/// </summary>
+public sealed class MailReconnectRequiredException : MailSourceException
+{
+    public MailReconnectRequiredException()
+        : base("Die Anmeldung bei Microsoft ist abgelaufen oder wurde widerrufen. Bitte das Postfach neu verbinden.")
+    {
+    }
+
+    public MailReconnectRequiredException(string message)
+        : base(message)
+    {
+    }
+
+    public MailReconnectRequiredException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}
+
 /// <summary>The provider no longer accepts the stored delta token.</summary>
 public sealed class MailDeltaExpiredException : MailSourceException
 {

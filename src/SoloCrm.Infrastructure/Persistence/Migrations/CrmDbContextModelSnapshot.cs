@@ -577,6 +577,10 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<bool>("IsReconnectRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_reconnect_required");
+
                     b.Property<string>("LastError")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")

@@ -4,9 +4,8 @@
 @using SoloCrm.Infrastructure.Identity
 
 @inject UserManager<ApplicationUser> UserManager
-@inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityRedirectManager RedirectManager
-@inject ILogger<ResetAuthenticator> Logger
+@inject FactorChanges FactorChanges
 
 <PageTitle>Schlüssel zurücksetzen · SoloCRM</PageTitle>
 
@@ -23,24 +22,40 @@
 </form>
 
 @code {
+    private ApplicationUser? user;
+    private bool confirmed;
+
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
 
-    private async Task OnSubmitAsync()
+    protected override async Task OnInitializedAsync()
     {
-        var user = await UserManager.GetUserAsync(HttpContext.User);
+        user = await UserManager.GetUserAsync(HttpContext.User);
         if (user is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
             return;
         }
 
+        confirmed = FactorChanges.EnsureConfirmed(HttpContext, user);
+    }
+
+    private async Task OnSubmitAsync()
+    {
+        if (user is null)
+        {
+            RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        if (!confirmed)
+        {
+            return;
+        }
+
         await UserManager.SetTwoFactorEnabledAsync(user, false);
         await UserManager.ResetAuthenticatorKeyAsync(user);
-        var userId = await UserManager.GetUserIdAsync(user);
-        Logger.LogInformation("User with ID '{UserId}' has reset their authentication app key.", userId);
-
-        await SignInManager.RefreshSignInAsync(user);
+        await FactorChanges.CompleteAsync(user, "authenticator key reset");
 
         RedirectManager.RedirectToWithStatus(
             "Account/Manage/EnableAuthenticator",

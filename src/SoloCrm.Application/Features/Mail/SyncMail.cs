@@ -18,6 +18,12 @@ public static class SyncMail
     public const int BodyMaxLength = Activity.BodyMaxLength;
     public const string EmptyBodyText = "(Kein Text)";
 
+    /// <summary>The provider rejected the stored sign-in; the sync pauses until the mailbox is connected again (SOL-34).</summary>
+    public const string ReconnectRequiredCode = "Mail.ReconnectRequired";
+
+    public static readonly Error Paused =
+        Error.Failure("Mail.Paused", "Der Abgleich ist pausiert, bis das Postfach neu verbunden ist.");
+
     private static readonly MailFolder[] Folders = [MailFolder.Inbox, MailFolder.Sent];
 
     public sealed record Command;
@@ -38,8 +44,21 @@ public static class SyncMail
             await Gate.WaitAsync(cancellationToken);
             try
             {
+                if (await connector.GetConnectionAsync(cancellationToken) is { IsReconnectRequired: true })
+                {
+                    return Paused;
+                }
+
                 var result = await SyncAllAsync(cancellationToken);
-                await connector.RecordSyncAsync(result.IsSuccess ? null : result.Error.Message, cancellationToken);
+                if (result.IsFailure && result.Error.Code == ReconnectRequiredCode)
+                {
+                    await connector.RequireReconnectAsync(result.Error.Message, cancellationToken);
+                }
+                else
+                {
+                    await connector.RecordSyncAsync(result.IsSuccess ? null : result.Error.Message, cancellationToken);
+                }
+
                 return result;
             }
             finally
@@ -88,6 +107,10 @@ public static class SyncMail
                     since = BackfillStart();
                     fromStoredToken = false;
                     continue;
+                }
+                catch (MailReconnectRequiredException ex)
+                {
+                    return Error.Failure(ReconnectRequiredCode, ex.Message);
                 }
                 catch (MailSourceException ex)
                 {

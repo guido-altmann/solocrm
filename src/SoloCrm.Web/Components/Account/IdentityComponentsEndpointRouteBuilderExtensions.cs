@@ -16,11 +16,12 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
         var accountGroup = endpoints.MapGroup("/Account");
 
         accountGroup.MapPost("/Logout", async (
-            ClaimsPrincipal user,
+            HttpContext context,
             [FromServices] SignInManager<ApplicationUser> signInManager,
             [FromForm] string returnUrl) =>
         {
             await signInManager.SignOutAsync();
+            SoloCrm.Web.Components.Account.FactorChanges.Clear(context);
             return TypedResults.LocalRedirect($"~/{returnUrl}");
         });
 

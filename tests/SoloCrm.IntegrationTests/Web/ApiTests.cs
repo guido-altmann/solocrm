@@ -96,6 +96,22 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
     }
 
     [Fact]
+    public async Task Get_RandomKeyPrefixesFromOneClient_AreLimitedPerClientIp()
+    {
+        var client = CreateClient(key: null);
+        for (var i = 0; i < ApiRateLimiting.ClientIpPermitLimit; i++)
+        {
+            (await GetWithKeyAsync(client, ApiKeyFormat.Generate().Key)).StatusCode.Should().Be(HttpStatusCode.Unauthorized, "request {0} is within the limit", i + 1);
+        }
+
+        var rejected = await GetWithKeyAsync(client, _key);
+
+        rejected.StatusCode.Should().Be(HttpStatusCode.TooManyRequests, "the valid key shares the budget of its client IP");
+        rejected.Headers.RetryAfter.Should().NotBeNull();
+        rejected.Content.Headers.ContentType!.MediaType.Should().Be("application/problem+json");
+    }
+
+    [Fact]
     public async Task PostContact_NewOrganizationName_CreatesContactAndReusesOrganizationIgnoringCase()
     {
         var client = CreateClient();
@@ -390,6 +406,13 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
         }
 
         return client;
+    }
+
+    private static async Task<HttpResponseMessage> GetWithKeyAsync(HttpClient client, string key)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/stages");
+        request.Headers.Add(ApiKeyAuthentication.HeaderName, key);
+        return await client.SendAsync(request, Ct);
     }
 
     private static Task<HttpResponseMessage> PatchAsync(HttpClient client, string path, string json)

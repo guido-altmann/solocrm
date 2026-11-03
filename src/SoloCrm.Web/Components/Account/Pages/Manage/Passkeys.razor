@@ -8,6 +8,7 @@
 @inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityRedirectManager RedirectManager
+@inject FactorChanges FactorChanges
 
 <PageTitle>Passkeys · SoloCRM</PageTitle>
 
@@ -60,6 +61,7 @@ else
     private const int MaxPasskeyCount = 100;
 
     private ApplicationUser? user;
+    private bool confirmed;
     private IList<UserPasskeyInfo>? currentPasskeys;
 
     [CascadingParameter]
@@ -84,6 +86,13 @@ else
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
             return;
         }
+
+        confirmed = FactorChanges.EnsureConfirmed(HttpContext, user);
+        if (!confirmed)
+        {
+            return;
+        }
+
         currentPasskeys = await UserManager.GetPasskeysAsync(user);
     }
 
@@ -92,6 +101,11 @@ else
         if (user is null)
         {
             RedirectManager.RedirectToInvalidUser(UserManager, HttpContext);
+            return;
+        }
+
+        if (!confirmed)
+        {
             return;
         }
 
@@ -127,6 +141,8 @@ else
             return;
         }
 
+        await FactorChanges.CompleteAsync(user, "passkey added");
+
         // Immediately prompt the user to enter a name for the credential
         var credentialIdBase64Url = Base64Url.EncodeToString(attestationResult.Passkey.CredentialId);
         RedirectManager.RedirectTo($"Account/Manage/RenamePasskey/{credentialIdBase64Url}");
@@ -134,6 +150,11 @@ else
 
     private async Task UpdatePasskey()
     {
+        if (!confirmed)
+        {
+            return;
+        }
+
         switch (Action)
         {
             case "rename":
@@ -174,6 +195,7 @@ else
             return;
         }
 
+        await FactorChanges.CompleteAsync(user, "passkey removed");
         RedirectManager.RedirectToCurrentPageWithStatus("Der Passkey wurde entfernt.", HttpContext);
     }
 }

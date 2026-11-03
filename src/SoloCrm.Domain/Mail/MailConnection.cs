@@ -47,6 +47,12 @@ public sealed class MailConnection : Entity
     /// <summary>User-facing reason why the last sync failed; <c>null</c> after a successful one.</summary>
     public string? LastError { get; private set; }
 
+    /// <summary>
+    /// The provider no longer accepts the stored sign-in (e.g. revoked or expired). The sync pauses until the mailbox
+    /// is connected again, so that it does not fail every few minutes (SOL-34).
+    /// </summary>
+    public bool IsReconnectRequired { get; private set; }
+
     /// <summary>Replaces the token after a refresh (providers rotate refresh tokens).</summary>
     public void ReplaceRefreshToken(string protectedRefreshToken) => ProtectedRefreshToken = RequiredToken(protectedRefreshToken);
 
@@ -58,6 +64,7 @@ public sealed class MailConnection : Entity
         ConnectedAt = connectedAt.ToUniversalTime();
         LastSyncedAt = null;
         LastError = null;
+        IsReconnectRequired = false;
     }
 
     public void RecordSuccess(DateTimeOffset syncedAt)
@@ -66,10 +73,19 @@ public sealed class MailConnection : Entity
         LastError = null;
     }
 
-    public void RecordFailure(string error)
+    public void RecordFailure(string error) => LastError = Truncate(error);
+
+    /// <summary>Notes that the sign-in is no longer accepted and pauses the sync until <see cref="Reconnect"/>.</summary>
+    public void RequireReconnect(string error)
+    {
+        LastError = Truncate(error);
+        IsReconnectRequired = true;
+    }
+
+    private static string Truncate(string error)
     {
         var trimmed = string.IsNullOrWhiteSpace(error) ? "Unbekannter Fehler." : error.Trim();
-        LastError = trimmed.Length <= ErrorMaxLength ? trimmed : string.Concat(trimmed.AsSpan(0, ErrorMaxLength - 1), "…");
+        return trimmed.Length <= ErrorMaxLength ? trimmed : string.Concat(trimmed.AsSpan(0, ErrorMaxLength - 1), "…");
     }
 
     private static string RequiredAccount(string account) =>

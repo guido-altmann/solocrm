@@ -125,7 +125,7 @@ internal sealed partial class GraphAuthenticator(
         return await db.MailConnections
             .AsNoTracking()
             .Where(c => c.Provider == Provider)
-            .Select(c => new MailConnectionInfo(c.Provider, c.Account, c.ConnectedAt, c.LastSyncedAt, c.LastError))
+            .Select(c => new MailConnectionInfo(c.Provider, c.Account, c.ConnectedAt, c.LastSyncedAt, c.LastError, c.IsReconnectRequired))
             .SingleOrDefaultAsync(cancellationToken);
     }
 
@@ -150,6 +150,20 @@ internal sealed partial class GraphAuthenticator(
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task RequireReconnectAsync(string error, CancellationToken cancellationToken)
+    {
+        await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
+        var connection = await db.MailConnections.SingleOrDefaultAsync(c => c.Provider == Provider, cancellationToken);
+        if (connection is null)
+        {
+            return;
+        }
+
+        connection.RequireReconnect(error);
+        await db.SaveChangesAsync(cancellationToken);
+        LogReconnectRequired(logger);
+    }
+
     public async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
         await _lock.WaitAsync(cancellationToken);
@@ -172,7 +186,7 @@ internal sealed partial class GraphAuthenticator(
             }
             catch (CryptographicException)
             {
-                throw new MailSourceException("Der gespeicherte Zugang ist nicht lesbar (Schlüssel gewechselt). Bitte das Postfach neu verbinden.");
+                throw new MailReconnectRequiredException("Der gespeicherte Zugang ist nicht lesbar (Schlüssel gewechselt). Bitte das Postfach neu verbinden.");
             }
 
             var tokens = await RequestTokensAsync([("grant_type", "refresh_token"), ("refresh_token", refreshToken)], cancellationToken);
@@ -237,7 +251,7 @@ internal sealed partial class GraphAuthenticator(
             var error = root.TryGetProperty("error", out var code) ? code.GetString() : null;
             LogTokenRequestRejected(logger, (int)response.StatusCode, error);
             throw error is "invalid_grant" or "interaction_required"
-                ? new MailSourceException("Die Anmeldung bei Microsoft ist abgelaufen oder wurde widerrufen. Bitte das Postfach neu verbinden.")
+                ? new MailReconnectRequiredException()
                 : new MailSourceException($"Die Anmeldung bei Microsoft wurde abgelehnt ({error ?? "HTTP " + (int)response.StatusCode}). Bitte Client-Id, Mandant und Client-Secret prüfen.");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException && !cancellationToken.IsCancellationRequested)
@@ -274,6 +288,9 @@ internal sealed partial class GraphAuthenticator(
 
     [GeneratedRegex(@"^[A-Za-z0-9][A-Za-z0-9.\-]*$")]
     private static partial Regex TenantPattern();
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Mail sync paused until the mailbox is connected again")]
+    private static partial void LogReconnectRequired(ILogger logger);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Microsoft token request rejected: HTTP {StatusCode}, error {Error}")]
     private static partial void LogTokenRequestRejected(ILogger logger, int statusCode, string? error);

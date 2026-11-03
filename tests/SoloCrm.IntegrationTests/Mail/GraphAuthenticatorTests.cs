@@ -213,15 +213,28 @@ public sealed class GraphAuthenticatorTests(PostgresFixture postgres) : HandlerT
         (await act.Should().ThrowAsync<MailSourceException>()).Which.Message.Should().Contain("kein Postfach");
     }
 
-    [Fact]
-    public async Task GetAccessToken_RevokedGrant_AsksToReconnect()
+    [Theory]
+    [InlineData("invalid_grant")]
+    [InlineData("interaction_required")]
+    public async Task GetAccessToken_RevokedGrant_RequiresReconnect(string error)
     {
         await StoreConnectionAsync();
-        _http.Respond(HttpStatusCode.BadRequest, """{ "error": "invalid_grant" }""");
+        _http.Respond(HttpStatusCode.BadRequest, $$"""{ "error": "{{error}}" }""");
 
         var act = () => CreateAuthenticator().GetAccessTokenAsync(Ct);
 
-        (await act.Should().ThrowAsync<MailSourceException>()).Which.Message.Should().Contain("neu verbinden");
+        (await act.Should().ThrowAsync<MailReconnectRequiredException>()).Which.Message.Should().Contain("neu verbinden");
+    }
+
+    [Fact]
+    public async Task GetAccessToken_OtherTokenError_DoesNotRequireReconnect()
+    {
+        await StoreConnectionAsync();
+        _http.Respond(HttpStatusCode.ServiceUnavailable, """{ "error": "temporarily_unavailable" }""");
+
+        var act = () => CreateAuthenticator().GetAccessTokenAsync(Ct);
+
+        (await act.Should().ThrowAsync<MailSourceException>()).Which.Should().NotBeOfType<MailReconnectRequiredException>();
     }
 
     [Fact]
@@ -235,7 +248,7 @@ public sealed class GraphAuthenticatorTests(PostgresFixture postgres) : HandlerT
 
         var act = () => CreateAuthenticator().GetAccessTokenAsync(Ct);
 
-        (await act.Should().ThrowAsync<MailSourceException>()).Which.Message.Should().Contain("nicht lesbar");
+        (await act.Should().ThrowAsync<MailReconnectRequiredException>()).Which.Message.Should().Contain("nicht lesbar");
         _http.Requests.Should().BeEmpty();
     }
 
@@ -274,9 +287,22 @@ public sealed class GraphAuthenticatorTests(PostgresFixture postgres) : HandlerT
         await authenticator.RecordSyncAsync("Fehler", Ct);
         var failed = await authenticator.GetConnectionAsync(Ct);
 
-        ok.Should().Be(new MailConnectionInfo("Graph", "guido@example.test", Start, Start.AddMinutes(5), null));
+        ok.Should().Be(new MailConnectionInfo("Graph", "guido@example.test", Start, Start.AddMinutes(5), null, false));
         failed!.LastError.Should().Be("Fehler");
         failed.LastSyncedAt.Should().Be(Start.AddMinutes(5));
+    }
+
+    [Fact]
+    public async Task RequireReconnect_PausesUntilConnectedAgain()
+    {
+        await StoreConnectionAsync();
+        var authenticator = CreateAuthenticator();
+
+        await authenticator.RequireReconnectAsync("Abgelaufen.", Ct);
+        var paused = await authenticator.GetConnectionAsync(Ct);
+
+        paused!.IsReconnectRequired.Should().BeTrue();
+        paused.LastError.Should().Be("Abgelaufen.");
     }
 
     [Fact]

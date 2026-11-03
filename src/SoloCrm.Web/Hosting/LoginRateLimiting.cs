@@ -26,31 +26,36 @@ public static partial class LoginRateLimiting
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-            options.OnRejected = OnRejectedAsync;
 
-            options.AddPolicy(PolicyName, context => PerClientIp(context, PermitLimit));
-            options.AddPolicy(PasskeyOptionsPolicyName, context => PerClientIp(context, PasskeyOptionsPermitLimit));
+            options.AddPolicy(PolicyName, new PerClientIpPolicy(PermitLimit));
+            options.AddPolicy(PasskeyOptionsPolicyName, new PerClientIpPolicy(PasskeyOptionsPermitLimit));
         });
 
         return services;
     }
 
-    private static RateLimitPartition<string> PerClientIp(HttpContext context, int permitLimit)
+    /// <summary>Own rejection handler, so the global one stays free for the API limiter per client IP (SOL-34).</summary>
+    private sealed class PerClientIpPolicy(int permitLimit) : IRateLimiterPolicy<string>
     {
-        if (!HttpMethods.IsPost(context.Request.Method))
+        public Func<OnRejectedContext, CancellationToken, ValueTask>? OnRejected { get; } = OnRejectedAsync;
+
+        public RateLimitPartition<string> GetPartition(HttpContext httpContext)
         {
-            return RateLimitPartition.GetNoLimiter(string.Empty);
+            if (!HttpMethods.IsPost(httpContext.Request.Method))
+            {
+                return RateLimitPartition.GetNoLimiter(string.Empty);
+            }
+
+            // Real client IP: UseForwardedHeaders runs before the rate limiter.
+            var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+            return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permitLimit,
+                Window = Window,
+                QueueLimit = 0,
+            });
         }
-
-        // Real client IP: UseForwardedHeaders runs before the rate limiter.
-        var clientIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-
-        return RateLimitPartition.GetFixedWindowLimiter(clientIp, _ => new FixedWindowRateLimiterOptions
-        {
-            PermitLimit = permitLimit,
-            Window = Window,
-            QueueLimit = 0,
-        });
     }
 
     private static async ValueTask OnRejectedAsync(OnRejectedContext context, CancellationToken cancellationToken)

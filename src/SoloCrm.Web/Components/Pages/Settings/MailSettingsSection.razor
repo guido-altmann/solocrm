@@ -59,16 +59,32 @@
             </tbody>
         </MudSimpleTable>
 
-        @if (connection.LastError is { } error)
+        @if (connection.IsReconnectRequired)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-3" data-testid="mail-paused">
+                Der Abgleich ist pausiert: @connection.LastError
+            </MudAlert>
+        }
+        else if (connection.LastError is { } error)
         {
             <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3" data-testid="mail-error">@error</MudAlert>
         }
 
         <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
-            <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Sync"
-                       OnClick="SyncAsync" Disabled="_busy" data-testid="mail-sync">
-                Jetzt abgleichen
-            </MudButton>
+            @if (connection.IsReconnectRequired)
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Link"
+                           OnClick="Connect" Disabled="_busy" data-testid="mail-reconnect">
+                    Neu verbinden
+                </MudButton>
+            }
+            else
+            {
+                <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.Sync"
+                           OnClick="SyncAsync" Disabled="_busy" data-testid="mail-sync">
+                    Jetzt abgleichen
+                </MudButton>
+            }
             <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Outlined.LinkOff"
                        OnClick="DisconnectAsync" Disabled="_busy" data-testid="mail-disconnect">
                 Verbindung trennen

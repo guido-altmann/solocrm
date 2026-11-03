@@ -5,7 +5,8 @@ using Scalar.AspNetCore;
 namespace SoloCrm.Web.Endpoints;
 
 /// <summary>
-/// The REST API under <c>/api/v1</c> (US-17, SPEC 5): API-key authentication, 60 requests per minute and key,
+/// The REST API under <c>/api/v1</c> (US-17, SPEC 5): API-key authentication, 60 requests per minute and key
+/// (and 300 per client IP),
 /// Problem Details, OpenAPI document and Scalar UI for the signed-in user (iteration 5 decision 5).
 /// Endpoints call the same handlers as the UI and never touch the DbContext.
 /// </summary>
@@ -20,6 +21,8 @@ public static class ApiEndpoints
         services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
         services.AddRateLimiter(options =>
         {
+            options.GlobalLimiter = ApiRateLimiting.CreateClientIpLimiter();
+            options.OnRejected = ApiRateLimiting.OnClientIpRejectedAsync;
             options.AddPolicy<string, ApiRateLimiting>(ApiRateLimiting.PolicyName);
             options.AddPolicy<string, CalendarFeedRateLimiting>(CalendarFeedEndpoints.RateLimitPolicyName);
         });

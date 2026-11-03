@@ -51,6 +51,7 @@ try
 
     builder.Services.AddCascadingAuthenticationState();
     builder.Services.AddScoped<IdentityRedirectManager>();
+    builder.Services.AddScoped<FactorChanges>();
     builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
     builder.Services.AddAuthentication(options =>
@@ -83,6 +84,7 @@ try
     builder.Services.AddAdminSeeding(builder.Configuration);
 
     var app = builder.Build();
+    app.WarnIfAllHostsAllowed();
 
     // Before the hosted services (admin seeding) start, which already need the schema.
     await app.MigrateDatabaseInDevelopmentAsync();
