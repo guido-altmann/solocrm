@@ -34,6 +34,9 @@ Genau ein Nutzer. Die UI braucht Login (optional 2FA), die API braucht maschinel
 - **Nach jeder Faktoränderung** wird der Security-Stamp erneuert (andere Sitzungen werden bei der nächsten Prüfung abgemeldet), die eigene Sitzung per `RefreshSignInAsync` erhalten und das Security-Event `Sign-in factor changed: <Änderung>` (Warning, nur mit User-Id) geschrieben; Fehleingaben auf der Bestätigungsseite als `Failed password confirmation.`.
 - **API-Limit zusätzlich pro Client-IP (F-04):** Ein globaler Limiter erlaubt 300 API-Anfragen pro Minute und IP; er läuft vor dem Limit pro Key-Präfix, beide müssen passen. Damit umgehen zufällige, wohlgeformte Präfixe das Limit nicht. Großzügig, weil mehrere Keys (n8n-Workflows) meist von derselben Adresse kommen. Die Login-Policies haben dafür eigene Ablehnungs-Handler; der globale gehört der API (Problem Details).
 
+## Akzeptiertes Restrisiko nach externem Audit (SOL-35, 2026-11-03)
+- **API-Keys ohne Ablaufdatum (F-06):** Ein Key gilt, bis er widerrufen wird; es gibt kein `ExpiresAt` und keine erzwungene Rotation. Bewusst so, weil es genau einen Client gibt (n8n) und ein abgelaufener Key dort nur Workflows stilllegt, ohne dass es jemand merkt. Ausgleich: Keys sind in den Einstellungen jederzeit widerrufbar und neu erzeugbar, `LastUsedAt` zeigt eine unerwartete Nutzung, der Key steht nur gehasht in der DB und nie im Log, und das Rate-Limit begrenzt den Schaden eines geleakten Keys. Neu prüfen, falls weitere Clients oder Nutzer dazukommen.
+
 ## Betrachtete Optionen
 ### A: Identity + API-Key (gewählt)
 **Pro:** keine externe Abhängigkeit, lehrreich (eigener Auth-Handler). **Contra:** kein SSO.

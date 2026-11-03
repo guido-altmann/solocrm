@@ -56,3 +56,6 @@ Randbedingungen: Mail-Inhalte sind personenbezogen und gehören nicht in Logs. A
 - **Pause bei abgelaufener Anmeldung (SOL-34, Audit F-20):** Lehnt Microsoft das Refresh-Token ab (`invalid_grant`, `interaction_required`) oder ist es nicht mehr lesbar, wird die Verbindung als „Neu verbinden nötig“ markiert (`IsReconnectRequired`). Der Hintergrunddienst überspringt sie dann, „Jetzt abgleichen“ meldet „pausiert“; erst erneutes Verbinden setzt die Markierung zurück. Andere Fehler (Netz, Graph nicht erreichbar) werden weiter beim nächsten Intervall erneut versucht.
 - **Offen bis zum ersten Praxistest:** der echte Austausch mit Microsoft (Berechtigungen, Zustimmung, Umleitungs-URI).
 
+## Akzeptiertes Restrisiko nach externem Audit (SOL-35, 2026-11-03)
+- **Autorisierungscode in der URL (F-21):** Microsoft liefert den Code als Query-Parameter an `/mail/callback`; das schreibt OAuth so vor. Die App loggt nur den Pfad ohne Query, ein Access-Log des Reverse Proxys kann den Code aber enthalten (Hinweis in `deploy/coolify.md`). Akzeptiert, weil der Code allein wertlos ist: Er ist einmalig und nur wenige Minuten gültig, und für den Tausch gegen Tokens braucht es zusätzlich das Client-Secret und den PKCE-Verifier aus dem verschlüsselten Cookie.
+

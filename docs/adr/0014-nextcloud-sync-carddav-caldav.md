@@ -67,6 +67,9 @@ Randbedingungen: SoloCRM ist Single-User und hat einen eigenen `BackgroundServic
 #### Option C: Domain Events aus der Outbox
 **Pro:** Nahezu sofort. **Contra:** Nicht jede relevante Änderung hat ein Event (z. B. Organisationsname); koppelt den Sync an die Webhook-Infrastruktur. Als späterer Auslöser für einen vorgezogenen Lauf denkbar.
 
+## Akzeptiertes Restrisiko nach externem Audit (SOL-35, 2026-11-03)
+- **Private Server erlaubt, keine IP- oder DNS-Prüfung (F-14):** Die Nextcloud-Adresse darf auf ein privates Netz zeigen, weil eine selbst gehostete Nextcloud oft neben SoloCRM läuft. Sie wird nur vom einzigen Admin eingetragen. Gegen den eigentlichen Schaden, das Weitergeben des App-Passworts, schützen die Regeln aus Entscheidung 11: nur `https` (`http` nur für `Nextcloud__AllowedHttpHosts`), keine Zugangsdaten, Query oder Fragment in der URL, und Weiterleitungen nur innerhalb desselben Origins. Eine Sperre privater Netze ist deshalb bewusst nicht umgesetzt.
+
 ## Konsequenzen
 - Leichter: Kontakte und Aufgaben sind auf jedem DAV-fähigen Gerät verfügbar, ohne Nextcloud-spezifische APIs. Abhaken auf dem Handy wirkt in SoloCRM inkl. Audit und Webhooks.
 - Schwerer: Personenbezogene Daten liegen zusätzlich in Nextcloud. Die DSGVO-Löschung (US-20) erreicht die Kopie erst mit dem nächsten Abgleich, nach dem Trennen gar nicht mehr. `docs/datenschutz.md` muss Nextcloud als Speicherort und Empfänger aufnehmen.
