@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ---- build: restore (cached layer), publish, create EF migrations bundle ----
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 
 # Restore only depends on project files and central build settings, so this layer
