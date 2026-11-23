@@ -34,7 +34,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Build">
-    <PackageVersion Include="GitVersion.MsBuild" Version="6.8.2" />
+    <PackageVersion Include="GitVersion.MsBuild" Version="7.0.1" />
   </ItemGroup>
 
   <ItemGroup Label="Tests">
