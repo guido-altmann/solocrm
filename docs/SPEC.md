@@ -1,7 +1,7 @@
 # SoloCRM – Spezifikation
 
 > **Arbeitstitel:** SoloCRM (frei umbenennbar; Namespace-Präfix `SoloCrm`)
-> **Status:** v1.6 · **Stand:** 2026-10-16 · **Owner:** Guido Altmann
+> **Status:** v1.16 · **Stand:** 2026-11-24 · **Owner:** Guido Altmann
 
 Dieses Dokument ist die fachliche und technische Referenz für die Entwicklung. Architekturentscheidungen stehen ausführlich in `docs/adr/`, Arbeitsanweisungen für Claude Code in `/CLAUDE.md`, die abgeschlossenen MVP-Iterationen in `docs/iterations/`; der Backlog nach dem MVP liegt im Jira-Projekt `SOL` (siehe Kap. 8).
 
@@ -624,12 +624,15 @@ public static class CreateContact
 | n8n-Workflow | CRM sendet Webhook `enrichment.requested`, n8n reichert an und schreibt Vorschläge über die REST-API zurück | Nutzt die vorhandene Integrationsarchitektur (Outbox/Webhooks) und hält KI-Logik außerhalb der App |
 | Kommerzielle APIs | Firmen-Datenbanken, Handelsregister-Dienste | Kosten- und Lizenzprüfung nötig |
 
+**Entscheidung (ADR-016):** Die Anreicherung läuft in der App. Erster Provider ist Website/Impressum: Die App ruft die Seiten selbst ab (mit SSRF-Schutz), das LLM extrahiert nur. Die LLM-Aufrufe gehen über `Microsoft.Extensions.AI` an Azure AI Foundry (Deployment-Typ `Standard`, regional in Sweden Central). n8n, LLM mit Web-Suche und kommerzielle APIs bleiben mögliche spätere `IEnrichmentProvider`.
+
 Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die Nutzungsbedingungen verstößt und rechtlich heikel ist. Die LinkedIn-URL wird weiterhin manuell gepflegt.
 
 ### 9.3 Datenmodell (Entwurf)
 - `EnrichmentRequest`: Zielobjekt (Typ/Id), Provider, Status (`Pending`, `Running`, `Completed`, `Failed`), angefordert am, Fehler
 - `EnrichmentSuggestion`: RequestId, Feldname, vorgeschlagener Wert, aktueller Wert, Quelle (URL), Konfidenz (0–1), Status (`Open`, `Accepted`, `Rejected`)
 - Übernahme schreibt den Wert regulär über einen Handler, d. h. mit Audit-Eintrag und Timeline-Hinweis „Angereichert aus <Quelle>“.
+- Verarbeitung: `EnrichmentRequest` mit Status `Pending` dient als Queue; ein eigener `EnrichmentProcessor` beansprucht Anfragen per Claim mit Lease wie die Outbox (ADR-008, ADR-016).
 
 ### 9.4 Datenschutz
 - Rechtsgrundlage für Personendaten ist in der Regel berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO); die Informationspflicht bei Dritterhebung (Art. 14) ist zu beachten.
@@ -647,7 +650,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 - [x] Migrations-Strategie beim Deploy (siehe 7.6) → `efbundle` im Entrypoint (ADR-009)
 - [x] Welche HubSpot-Felder werden beim Import tatsächlich benötigt? → Vorlage siehe `docs/iterations/05-integration.md`, Entscheidung 9 (Name, E-Mail, Telefon, Rolle, LinkedIn, Firma, Quelle, Record ID)
 - [x] Repo öffentlich ab Iteration 1 oder erst ab MVP? → öffentlich ab Iteration 1
-- [x] Datenanreicherung: in der App (Hintergrundjob + LLM-API) oder ausgelagert in n8n? → nicht im MVP entschieden, in den Backlog verschoben (SOL-3)
+- [x] Datenanreicherung: in der App (Hintergrundjob + LLM-API) oder ausgelagert in n8n? → in der App, erster Provider Website/Impressum, Inferenz über Azure AI Foundry (EU) (SOL-3, ADR-016)
 - [x] Brauche ich Stundensatz-Varianten (z. B. Remote- vs. Vor-Ort-Satz) oder reicht ein Satz pro Anfrage? → im MVP ein Satz pro Anfrage; Varianten im Backlog (SOL-17)
 
 ## 11. Glossar
@@ -702,3 +705,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.13 | 2026-10-29 | Tag-Farbe „reihum“ deterministisch (SOL-36): `Sequence` am Tag (2.3), Import speichert neue Tags einzeln |
 | 1.14 | 2026-11-02 | Backlog-Härtung nach externem Audit (SOL-34): Passwortbestätigung vor Faktoränderungen (US-21), API-Limit zusätzlich pro Client-IP (US-17, 5), `MailConnection.IsReconnectRequired` (2.4, S6), `AllowedHosts` und Proxy-Netze (7.6) |
 | 1.15 | 2026-11-03 | Akzeptierte Risiken nach externem Audit (SOL-35): Log-Redaction und Proxy-Access-Logs (6); Begründungen in ADR-004, -009, -010, -013 und -014 |
+| 1.16 | 2026-11-24 | Datenanreicherung entschieden (SOL-3, ADR-016): in der App mit eigenem `EnrichmentProcessor`, erster Provider Website/Impressum, Inferenz über Azure AI Foundry in der EU (9.2, 9.3, 10) |
