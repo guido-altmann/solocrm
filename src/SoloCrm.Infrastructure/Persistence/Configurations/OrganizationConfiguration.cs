@@ -14,7 +14,12 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
         builder.Property(o => o.Type).HasConversion<string>().HasMaxLength(20);
         builder.Property(o => o.Website).HasMaxLength(Organization.WebsiteMaxLength);
         builder.Property(o => o.Phone).HasMaxLength(Organization.PhoneMaxLength);
-        builder.Property(o => o.Email).HasMaxLength(Organization.EmailMaxLength);
+        // citext like contacts.email, so the mail sync matches case-insensitively (SOL-50); not unique (SOL-49).
+        // citext has no type modifier, so the length is enforced by the validator and a check constraint.
+        builder.Property(o => o.Email).HasColumnType("citext");
+        builder.ToTable(t => t.HasCheckConstraint(
+            "ck_organizations_email_length",
+            $"char_length(email) <= {Organization.EmailMaxLength}"));
         // The city keeps its column "city" (part of the search vector); the other parts are new nullable columns.
         builder.ComplexProperty(o => o.Address, address =>
         {

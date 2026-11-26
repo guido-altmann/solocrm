@@ -198,6 +198,17 @@ public static class SyncMail
                 .ToListAsync(cancellationToken))
                 .ToDictionary(c => c.Email, c => c.Id, StringComparer.OrdinalIgnoreCase);
 
+            // Fallback when no contact matches (ADR-013 addendum, SOL-50). Organization addresses are not unique,
+            // so an address shared by several organizations is ignored.
+            var organizations = (await db.Organizations
+                .AsNoTracking()
+                .Where(o => !o.IsArchived && o.Email != null && addresses.Contains(o.Email))
+                .Select(o => new { o.Id, Email = o.Email! })
+                .ToListAsync(cancellationToken))
+                .GroupBy(o => o.Email, StringComparer.OrdinalIgnoreCase)
+                .Where(g => g.Count() == 1)
+                .ToDictionary(g => g.Key, g => g.Single().Id, StringComparer.OrdinalIgnoreCase);
+
             int created = 0, duplicates = 0, unmatched = 0;
             foreach (var mail in messages)
             {
@@ -208,7 +219,10 @@ public static class SyncMail
                     continue;
                 }
 
-                if (MainContact(mail, contacts) is not { } contactId)
+                var linked = MainMatch(mail, contacts) is { } contactId ? new LinkedRecords(ContactId: contactId)
+                    : MainMatch(mail, organizations) is { } organizationId ? new LinkedRecords(OrganizationId: organizationId)
+                    : null;
+                if (linked is null)
                 {
                     known.Remove(id);
                     unmatched++;
@@ -220,7 +234,7 @@ public static class SyncMail
                     mail.OccurredAt,
                     Truncate(mail.Subject, SubjectMaxLength),
                     BodyOf(mail),
-                    new LinkedRecords(ContactId: contactId));
+                    linked);
                 if (!options.RaiseActivityLoggedEvents)
                 {
                     activity.ClearDomainEvents();
@@ -243,17 +257,20 @@ public static class SyncMail
                 .Where(a => !string.IsNullOrWhiteSpace(a))
                 .Select(a => a.Trim());
 
-        /// <summary>Incoming: the sender if known, else the first known recipient. Outgoing: the first known recipient.</summary>
-        private static Guid? MainContact(IncomingMail mail, Dictionary<string, Guid> contacts)
+        /// <summary>
+        /// The main reference among <paramref name="known"/> addresses (contacts or organizations).
+        /// Incoming: the sender if known, else the first known recipient. Outgoing: the first known recipient.
+        /// </summary>
+        private static Guid? MainMatch(IncomingMail mail, Dictionary<string, Guid> known)
         {
-            if (mail.Folder != MailFolder.Sent && mail.Sender is { } sender && contacts.TryGetValue(sender.Trim(), out var senderId))
+            if (mail.Folder != MailFolder.Sent && mail.Sender is { } sender && known.TryGetValue(sender.Trim(), out var senderId))
             {
                 return senderId;
             }
 
             foreach (var recipient in mail.Recipients)
             {
-                if (!string.IsNullOrWhiteSpace(recipient) && contacts.TryGetValue(recipient.Trim(), out var id))
+                if (!string.IsNullOrWhiteSpace(recipient) && known.TryGetValue(recipient.Trim(), out var id))
                 {
                     return id;
                 }

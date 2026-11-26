@@ -51,6 +51,8 @@ Inhalt (Format `formatVersion: 1`, camelCase, Zeitstempel in UTC als ISO 8601 mi
 
 Activities einer Anfrage ohne direkten Bezug zum Kontakt gehören nicht dazu (`docs/iterations/06-dsgvo-und-politur.md`, Entscheidung 1; die folgenden Entscheidungen beziehen sich auf dieselbe Datei).
 
+Ebenso nicht dabei sind importierte E-Mails, die über die allgemeine Adresse einer Organisation (z. B. `info@…`) zugeordnet wurden (SOL-50, Nachtrag zu ADR-013). Sie hängen an der Organisation, auch wenn eine namentlich bekannte Person sie geschrieben hat. Bei einer Auskunft deshalb zusätzlich die Timeline der Organisation auf Mails dieser Person durchsehen und sie bei einer Löschung dort einzeln löschen.
+
 ## Löschung (Art. 17, US-20)
 
 1. Kontakt öffnen, Menü **⋮ → Endgültig löschen (DSGVO)**.

@@ -1095,8 +1095,7 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("Email")
-                        .HasMaxLength(320)
-                        .HasColumnType("character varying(320)")
+                        .HasColumnType("citext")
                         .HasColumnName("email");
 
                     b.Property<string>("ExtraFields")
@@ -1198,7 +1197,10 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                     NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex(new[] { "Name" }, "ix_organizations_name_trgm"), "gin");
                     NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex(new[] { "Name" }, "ix_organizations_name_trgm"), new[] { "gin_trgm_ops" });
 
-                    b.ToTable("organizations", (string)null);
+                    b.ToTable("organizations", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_organizations_email_length", "char_length(email) <= 320");
+                        });
                 });
 
             modelBuilder.Entity("SoloCrm.Domain.Settings.AppSetting", b =>
