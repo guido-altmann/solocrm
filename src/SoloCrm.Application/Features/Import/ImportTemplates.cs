@@ -41,6 +41,7 @@ public static class ImportTemplates
         new(ImportField.Organization, ["Company name"]),
         new(ImportField.OrganizationType, ["Type"]),
         new(ImportField.OrganizationWebsite, ["Website URL"], ["Company Domain Name"]),
+        new(ImportField.Phone, ["Phone Number"]),
         new(ImportField.Street, ["Street Address"]),
         new(ImportField.Street2, ["Street Address 2"]),
         new(ImportField.PostalCode, ["Postal Code"]),
@@ -86,6 +87,8 @@ public static class ImportTemplates
         [ImportField.Organization] = ["Name", .. OrganizationNameColumns],
         [ImportField.OrganizationType] = ["Typ", "Type", "Art"],
         [ImportField.OrganizationWebsite] = ["Website", "Website URL", "Webseite", "Domain", "Company Domain Name"],
+        [ImportField.Phone] = ["Phone", "Phone Number", "Telefon", "Telefonnummer"],
+        [ImportField.Email] = ["Email", "E-Mail", "Mail", "Email Address", "E-Mail-Adresse"],
         [ImportField.Tag] = ["Tag", "Tags"],
         [ImportField.HubSpotRecordId] = ["Record ID"],
     };

@@ -10,6 +10,8 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
     public const int NameMaxLength = 200;
     public const int WebsiteMaxLength = 500;
     public const int NotesMaxLength = 100_000;
+    public const int PhoneMaxLength = 50;
+    public const int EmailMaxLength = 320;
 
     // Required by EF Core.
     private Organization()
@@ -29,6 +31,12 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
     /// <summary>Normalized, see <see cref="Website.TryNormalize"/>.</summary>
     public string? Website { get; private set; }
 
+    /// <summary>Main phone number (SOL-49).</summary>
+    public string? Phone { get; private set; }
+
+    /// <summary>General e-mail address (SOL-49); unlike <see cref="Contacts.Contact.Email"/> not unique.</summary>
+    public string? Email { get; private set; }
+
     /// <summary>Postal address (iteration 5 decision 14); <see cref="Address.City"/> replaces the former <c>City</c>.</summary>
     public Address Address { get; private set; } = Address.Empty;
 
@@ -42,24 +50,33 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
         OrganizationType type = OrganizationType.Other,
         string? website = null,
         Address? address = null,
-        string? notes = null)
+        string? notes = null,
+        string? phone = null,
+        string? email = null)
     {
         var organization = new Organization(RequireName(name));
-        organization.Apply(type, website, address, notes);
+        organization.Apply(type, website, address, notes, phone, email);
         organization.AddDomainEvent(new OrganizationCreated(organization.Id));
         return organization;
     }
 
-    public void Update(string name, OrganizationType type, string? website, Address? address, string? notes)
+    public void Update(
+        string name,
+        OrganizationType type,
+        string? website,
+        Address? address,
+        string? notes,
+        string? phone,
+        string? email)
     {
         Name = RequireName(name);
-        Apply(type, website, address, notes);
+        Apply(type, website, address, notes, phone, email);
     }
 
     /// <summary>Sets or removes (blank value) an additional field, e.g. <c>HubSpotRecordId</c> from the CSV import.</summary>
     public void SetExtraField(string key, string? value) => ExtraFields = ExtraFieldValues.With(ExtraFields, key, value);
 
-    private void Apply(OrganizationType type, string? website, Address? address, string? notes)
+    private void Apply(OrganizationType type, string? website, Address? address, string? notes, string? phone, string? email)
     {
         if (!Enum.IsDefined(type))
         {
@@ -70,6 +87,8 @@ public sealed class Organization : ArchivableEntity, IAuditable, IHasExtraFields
         Website = NormalizeWebsite(website);
         Address = address ?? Address.Empty;
         Notes = Normalize(notes);
+        Phone = Normalize(phone);
+        Email = Normalize(email);
     }
 
     private static string RequireName(string name) =>

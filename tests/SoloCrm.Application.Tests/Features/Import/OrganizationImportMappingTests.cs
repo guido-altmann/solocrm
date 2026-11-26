@@ -53,6 +53,19 @@ public sealed class OrganizationImportMappingTests
     }
 
     [Fact]
+    public void Suggest_GenericCompanyList_MapsPhoneAndEmail()
+    {
+        var mapping = ImportTemplates.Suggest(ImportTarget.Organizations, ImportTemplate.Generic, ["Firma", "Telefon", "E-Mail"]);
+
+        mapping.Fields.Where(f => f.Column is not null).Should().BeEquivalentTo(new FieldMapping[]
+        {
+            new(ImportField.Organization, 0),
+            new(ImportField.Phone, 1),
+            new(ImportField.Email, 2),
+        });
+    }
+
+    [Fact]
     public void Suggest_HubSpotCompany_MapsAllFieldsWithDomainAndCountryFallbacks()
     {
         var mapping = ImportTemplates.Suggest(ImportTarget.Organizations, ImportTemplate.HubSpot, HubSpotCompanyHeader);
@@ -63,6 +76,7 @@ public sealed class OrganizationImportMappingTests
             new(ImportField.Organization, 1),
             new(ImportField.OrganizationType, 4),
             new(ImportField.OrganizationWebsite, 3, 2),
+            new(ImportField.Phone, 5),
             new(ImportField.Street, 6),
             new(ImportField.Street2, 7),
             new(ImportField.PostalCode, 8),

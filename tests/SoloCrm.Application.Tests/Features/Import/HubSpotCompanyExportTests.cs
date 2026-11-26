@@ -30,6 +30,7 @@ public sealed class HubSpotCompanyExportTests
             new(ImportField.Organization, 101),
             new(ImportField.OrganizationType, 96),
             new(ImportField.OrganizationWebsite, 103, 49),
+            new(ImportField.Phone, 92),
             new(ImportField.Street, 6),
             new(ImportField.Street2, 7),
             new(ImportField.PostalCode, 86),

@@ -60,12 +60,30 @@ public sealed class OrganizationDialogTests : BunitContext
     }
 
     [Fact]
+    public async Task Submit_ValidationError_ShowsMessageAtEmail()
+    {
+        _create.Handle(Arg.Any<CreateOrganization.Command>(), Arg.Any<CancellationToken>())
+            .Returns(Result<CreateOrganization.Result>.Failure(new ValidationError(new Dictionary<string, string[]>
+            {
+                ["Email"] = ["Bitte eine gültige E-Mail-Adresse angeben."],
+            })));
+        var (provider, _) = await OpenDialogAsync(null);
+        provider.FindAll("button").Single(b => b.TextContent.Contains("Weitere Angaben", StringComparison.Ordinal)).Click();
+
+        await provider.Find("form").SubmitAsync();
+
+        provider.WaitForAssertion(() =>
+            provider.FindAll("label.mud-input-error").Select(l => l.TextContent.Trim()).Should().Equal("E-Mail"));
+    }
+
+    [Fact]
     public async Task Submit_EditMode_LoadsValuesAndSendsUpdate()
     {
         var id = Guid.CreateVersion7();
         _get.Handle(new GetOrganization.Query(id), Arg.Any<CancellationToken>())
             .Returns(Result<GetOrganization.Result>.Success(
-                new GetOrganization.Result(id, "Contoso", OrganizationType.Client, "https://contoso.de", new AddressData(City: "Berlin", CountryCode: "DE"), null, false)));
+                new GetOrganization.Result(id, "Contoso", OrganizationType.Client, "https://contoso.de", new AddressData(City: "Berlin", CountryCode: "DE"), null, false,
+                    "030 123456", "info@contoso.de")));
         _update.Handle(Arg.Any<UpdateOrganization.Command>(), Arg.Any<CancellationToken>())
             .Returns(Result<UpdateOrganization.Result>.Success(new UpdateOrganization.Result(id)));
         var (provider, dialog) = await OpenDialogAsync(id);
@@ -76,7 +94,9 @@ public sealed class OrganizationDialogTests : BunitContext
 
         (await dialog.Result)!.Data.Should().Be(id);
         await _update.Received(1).Handle(
-            new UpdateOrganization.Command(id, "Contoso AG", OrganizationType.Client, "https://contoso.de", new AddressData(City: "Berlin", CountryCode: "DE"), null),
+            new UpdateOrganization.Command(
+                id, "Contoso AG", OrganizationType.Client, "https://contoso.de", new AddressData(City: "Berlin", CountryCode: "DE"), null, "030 123456",
+                "info@contoso.de"),
             Arg.Any<CancellationToken>());
         await _create.DidNotReceiveWithAnyArgs().Handle(default!, Xunit.TestContext.Current.CancellationToken);
     }

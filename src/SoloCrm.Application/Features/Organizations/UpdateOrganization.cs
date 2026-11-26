@@ -17,7 +17,9 @@ public static class UpdateOrganization
         OrganizationType Type,
         string? Website,
         AddressData? Address,
-        string? Notes) : IOrganizationFields;
+        string? Notes,
+        string? Phone,
+        string? Email) : IOrganizationFields;
 
     public sealed record Result(Guid Id);
 
@@ -47,7 +49,8 @@ public static class UpdateOrganization
                 return OrganizationErrors.NotFound;
             }
 
-            organization.Update(command.Name!, command.Type, command.Website, command.Address?.ToAddress(), command.Notes);
+            organization.Update(
+                command.Name!, command.Type, command.Website, command.Address?.ToAddress(), command.Notes, command.Phone, command.Email);
             await db.SaveChangesAsync(cancellationToken);
 
             return new Result(organization.Id);

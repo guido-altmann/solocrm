@@ -82,6 +82,8 @@ erDiagram
 | Name | string(200) | ✅ | |
 | Type | enum `OrganizationType` | ✅ | `Client`, `Agency`, `Partner`, `Other`; Default: `Other` |
 | Website | string(500) | | URL-Validierung |
+| Phone | string(50) | | zentrale Telefonnummer (SOL-49) |
+| Email | string(320) | | allgemeine E-Mail-Adresse, z. B. `info@…`; Formatprüfung wie beim Kontakt, aber **nicht** eindeutig (SOL-49) |
 | Address | Value Object `Address`? | | Anschrift, siehe unten; `Address.City` ersetzt das frühere Feld `City` (Spalte `city`) |
 | Notes | text | | Freitext-Stammnotiz (Verlauf läuft über Activities); höchstens 100.000 Zeichen |
 
@@ -382,7 +384,7 @@ Format: **US-xx** · Story · Akzeptanzkriterien (AK) · Iteration
 - AK2: Dubletten werden per E-Mail erkannt (Optionen: überspringen / aktualisieren).
 - AK3: Ein Ergebnisbericht zeigt angelegt, aktualisiert, übersprungen und fehlerhaft (mit Zeile und Grund).
 - AK4: Eine Mapping-Vorlage für den HubSpot-Kontaktexport ist enthalten.
-- AK5: Organisationen lassen sich ebenso importieren (Vorlage für den HubSpot-Firmenexport); beim anschließenden Kontakt-Import werden Kontakte über die HubSpot-Firmen-ID mit ihren Organisationen verknüpft.
+- AK5: Organisationen lassen sich ebenso importieren (Vorlage für den HubSpot-Firmenexport, inkl. „Phone Number“; Telefon und E-Mail auch bei generischen Dateien); beim anschließenden Kontakt-Import werden Kontakte über die HubSpot-Firmen-ID mit ihren Organisationen verknüpft.
 
 **US-17 · REST-API mit API-Key** · It. 5
 - AK1: Der Key wird in den Einstellungen erzeugt und nur einmal im Klartext angezeigt; gespeichert wird der Hash.
@@ -710,3 +712,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.15 | 2026-11-03 | Akzeptierte Risiken nach externem Audit (SOL-35): Log-Redaction und Proxy-Access-Logs (6); Begründungen in ADR-004, -009, -010, -013 und -014 |
 | 1.16 | 2026-11-24 | Datenanreicherung entschieden (SOL-3, ADR-016): in der App mit eigenem `EnrichmentProcessor`, erster Provider Website/Impressum, Inferenz über Azure AI Foundry in der EU (9.2, 9.3, 10) |
 | 1.17 | 2026-11-26 | Datenanreicherung überarbeitet (SOL-4, ADR-016): erster Provider ist ein Foundry-Agent mit Websuche statt Website/Impressum mit eigenem Abruf; Websuche außerhalb des Auftragsverarbeitungsvertrags als Restrisiko akzeptiert; Vorschläge je Feld, Status `Superseded` und Firmenprofil als Notiz (9.2, 9.3, 9.4, 10) |
+| 1.18 | 2026-11-26 | Telefon und E-Mail als feste Felder der Organisation (SOL-49): Organization (2.3), Import (US-16 AK5), REST-API analog zum Kontakt (5) |

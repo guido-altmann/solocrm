@@ -51,6 +51,18 @@ else
                                 </span>
                             </DisplayTemplate>
                         </InlineText>
+                        <InlineText Label="E-Mail" Field="@nameof(IOrganizationFields.Email)" Value="@_organization.Email" InputType="InputType.Email"
+                                    MaxLength="@Organization.EmailMaxLength" Save="@(v => SaveAsync(o => o with { Email = v }))">
+                            <DisplayTemplate>
+                                <span @onclick:stopPropagation="true"><MudLink Href="@($"mailto:{context}")">@context</MudLink></span>
+                            </DisplayTemplate>
+                        </InlineText>
+                        <InlineText Label="Telefon" Field="@nameof(IOrganizationFields.Phone)" Value="@_organization.Phone" InputType="InputType.Telephone"
+                                    MaxLength="@Organization.PhoneMaxLength" Save="@(v => SaveAsync(o => o with { Phone = v }))">
+                            <DisplayTemplate>
+                                <span @onclick:stopPropagation="true"><MudLink Href="@($"tel:{context}")">@context</MudLink></span>
+                            </DisplayTemplate>
+                        </InlineText>
                         <InlineAddress Value="_organization.Address" Save="@(a => SaveAsync(o => o with { Address = a }))" />
                         <InlineText Label="Notizen" Field="@nameof(IOrganizationFields.Notes)" Value="@_organization.Notes" Multiline="true"
                                     MaxLength="@Organization.NotesMaxLength"
@@ -154,7 +166,7 @@ else
     private async Task<Error?> SaveAsync(Func<UpdateOrganization.Command, UpdateOrganization.Command> change)
     {
         var o = _organization!;
-        var command = change(new UpdateOrganization.Command(o.Id, o.Name, o.Type, o.Website, o.Address, o.Notes));
+        var command = change(new UpdateOrganization.Command(o.Id, o.Name, o.Type, o.Website, o.Address, o.Notes, o.Phone, o.Email));
         var result = await UpdateOrganizationHandler.Handle(command, CancellationToken.None);
         if (result.IsFailure)
         {

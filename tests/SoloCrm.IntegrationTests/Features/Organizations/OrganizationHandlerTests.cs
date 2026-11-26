@@ -36,26 +36,61 @@ public sealed class OrganizationHandlerTests(PostgresFixture postgres) : Handler
     }
 
     [Fact]
+    public async Task Create_InvalidEmail_ReturnsValidationError()
+    {
+        var result = await SendAsync<CreateOrganization.Command, CreateOrganization.Result>(
+            new CreateOrganization.Command("Contoso", Email: "keine-mail"));
+
+        result.Error.Should().BeOfType<ValidationError>()
+            .Which.Errors.Should().ContainKey(nameof(CreateOrganization.Command.Email));
+    }
+
+    [Fact]
+    public async Task Create_TooLongPhone_ReturnsValidationError()
+    {
+        var result = await SendAsync<CreateOrganization.Command, CreateOrganization.Result>(
+            new CreateOrganization.Command("Contoso", Phone: new string('1', Organization.PhoneMaxLength + 1)));
+
+        result.Error.Should().BeOfType<ValidationError>()
+            .Which.Errors.Should().ContainKey(nameof(CreateOrganization.Command.Phone));
+    }
+
+    [Fact]
+    public async Task Create_SameEmailTwice_IsAllowed()
+    {
+        var first = await SendAsync<CreateOrganization.Command, CreateOrganization.Result>(
+            new CreateOrganization.Command("Contoso", Email: "info@example.com"));
+        var second = await SendAsync<CreateOrganization.Command, CreateOrganization.Result>(
+            new CreateOrganization.Command("Contoso Services", Email: "INFO@example.com"));
+
+        first.IsSuccess.Should().BeTrue();
+        second.IsSuccess.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Update_ExistingOrganization_ChangesFieldsAndWritesUpdatedAudit()
     {
         var id = await CreateAsync("Contoso", OrganizationType.Other);
 
         var result = await SendAsync<UpdateOrganization.Command, UpdateOrganization.Result>(
-            new UpdateOrganization.Command(id, "Contoso AG", OrganizationType.Agency, null, new AddressData(City: "Köln"), "Stammkunde"));
+            new UpdateOrganization.Command(
+                id, "Contoso AG", OrganizationType.Agency, null, new AddressData(City: "Köln"), "Stammkunde", " 0221 98765 ", "info@contoso.de"));
 
         result.IsSuccess.Should().BeTrue();
         var loaded = await QueryAsync<GetOrganization.Query, GetOrganization.Result>(new GetOrganization.Query(id));
-        loaded.Value.Should().Be(new GetOrganization.Result(id, "Contoso AG", OrganizationType.Agency, null, new AddressData(City: "Köln"), "Stammkunde", false));
+        loaded.Value.Should().Be(new GetOrganization.Result(
+            id, "Contoso AG", OrganizationType.Agency, null, new AddressData(City: "Köln"), "Stammkunde", false, "0221 98765", "info@contoso.de"));
         await using var db = OpenDb();
         var audit = await db.AuditEntries.SingleAsync(a => a.Action == AuditAction.Updated, Ct);
         audit.Changes.Should().Contain(new AuditChange("Type", "Other", "Agency"));
+        audit.Changes.Should().Contain(new AuditChange("Phone", null, "0221 98765"));
     }
 
     [Fact]
     public async Task Update_UnknownId_ReturnsNotFound()
     {
         var result = await SendAsync<UpdateOrganization.Command, UpdateOrganization.Result>(
-            new UpdateOrganization.Command(Guid.CreateVersion7(), "Contoso", OrganizationType.Other, null, null, null));
+            new UpdateOrganization.Command(Guid.CreateVersion7(), "Contoso", OrganizationType.Other, null, null, null, null, null));
 
         result.Error.Should().Be(OrganizationErrors.NotFound);
     }
@@ -66,7 +101,7 @@ public sealed class OrganizationHandlerTests(PostgresFixture postgres) : Handler
         var id = await CreateAsync("Contoso");
 
         var result = await SendAsync<UpdateOrganization.Command, UpdateOrganization.Result>(
-            new UpdateOrganization.Command(id, " ", OrganizationType.Other, null, null, null));
+            new UpdateOrganization.Command(id, " ", OrganizationType.Other, null, null, null, null, null));
 
         result.Error.Should().BeOfType<ValidationError>()
             .Which.Errors.Should().ContainKey(nameof(UpdateOrganization.Command.Name));

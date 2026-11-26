@@ -164,7 +164,7 @@ public sealed class SyncNextcloudTests(PostgresFixture postgres, RadicaleFixture
         await using (var db = OpenDb())
         {
             var stored = await db.Organizations.SingleAsync(o => o.Id == organization.Id, Ct);
-            stored.Update("ACME Holding AG", stored.Type, null, null, null);
+            stored.Update("ACME Holding AG", stored.Type, null, null, null, null, null);
             await db.SaveChangesAsync(Ct);
         }
 

@@ -19,7 +19,9 @@ public static class GetOrganization
         string? Website,
         AddressData Address,
         string? Notes,
-        bool IsArchived);
+        bool IsArchived,
+        string? Phone,
+        string? Email);
 
     public sealed class Handler(ICrmDbContextFactory dbFactory) : IQueryHandler<Query, Result>
     {
@@ -29,7 +31,7 @@ public static class GetOrganization
             var organization = await db.Organizations
                 .AsNoTracking()
                 .Where(o => o.Id == query.Id)
-                .Select(o => new Result(o.Id, o.Name, o.Type, o.Website, new AddressData(o.Address.Street, o.Address.Street2, o.Address.PostalCode, o.Address.City, o.Address.Region, o.Address.CountryCode), o.Notes, o.IsArchived))
+                .Select(o => new Result(o.Id, o.Name, o.Type, o.Website, new AddressData(o.Address.Street, o.Address.Street2, o.Address.PostalCode, o.Address.City, o.Address.Region, o.Address.CountryCode), o.Notes, o.IsArchived, o.Phone, o.Email))
                 .SingleOrDefaultAsync(cancellationToken);
 
             return organization is null ? OrganizationErrors.NotFound : organization;
