@@ -620,24 +620,27 @@ public static class CreateContact
 | Provider | Vorgehen | Bemerkung |
 |---|---|---|
 | Website/Impressum | Website abrufen, Impressum-Seite finden, strukturiert extrahieren (LLM) | Im DACH-Raum sehr ergiebig: Adresse, Rechtsform, Registernummer, Geschäftsführung |
+| Foundry-Agent mit Websuche | Agent im Foundry Agent Service sucht per Web-Search-Tool und antwortet strukturiert | Kein eigener Website-Abruf in der App; Websuche außerhalb des Auftragsverarbeitungsvertrags |
 | LLM mit Web-Suche | z. B. Claude API mit Web-Search-Tool; strukturierte JSON-Antwort gegen ein Schema | Flexibel; Halluzinationen per Quellenpflicht und Konfidenz begrenzen |
 | n8n-Workflow | CRM sendet Webhook `enrichment.requested`, n8n reichert an und schreibt Vorschläge über die REST-API zurück | Nutzt die vorhandene Integrationsarchitektur (Outbox/Webhooks) und hält KI-Logik außerhalb der App |
 | Kommerzielle APIs | Firmen-Datenbanken, Handelsregister-Dienste | Kosten- und Lizenzprüfung nötig |
 
-**Entscheidung (ADR-016):** Die Anreicherung läuft in der App. Erster Provider ist Website/Impressum: Die App ruft die Seiten selbst ab (mit SSRF-Schutz), das LLM extrahiert nur. Die LLM-Aufrufe gehen über `Microsoft.Extensions.AI` an Azure AI Foundry (Deployment-Typ `Standard`, regional in Sweden Central). n8n, LLM mit Web-Suche und kommerzielle APIs bleiben mögliche spätere `IEnrichmentProvider`.
+**Entscheidung (ADR-016, überarbeitet 2026-11-26):** Die Anreicherung läuft in der App. Erster und vorerst einziger Provider ist ein Agent im Foundry Agent Service (Germany West Central, Modell-Deployment `Standard`) mit Web-Search-Tool (Web IQ). Modell, Instructions und Tools sind im Agent konfiguriert; die App gibt nur Firmenname und Domain mit, besitzt das Antwortschema, validiert die Antwort und speichert nur Vorschläge, deren Quell-URL unter den Zitaten der Antwort steht. Die App ruft selbst keine fremden Websites ab. Website/Impressum und ein separater Provider „LLM mit Web-Suche“ entfallen; n8n und kommerzielle APIs bleiben mögliche spätere `IEnrichmentProvider`.
 
 Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die Nutzungsbedingungen verstößt und rechtlich heikel ist. Die LinkedIn-URL wird weiterhin manuell gepflegt.
 
 ### 9.3 Datenmodell (Entwurf)
 - `EnrichmentRequest`: Zielobjekt (Typ/Id), Provider, Status (`Pending`, `Running`, `Completed`, `Failed`), angefordert am, Fehler
-- `EnrichmentSuggestion`: RequestId, Feldname, vorgeschlagener Wert, aktueller Wert, Quelle (URL), Konfidenz (0–1), Status (`Open`, `Accepted`, `Rejected`)
-- Übernahme schreibt den Wert regulär über einen Handler, d. h. mit Audit-Eintrag und Timeline-Hinweis „Angereichert aus <Quelle>“.
+- `EnrichmentSuggestion`: RequestId, Feldname, vorgeschlagener Wert, aktueller Wert, Quelle (URL), Konfidenz (0–1), Status (`Open`, `Accepted`, `Rejected`, `Superseded`); offene Vorschläge älterer Anfragen werden beim Abschluss einer neuen Anfrage `Superseded`
+- Vorschläge je Feld: Adresse (als Ganzes), Telefon und E-Mail (feste Felder der Organisation, SOL-49), Rechtsform, Registergericht und -nummer, Geschäftsführung, USt-IdNr. (in `ExtraFields`) sowie ein Firmenprofil mit allgemeinen Informationen (Branche, Größe, Leistungen, Kurzbeschreibung …) als Markdown mit Quellen.
+- Übernahme schreibt den Wert regulär über einen Handler, d. h. mit Audit-Eintrag und Timeline-Hinweis „Angereichert aus <Quelle>“. Das Firmenprofil wird als Activity vom Typ `Note` mit Herkunft `Enrichment` angelegt (neuer Wert von `ActivityOrigin`, SOL-45) und erscheint dadurch selbst in der Timeline.
 - Verarbeitung: `EnrichmentRequest` mit Status `Pending` dient als Queue; ein eigener `EnrichmentProcessor` beansprucht Anfragen per Claim mit Lease wie die Outbox (ADR-008, ADR-016).
 
 ### 9.4 Datenschutz
 - Rechtsgrundlage für Personendaten ist in der Regel berechtigtes Interesse (Art. 6 Abs. 1 lit. f DSGVO); die Informationspflicht bei Dritterhebung (Art. 14) ist zu beachten.
 - Die Herkunft der Daten muss für DSGVO-Auskünfte nachvollziehbar sein (US-19 um Enrichment-Herkunft erweitern).
 - Bei LLM-Providern: Auftragsverarbeitung/Datenübermittlung prüfen und nur minimale Daten senden (z. B. Firmenname + Domain, keine Notizen).
+- Die Websuche des Agents (Web IQ) fällt nicht unter den Microsoft-Auftragsverarbeitungsvertrag und kann die EU verlassen; Microsoft ist dafür eigener Verantwortlicher. Als Restrisiko akzeptiert, da nur Firmenname und Domain in die Suche eingehen (ADR-016).
 
 ### 9.5 Vorbereitung im MVP (ohne Mehraufwand)
 - `Organization.Website` sauber normalisiert speichern (Domain ist der wichtigste Enrichment-Schlüssel).
@@ -650,7 +653,7 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 - [x] Migrations-Strategie beim Deploy (siehe 7.6) → `efbundle` im Entrypoint (ADR-009)
 - [x] Welche HubSpot-Felder werden beim Import tatsächlich benötigt? → Vorlage siehe `docs/iterations/05-integration.md`, Entscheidung 9 (Name, E-Mail, Telefon, Rolle, LinkedIn, Firma, Quelle, Record ID)
 - [x] Repo öffentlich ab Iteration 1 oder erst ab MVP? → öffentlich ab Iteration 1
-- [x] Datenanreicherung: in der App (Hintergrundjob + LLM-API) oder ausgelagert in n8n? → in der App, erster Provider Website/Impressum, Inferenz über Azure AI Foundry (EU) (SOL-3, ADR-016)
+- [x] Datenanreicherung: in der App (Hintergrundjob + LLM-API) oder ausgelagert in n8n? → in der App, erster Provider ein Foundry-Agent mit Websuche, Agent und Modell in Azure AI Foundry (EU) (SOL-3, ADR-016)
 - [x] Brauche ich Stundensatz-Varianten (z. B. Remote- vs. Vor-Ort-Satz) oder reicht ein Satz pro Anfrage? → im MVP ein Satz pro Anfrage; Varianten im Backlog (SOL-17)
 
 ## 11. Glossar
@@ -706,3 +709,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.14 | 2026-11-02 | Backlog-Härtung nach externem Audit (SOL-34): Passwortbestätigung vor Faktoränderungen (US-21), API-Limit zusätzlich pro Client-IP (US-17, 5), `MailConnection.IsReconnectRequired` (2.4, S6), `AllowedHosts` und Proxy-Netze (7.6) |
 | 1.15 | 2026-11-03 | Akzeptierte Risiken nach externem Audit (SOL-35): Log-Redaction und Proxy-Access-Logs (6); Begründungen in ADR-004, -009, -010, -013 und -014 |
 | 1.16 | 2026-11-24 | Datenanreicherung entschieden (SOL-3, ADR-016): in der App mit eigenem `EnrichmentProcessor`, erster Provider Website/Impressum, Inferenz über Azure AI Foundry in der EU (9.2, 9.3, 10) |
+| 1.17 | 2026-11-26 | Datenanreicherung überarbeitet (SOL-4, ADR-016): erster Provider ist ein Foundry-Agent mit Websuche statt Website/Impressum mit eigenem Abruf; Websuche außerhalb des Auftragsverarbeitungsvertrags als Restrisiko akzeptiert; Vorschläge je Feld, Status `Superseded` und Firmenprofil als Notiz (9.2, 9.3, 9.4, 10) |
