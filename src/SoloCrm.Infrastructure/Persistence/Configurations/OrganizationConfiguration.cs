@@ -13,6 +13,8 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
         builder.Property(o => o.Name).HasMaxLength(Organization.NameMaxLength);
         builder.Property(o => o.Type).HasConversion<string>().HasMaxLength(20);
         builder.Property(o => o.Website).HasMaxLength(Organization.WebsiteMaxLength);
+        builder.Property(o => o.Phone).HasMaxLength(Organization.PhoneMaxLength);
+        builder.Property(o => o.Email).HasMaxLength(Organization.EmailMaxLength);
         // The city keeps its column "city" (part of the search vector); the other parts are new nullable columns.
         builder.ComplexProperty(o => o.Address, address =>
         {

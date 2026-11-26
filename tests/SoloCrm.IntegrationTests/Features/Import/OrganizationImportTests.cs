@@ -15,7 +15,7 @@ public sealed class OrganizationImportTests(PostgresFixture postgres) : HandlerT
 {
     private const string CompanyHeader =
         "\"Record ID\",\"Company name\",\"Company Domain Name\",\"Website URL\",\"Type\",\"Street Address\",\"Street Address 2\","
-        + "\"Postal Code\",\"City\",\"State/Region\",\"Country/Region\",\"Country/Region Code\",\"Lifecycle Stage\"";
+        + "\"Postal Code\",\"City\",\"State/Region\",\"Country/Region\",\"Country/Region Code\",\"Lifecycle Stage\",\"Phone Number\"";
 
     private const string ContactHeader =
         "\"Record ID\",\"First Name\",\"Last Name\",\"Email\",\"Company Name\",\"Associated Company IDs\"";
@@ -81,6 +81,23 @@ public sealed class OrganizationImportTests(PostgresFixture postgres) : HandlerT
     }
 
     [Fact]
+    public async Task Import_HubSpotPhoneNumber_IsStoredAndUpdatedOnlyWhenNotEmpty()
+    {
+        await ImportAsync(Csv(CompanyHeader, [Company("9001", "Contoso GmbH", phone: "+49 30 123456")]), DuplicateHandling.Skip);
+        await ImportAsync(Csv(CompanyHeader, [Company("9001", "Contoso AG")]), DuplicateHandling.Update);
+
+        await using (var db = OpenDb())
+        {
+            (await db.Organizations.SingleAsync(Ct)).Phone.Should().Be("+49 30 123456", "an empty column keeps the existing number");
+        }
+
+        await ImportAsync(Csv(CompanyHeader, [Company("9001", "Contoso AG", phone: "030 654321")]), DuplicateHandling.Update);
+
+        await using var after = OpenDb();
+        (await after.Organizations.SingleAsync(Ct)).Phone.Should().Be("030 654321");
+    }
+
+    [Fact]
     public async Task Import_InvalidRows_ReportsRowAndReason()
     {
         var file = Csv(CompanyHeader,
@@ -113,7 +130,7 @@ public sealed class OrganizationImportTests(PostgresFixture postgres) : HandlerT
             file, new ImportMapping([new FieldMapping(ImportField.City, 8)], Target: ImportTarget.Organizations), DuplicateHandling.Skip));
         var contactField = await SendAsync<ImportOrganizations.Command, ImportOrganizations.Result>(new ImportOrganizations.Command(
             file,
-            new ImportMapping([new FieldMapping(ImportField.Organization, 1), new FieldMapping(ImportField.Email, 2)], Target: ImportTarget.Organizations),
+            new ImportMapping([new FieldMapping(ImportField.Organization, 1), new FieldMapping(ImportField.FirstName, 2)], Target: ImportTarget.Organizations),
             DuplicateHandling.Skip));
 
         contactMapping.Error.Should().BeOfType<ValidationError>().Which.Errors.Should().ContainKey("Mapping");
@@ -202,7 +219,8 @@ public sealed class OrganizationImportTests(PostgresFixture postgres) : HandlerT
         string region = "",
         string country = "",
         string countryCode = "",
-        string stage = "") =>
-        string.Join(',', new[] { id, name, domain, website, type, street, street2, postalCode, city, region, country, countryCode, stage }
+        string stage = "",
+        string phone = "") =>
+        string.Join(',', new[] { id, name, domain, website, type, street, street2, postalCode, city, region, country, countryCode, stage, phone }
             .Select(v => $"\"{v}\""));
 }

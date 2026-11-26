@@ -13,7 +13,7 @@ namespace SoloCrm.Web.Endpoints;
 /// <summary><c>/api/v1/organizations</c> (SPEC 5).</summary>
 internal static class OrganizationEndpoints
 {
-    private static readonly string[] PatchFields = ["name", "type", "website", "notes", .. ApiAddress.Fields];
+    private static readonly string[] PatchFields = ["name", "type", "website", "phone", "email", "notes", .. ApiAddress.Fields];
 
     public static void MapOrganizationEndpoints(this RouteGroupBuilder api)
     {
@@ -67,7 +67,7 @@ internal static class OrganizationEndpoints
         return result.Match<IResult>(
             r => TypedResults.Ok(new PageResponse<OrganizationListItem>(
                 [.. r.Items.Select(o => new OrganizationListItem(
-                    o.Id, o.Name, o.Type, o.Website, o.City, o.IsArchived, o.CreatedAt, TagResponse.From(o.Tags)))],
+                    o.Id, o.Name, o.Type, o.Website, o.Phone, o.Email, o.City, o.IsArchived, o.CreatedAt, TagResponse.From(o.Tags)))],
                 pageIndex + 1,
                 size,
                 r.TotalCount)),
@@ -91,7 +91,7 @@ internal static class OrganizationEndpoints
         var result = await createOrganization.Handle(
             new CreateOrganization.Command(request.Name, request.Type ?? OrganizationType.Other, request.Website,
                 new AddressData(request.Street, request.Street2, request.PostalCode, request.City, request.Region, request.CountryCode),
-                request.Notes),
+                request.Notes, request.Phone, request.Email),
             cancellationToken);
 
         return result.IsSuccess
@@ -122,7 +122,9 @@ internal static class OrganizationEndpoints
             patch.Value("type", o.Type),
             patch.Value("website", o.Website),
             ApiAddress.Patch(patch, o.Address),
-            patch.Value("notes", o.Notes));
+            patch.Value("notes", o.Notes),
+            patch.Value("phone", o.Phone),
+            patch.Value("email", o.Email));
         if (!patch.IsValid)
         {
             return patch.ValidationProblem();
@@ -150,7 +152,7 @@ internal static class OrganizationEndpoints
         var tags = await getRecordTags.Handle(new GetRecordTags.Query(TimelineRecordType.Organization, id), cancellationToken);
         var o = organization.Value;
         var detail = new OrganizationDetail(
-            o.Id, o.Name, o.Type, o.Website, o.Address.Street, o.Address.Street2, o.Address.PostalCode, o.Address.City, o.Address.Region,
+            o.Id, o.Name, o.Type, o.Website, o.Phone, o.Email, o.Address.Street, o.Address.Street2, o.Address.PostalCode, o.Address.City, o.Address.Region,
             o.Address.CountryCode, o.Notes, o.IsArchived, tags.IsSuccess ? TagResponse.From(tags.Value.Items) : []);
 
         return created ? TypedResults.Created($"{ApiEndpoints.BasePath}/organizations/{id}", detail) : TypedResults.Ok(detail);

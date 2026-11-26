@@ -148,6 +148,8 @@ public static class ImportOrganizations
 
             var type = mapping.OrganizationTypeOf(Value(ImportField.OrganizationType));
             var website = Value(ImportField.OrganizationWebsite);
+            var phone = Value(ImportField.Phone);
+            var email = Value(ImportField.Email);
 
             var (existingId, matchedBy) = FindExisting(name, hubSpotId);
             Organization organization;
@@ -166,24 +168,27 @@ public static class ImportOrganizations
                     type ?? organization.Type,
                     website ?? organization.Website,
                     ImportAddress.Merge(address, AddressData.From(organization.Address)),
-                    organization.Notes);
+                    organization.Notes,
+                    phone ?? organization.Phone,
+                    email ?? organization.Email);
                 if (await ValidateAsync(merged, cancellationToken) is { } invalid)
                 {
                     return invalid;
                 }
 
-                organization.Update(merged.Name!, merged.Type, merged.Website, merged.Address!.ToAddress(), merged.Notes);
+                organization.Update(
+                    merged.Name!, merged.Type, merged.Website, merged.Address!.ToAddress(), merged.Notes, merged.Phone, merged.Email);
                 result = new RowResult.Updated();
             }
             else
             {
-                var create = new CreateOrganization.Command(name, type ?? OrganizationType.Other, website, address);
+                var create = new CreateOrganization.Command(name, type ?? OrganizationType.Other, website, address, Phone: phone, Email: email);
                 if (await ValidateAsync(create, cancellationToken) is { } invalid)
                 {
                     return invalid;
                 }
 
-                organization = Organization.Create(create.Name!, create.Type, create.Website, address.ToAddress());
+                organization = Organization.Create(create.Name!, create.Type, create.Website, address.ToAddress(), phone: create.Phone, email: create.Email);
                 db.Organizations.Add(organization);
                 result = new RowResult.Created();
             }

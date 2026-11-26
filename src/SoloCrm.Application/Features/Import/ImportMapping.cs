@@ -73,7 +73,7 @@ public static class ImportFields
 
     private static readonly ImportField[] Organizations =
     [
-        ImportField.Organization, ImportField.OrganizationType, ImportField.OrganizationWebsite,
+        ImportField.Organization, ImportField.OrganizationType, ImportField.OrganizationWebsite, ImportField.Phone, ImportField.Email,
         .. Address,
         ImportField.Tag, ImportField.HubSpotRecordId,
     ];

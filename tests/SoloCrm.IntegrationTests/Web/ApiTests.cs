@@ -204,6 +204,26 @@ public sealed class ApiTests(PostgresFixture postgres) : IClassFixture<PostgresF
     }
 
     [Fact]
+    public async Task Organization_PhoneAndEmail_PostPatchAndList()
+    {
+        var client = CreateClient();
+        var created = await ReadAsync(await client.PostAsJsonAsync("/api/v1/organizations",
+            new { name = "Contoso", phone = "+49 30 123456", email = "info@contoso.de" }, Ct));
+        var id = created.GetProperty("id").GetGuid();
+
+        var patched = await ReadAsync(await PatchAsync(client, $"/api/v1/organizations/{id}", """{ "email": "kontakt@contoso.de" }"""));
+        var invalid = await PatchAsync(client, $"/api/v1/organizations/{id}", """{ "email": "keine-mail" }""");
+        var list = await ReadAsync(await client.GetAsync("/api/v1/organizations", Ct));
+
+        created.GetProperty("phone").GetString().Should().Be("+49 30 123456");
+        patched.GetProperty("phone").GetString().Should().Be("+49 30 123456", "fields that are not sent stay unchanged");
+        patched.GetProperty("email").GetString().Should().Be("kontakt@contoso.de");
+        invalid.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await ReadAsync(invalid)).GetProperty("errors").EnumerateObject().Select(p => p.Name).Should().Equal("email");
+        list.GetProperty("items")[0].GetProperty("email").GetString().Should().Be("kontakt@contoso.de");
+    }
+
+    [Fact]
     public async Task GetContact_UnknownId_ReturnsNotFoundProblem()
     {
         var response = await CreateClient().GetAsync($"/api/v1/contacts/{Guid.NewGuid()}", Ct);

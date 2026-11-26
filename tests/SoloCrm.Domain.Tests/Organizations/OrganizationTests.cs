@@ -28,6 +28,18 @@ public sealed class OrganizationTests
         organization.Notes.Should().BeNull();
     }
 
+    [Fact]
+    public void Create_PhoneAndEmail_TrimsAndStoresBlankAsNull()
+    {
+        var organization = Organization.Create("Contoso", phone: " +49 30 123456 ", email: " info@contoso.de ");
+        var blank = Organization.Create("Fabrikam", phone: " ", email: "");
+
+        organization.Phone.Should().Be("+49 30 123456");
+        organization.Email.Should().Be("info@contoso.de");
+        blank.Phone.Should().BeNull();
+        blank.Email.Should().BeNull();
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
@@ -52,12 +64,14 @@ public sealed class OrganizationTests
         var organization = Organization.Create("Contoso");
         organization.ClearDomainEvents();
 
-        organization.Update("Contoso AG", OrganizationType.Agency, null, Address.Create(city: "Köln"), "Notiz");
+        organization.Update("Contoso AG", OrganizationType.Agency, null, Address.Create(city: "Köln"), "Notiz", "0221 98765", "kontakt@contoso.de");
 
         organization.Name.Should().Be("Contoso AG");
         organization.Type.Should().Be(OrganizationType.Agency);
         organization.Address.City.Should().Be("Köln");
         organization.Notes.Should().Be("Notiz");
+        organization.Phone.Should().Be("0221 98765");
+        organization.Email.Should().Be("kontakt@contoso.de");
         organization.DomainEvents.Should().BeEmpty();
     }
 
@@ -66,7 +80,7 @@ public sealed class OrganizationTests
     {
         var organization = Organization.Create("Contoso");
 
-        var act = () => organization.Update("Contoso", (OrganizationType)99, null, null, null);
+        var act = () => organization.Update("Contoso", (OrganizationType)99, null, null, null, null, null);
 
         act.Should().Throw<ArgumentOutOfRangeException>();
     }

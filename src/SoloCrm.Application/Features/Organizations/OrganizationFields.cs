@@ -18,6 +18,10 @@ public interface IOrganizationFields
     AddressData? Address { get; }
 
     string? Notes { get; }
+
+    string? Phone { get; }
+
+    string? Email { get; }
 }
 
 public sealed class OrganizationFieldsValidator<T> : AbstractValidator<T>
@@ -43,6 +47,18 @@ public sealed class OrganizationFieldsValidator<T> : AbstractValidator<T>
         RuleFor(c => c.Notes)
             .MaximumLength(Organization.NotesMaxLength)
             .WithMessage($"Die Notizen dürfen höchstens {Organization.NotesMaxLength} Zeichen lang sein.");
+
+        RuleFor(c => c.Phone)
+            .MaximumLength(Organization.PhoneMaxLength)
+            .WithMessage($"Die Telefonnummer darf höchstens {Organization.PhoneMaxLength} Zeichen lang sein.");
+
+        RuleFor(c => c.Email!.Trim())
+            .MaximumLength(Organization.EmailMaxLength)
+            .WithMessage($"Die E-Mail-Adresse darf höchstens {Organization.EmailMaxLength} Zeichen lang sein.")
+            .EmailAddress()
+            .WithMessage("Bitte eine gültige E-Mail-Adresse angeben.")
+            .OverridePropertyName(nameof(IOrganizationFields.Email))
+            .When(c => !string.IsNullOrWhiteSpace(c.Email));
 
         RuleFor(c => c.Address!)
             .SetValidator(new AddressDataValidator())

@@ -15,7 +15,9 @@ public static class CreateOrganization
         OrganizationType Type = OrganizationType.Other,
         string? Website = null,
         AddressData? Address = null,
-        string? Notes = null) : IOrganizationFields;
+        string? Notes = null,
+        string? Phone = null,
+        string? Email = null) : IOrganizationFields;
 
     public sealed record Result(Guid Id);
 
@@ -38,7 +40,8 @@ public static class CreateOrganization
                 return validation.ToValidationError();
             }
 
-            var organization = Organization.Create(command.Name!, command.Type, command.Website, command.Address?.ToAddress(), command.Notes);
+            var organization = Organization.Create(
+                command.Name!, command.Type, command.Website, command.Address?.ToAddress(), command.Notes, command.Phone, command.Email);
 
             await using var db = await dbFactory.CreateDbContextAsync(cancellationToken);
             db.Organizations.Add(organization);
