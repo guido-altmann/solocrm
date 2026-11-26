@@ -83,7 +83,7 @@ erDiagram
 | Type | enum `OrganizationType` | ✅ | `Client`, `Agency`, `Partner`, `Other`; Default: `Other` |
 | Website | string(500) | | URL-Validierung |
 | Phone | string(50) | | zentrale Telefonnummer (SOL-49) |
-| Email | string(320) | | allgemeine E-Mail-Adresse, z. B. `info@…`; Formatprüfung wie beim Kontakt, aber **nicht** eindeutig (SOL-49) |
+| Email | citext(320) | | allgemeine E-Mail-Adresse, z. B. `info@…`; Formatprüfung wie beim Kontakt, aber **nicht** eindeutig (SOL-49); Rückfallebene beim Mail-Abgleich (SOL-50) |
 | Address | Value Object `Address`? | | Anschrift, siehe unten; `Address.City` ersetzt das frühere Feld `City` (Spalte `city`) |
 | Notes | text | | Freitext-Stammnotiz (Verlauf läuft über Activities); höchstens 100.000 Zeichen |
 
@@ -236,7 +236,7 @@ Die Timeline eines Objekts ist ein chronologischer Strom, absteigend sortiert, a
 2. Tasks (angelegt / erledigt),
 3. relevanten AuditEntries (Anlage, Stage-Wechsel, Änderung von Schlüsselfeldern). Die Anlage erscheint als „Angelegt“; in der aggregierten Organisations-Timeline nur für Anfragen, nicht für die Kontakte der Organisation.
 
-Aus dem Postfach importierte E-Mails (`Origin = Mail`) erscheinen als „E-Mail eingegangen“ bzw. „E-Mail gesendet“ mit dem Hinweis „aus dem Postfach“; sie lassen sich nicht bearbeiten, aber löschen (ADR-013).
+Aus dem Postfach importierte E-Mails (`Origin = Mail`) erscheinen als „E-Mail eingegangen“ bzw. „E-Mail gesendet“ mit dem Hinweis „aus dem Postfach“; sie lassen sich nicht bearbeiten, aber löschen (ADR-013). Passt keine Adresse einer Mail auf einen Kontakt, aber genau eine auf die E-Mail-Adresse einer nicht archivierten Organisation, bezieht sich die Mail auf diese Organisation und erscheint direkt in deren Timeline (SOL-50, Nachtrag zu ADR-013).
 
 **Aggregation:**
 - **Organization-Timeline** enthält zusätzlich die Einträge ihrer Contacts und Opportunities (Kennzeichnung „via Max Mustermann“).
@@ -713,3 +713,4 @@ Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die N
 | 1.16 | 2026-11-24 | Datenanreicherung entschieden (SOL-3, ADR-016): in der App mit eigenem `EnrichmentProcessor`, erster Provider Website/Impressum, Inferenz über Azure AI Foundry in der EU (9.2, 9.3, 10) |
 | 1.17 | 2026-11-26 | Datenanreicherung überarbeitet (SOL-4, ADR-016): erster Provider ist ein Foundry-Agent mit Websuche statt Website/Impressum mit eigenem Abruf; Websuche außerhalb des Auftragsverarbeitungsvertrags als Restrisiko akzeptiert; Vorschläge je Feld, Status `Superseded` und Firmenprofil als Notiz (9.2, 9.3, 9.4, 10) |
 | 1.18 | 2026-11-26 | Telefon und E-Mail als feste Felder der Organisation (SOL-49): Organization (2.3), Import (US-16 AK5), REST-API analog zum Kontakt (5) |
+| 1.19 | 2026-11-26 | Mail-Abgleich ordnet Mails ohne passenden Kontakt der Organisation mit passender E-Mail-Adresse zu (SOL-50, Nachtrag ADR-013): `Organization.Email` als `citext` (2.3), Timeline (2.5) |

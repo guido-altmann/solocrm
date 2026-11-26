@@ -4,6 +4,7 @@ using SoloCrm.Application.Features.Mail;
 using SoloCrm.Domain.Activities;
 using SoloCrm.Domain.Contacts;
 using SoloCrm.Domain.Mail;
+using SoloCrm.Domain.Organizations;
 
 namespace SoloCrm.IntegrationTests.Features.Mail;
 
@@ -29,6 +30,20 @@ public sealed class SyncMailTests(PostgresFixture postgres) : HandlerTest(postgr
         db.Contacts.Add(contact);
         await db.SaveChangesAsync(Ct);
         return contact;
+    }
+
+    private async Task<Organization> AddOrganizationAsync(string name, string email, bool archived = false)
+    {
+        var organization = Organization.Create(name, email: email);
+        if (archived)
+        {
+            organization.Archive();
+        }
+
+        await using var db = OpenDb();
+        db.Organizations.Add(organization);
+        await db.SaveChangesAsync(Ct);
+        return organization;
     }
 
     private static IncomingMail Mail(
@@ -122,6 +137,82 @@ public sealed class SyncMailTests(PostgresFixture postgres) : HandlerTest(postgr
         await using var db = OpenDb();
         (await db.Activities.AnyAsync(Ct)).Should().BeFalse();
         (await db.MailMessages.AnyAsync(Ct)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Handle_IncomingMailFromOrganizationAddress_LogsWithOrganizationIgnoringCase()
+    {
+        var organization = await AddOrganizationAsync("Contoso GmbH", "Info@Contoso.Example");
+        _source.Respond(MailFolder.Inbox, Done("d1", Mail("m1", sender: "info@contoso.EXAMPLE")));
+
+        var result = await CreateHandler().Handle(new SyncMail.Command(), Ct);
+
+        result.Value.Should().Be(new SyncMail.Result(1, 0, 0));
+        await using var db = OpenDb();
+        var activity = await db.Activities.SingleAsync(Ct);
+        activity.OrganizationId.Should().Be(organization.Id);
+        activity.ContactId.Should().BeNull();
+        activity.Direction.Should().Be(ActivityDirection.Inbound);
+        (await db.MailMessages.SingleAsync(Ct)).ActivityId.Should().Be(activity.Id);
+    }
+
+    [Fact]
+    public async Task Handle_OutgoingMailToOrganizationAddress_LogsOutboundWithOrganization()
+    {
+        var organization = await AddOrganizationAsync("Contoso GmbH", "info@contoso.example");
+        _source.Respond(MailFolder.Sent, Done("d1", Mail("s1", MailFolder.Sent, sender: "guido@example.test", recipients: ["info@contoso.example"])));
+
+        await CreateHandler().Handle(new SyncMail.Command(), Ct);
+
+        await using var db = OpenDb();
+        var activity = await db.Activities.SingleAsync(Ct);
+        activity.OrganizationId.Should().Be(organization.Id);
+        activity.Direction.Should().Be(ActivityDirection.Outbound);
+    }
+
+    [Fact]
+    public async Task Handle_ContactAndOrganizationAddressInSameMail_PrefersContact()
+    {
+        await AddOrganizationAsync("Contoso GmbH", "info@contoso.example");
+        var contact = await AddContactAsync("max@contoso.example");
+        _source.Respond(MailFolder.Inbox, Done("d1", Mail("m1", sender: "info@contoso.example", recipients: ["guido@example.test", "max@contoso.example"])));
+
+        await CreateHandler().Handle(new SyncMail.Command(), Ct);
+
+        await using var db = OpenDb();
+        var activity = await db.Activities.SingleAsync(Ct);
+        activity.ContactId.Should().Be(contact.Id, "a contact always wins, even as a recipient over an organization sender");
+        activity.OrganizationId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Handle_AddressSharedByTwoOrganizations_IsSkipped()
+    {
+        await AddOrganizationAsync("Contoso GmbH", "info@holding.example");
+        await AddOrganizationAsync("Contoso Services", "INFO@holding.example");
+        var fabrikam = await AddOrganizationAsync("Fabrikam AG", "office@fabrikam.example");
+        _source.Respond(MailFolder.Inbox, Done("d1",
+            Mail("m1", sender: "info@holding.example"),
+            Mail("m2", sender: "info@holding.example", recipients: ["guido@example.test", "office@fabrikam.example"])));
+
+        var result = await CreateHandler().Handle(new SyncMail.Command(), Ct);
+
+        result.Value.Should().Be(new SyncMail.Result(1, 0, 1));
+        await using var db = OpenDb();
+        (await db.Activities.SingleAsync(Ct)).OrganizationId.Should().Be(fabrikam.Id, "the ambiguous sender is skipped, the next address decides");
+    }
+
+    [Fact]
+    public async Task Handle_ArchivedOrganization_StoresNothing()
+    {
+        await AddOrganizationAsync("Contoso GmbH", "info@contoso.example", archived: true);
+        _source.Respond(MailFolder.Inbox, Done("d1", Mail("m1", sender: "info@contoso.example")));
+
+        var result = await CreateHandler().Handle(new SyncMail.Command(), Ct);
+
+        result.Value.Should().Be(new SyncMail.Result(0, 0, 1));
+        await using var db = OpenDb();
+        (await db.Activities.AnyAsync(Ct)).Should().BeFalse();
     }
 
     [Fact]

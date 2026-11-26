@@ -46,9 +46,9 @@ Ohne diese Variablen bleibt die Funktion abgeschaltet.
 Das Refresh-Token wird per Data Protection verschlüsselt gespeichert. Das Volume `/app/keys` muss deshalb erhalten bleiben (siehe `deploy/coolify.md`); geht es verloren, musst du das Postfach neu verbinden.
 
 ## Was passiert mit den Mails?
-- Nur Mails, bei denen Absender oder ein Empfänger (An/Cc) die E-Mail-Adresse eines **nicht archivierten Kontakts** hat, werden gespeichert. Alles andere wird nicht übernommen.
+- Nur Mails, bei denen Absender oder ein Empfänger (An/Cc) die E-Mail-Adresse eines **nicht archivierten Kontakts** hat, werden gespeichert. Passt keine Adresse auf einen Kontakt, zählt die allgemeine E-Mail-Adresse einer **nicht archivierten Organisation** (z. B. `info@…`), sofern genau eine Organisation sie hat. Alles andere wird nicht übernommen.
 - Gespeichert werden der Betreff, der Zeitpunkt und der Text als Klartext, **ohne zitierte Vorgängermails und Signatur und ohne Anhänge**.
-- Pro Mail entsteht eine Activity vom Typ E-Mail mit dem Absender (eingehend) bzw. dem ersten bekannten Empfänger (ausgehend) als Hauptbezug.
+- Pro Mail entsteht eine Activity vom Typ E-Mail mit dem Absender (eingehend) bzw. dem ersten bekannten Empfänger (ausgehend) als Hauptbezug. Ein Kontakt hat dabei immer Vorrang vor einer Organisation.
 - In der Timeline erscheinen sie als „E-Mail eingegangen“ bzw. „E-Mail gesendet“ mit dem Hinweis „aus dem Postfach“. Importierte Mails lassen sich nicht bearbeiten, nur löschen.
 - Eine gelöschte importierte Mail kann wieder auftauchen, wenn sie sich im Postfach ändert (z. B. als gelesen markiert) oder wenn nach einem Neu-Verbinden erneut nachgeladen wird.
 - In Logs stehen nie Adressen, Betreff oder Text.
