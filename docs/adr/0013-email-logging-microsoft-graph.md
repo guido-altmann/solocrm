@@ -59,3 +59,12 @@ Randbedingungen: Mail-Inhalte sind personenbezogen und gehören nicht in Logs. A
 ## Akzeptiertes Restrisiko nach externem Audit (SOL-35, 2026-11-03)
 - **Autorisierungscode in der URL (F-21):** Microsoft liefert den Code als Query-Parameter an `/mail/callback`; das schreibt OAuth so vor. Die App loggt nur den Pfad ohne Query, ein Access-Log des Reverse Proxys kann den Code aber enthalten (Hinweis in `deploy/coolify.md`). Akzeptiert, weil der Code allein wertlos ist: Er ist einmalig und nur wenige Minuten gültig, und für den Tausch gegen Tokens braucht es zusätzlich das Client-Secret und den PKCE-Verifier aus dem verschlüsselten Cookie.
 
+
+## Nachtrag: Zuordnung über die E-Mail-Adresse der Organisation (SOL-50, 2026-11-26)
+Seit SOL-49 haben Organisationen eine allgemeine E-Mail-Adresse (z. B. `info@…`). Mails von und an diese Adresse wurden nach Punkt 4 verworfen. Punkt 4 wird erweitert:
+
+- **Organisation als Rückfallebene:** Passt keine Adresse (Absender, To, Cc) auf einen nicht archivierten Kontakt, wird die Mail einer nicht archivierten Organisation zugeordnet, deren E-Mail-Adresse (case-insensitive) einer dieser Adressen entspricht. Die Activity bezieht sich dann auf die Organisation statt auf einen Kontakt. Ein Kontakt hat immer Vorrang; Mails, die bisher zugeordnet wurden, werden weiterhin genauso zugeordnet.
+- **Reihenfolge** wie in Punkt 9: eingehend zuerst der Absender, sonst der erste passende Empfänger (To vor Cc); ausgehend der erste passende Empfänger.
+- **Nur eindeutige Treffer:** Die Adresse einer Organisation ist nicht eindeutig (SOL-49). Passt eine Adresse auf mehrere Organisationen, wird sie übersprungen; passt keine weitere Adresse, wird die Mail wie bisher verworfen.
+- **Keine Zuordnung über die Domain** (z. B. jede Mail von `*@contoso.de`): Dann würden Mails unbekannter Personen gespeichert, was Punkt 4 gerade ausschließt.
+- **Datenschutz:** Über allgemeine Adressen schreiben oft namentlich bekannte Mitarbeitende. Solche Mails hängen an der Organisation und erscheinen deshalb in keiner DSGVO-Auskunft eines Kontakts (US-19); beim Löschen einer Organisation werden sie mit ihren Activities entfernt. Hinweis in `docs/datenschutz.md`.
