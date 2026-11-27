@@ -459,3 +459,8 @@ kbd {
     min-height: var(--mud-internal-toolbar-height);
     padding-block: 8px;
 }
+
+/* Enrichment suggestions (ADR-016) */
+.enrichment-suggestion + .enrichment-suggestion {
+    border-top: 1px solid var(--mud-palette-lines-default);
+}

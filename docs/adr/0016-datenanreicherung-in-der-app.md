@@ -23,9 +23,9 @@ Randbedingungen:
 4. **Erster (und vorerst einziger) Provider: Foundry-Agent mit Websuche.** Ein Agent im Foundry Agent Service sucht mit dem Web-Search-Tool (Web IQ) nach der Organisation, wertet die Treffer aus (bevorzugt Impressum und eigene Website der Firma) und antwortet strukturiert. Gesucht werden die Impressumsangaben Adresse, Telefon, E-Mail, Rechtsform, Registergericht und -nummer, Geschäftsführung und USt-IdNr. Allgemeine Informationen zur Firma (z. B. Branche, Größe, Leistungen, Gründungsjahr, Kurzbeschreibung) liefert der Agent als ein Firmenprofil in Markdown mit Quellenangaben; es wird nach Übernahme als Notiz (Activity vom Typ `Note`, Herkunft `Enrichment`) an der Organisation gespeichert. Adresse, Telefon und E-Mail sind feste Felder der Organisation (Telefon und E-Mail kommen mit SOL-49), die übrigen Impressumsangaben landen in `ExtraFields`. Die App ruft selbst keine fremden Websites ab. Ein eigener Provider Website/Impressum und ein separater Provider „LLM mit Web-Suche“ entfallen.
 5. **Aufgaben der App und des Agents.** Im Agent (in Foundry konfigurierbar, ohne Deployment der App): Modell, Instructions, Tools. In der App:
    - **Schema-Hoheit:** Das JSON-Schema der Antwort ist im Code definiert. Die App gibt es pro Aufruf mit, sofern der Agent Service das zulässt; in jedem Fall validiert sie die Antwort strikt dagegen und verwirft, was nicht passt (Anfrage `Failed`).
-   - **Quellenpflicht:** Ein Vorschlag wird nur gespeichert, wenn seine Quell-URL (`http`/`https`) unter den URL-Zitaten der Antwort vorkommt. Die Konfidenz liefert der Agent; Werte ohne Quelle werden verworfen.
+   - **Quellenpflicht:** Ein Vorschlag wird nur gespeichert, wenn der Agent mindestens eine Quell-URL (`http`/`https`) dazu nennt; Werte ohne Quelle werden verworfen. Die Konfidenz liefert der Agent. Die App kann die Quelle nicht technisch prüfen (siehe „Erkenntnis aus dem ersten Lauf“); du siehst sie als Link und entscheidest je Feld.
    - **Referenzdefinition im Repo:** Instructions, Schema und Tool-Auswahl des Agents liegen als Vorlage in `docs/` (Einrichtungsanleitung), damit die Konfiguration nachvollziehbar und wiederherstellbar ist. Änderungen im Portal sollen dort nachgezogen werden.
-6. **Azure-Rahmen:** Foundry-Projekt in Germany West Central; das Modell des Agents ist ein Deployment vom Typ `Standard` (regional) in derselben Ressource. `GlobalStandard` ist ausgeschlossen (Verarbeitung in jeder Azure-Region möglich), ebenso `DataZoneStandard` (EU-Zone laut Microsoft-Doku uneinheitlich definiert und ohne Vorankündigung erweiterbar). Startmodell `gpt-5-mini` (in Germany West Central als `Standard` verfügbar, Stand 2026-11-26); das Web-Search-Tool unterstützt nur Azure-OpenAI-Modelle. Vertragspartner für Agent und Modell ist Microsoft mit dessen Auftragsverarbeitungsvertrag; Prompts und Antworten werden nicht zum Training genutzt. Projekt-Endpunkt, Agent-Name und Zugangsdaten kommen aus Umgebungsvariablen (`Ai__ProjectEndpoint`, `Ai__AgentName` und die Anmeldedaten), nie ins Repo. Ohne Konfiguration ist die Anreicherung in der UI deaktiviert, statt beim Start zu scheitern.
+6. **Azure-Rahmen:** Foundry-Projekt in Germany West Central; das Modell des Agents ist ein Deployment vom Typ `Standard` (regional) in derselben Ressource. `GlobalStandard` ist ausgeschlossen (Verarbeitung in jeder Azure-Region möglich), ebenso `DataZoneStandard` (EU-Zone laut Microsoft-Doku uneinheitlich definiert und ohne Vorankündigung erweiterbar). Startmodell `gpt-5-mini` (in Germany West Central als `Standard` verfügbar, Stand 2026-11-26); das Web-Search-Tool unterstützt nur Azure-OpenAI-Modelle. Vertragspartner für Agent und Modell ist Microsoft mit dessen Auftragsverarbeitungsvertrag; Prompts und Antworten werden nicht zum Training genutzt. Projekt-Endpunkt und Agent-Name kommen aus Umgebungsvariablen (`Ai__ProjectEndpoint`, `Ai__AgentName`), die Anmeldedaten über die Standardvariablen von `DefaultAzureCredential`, nie ins Repo. Ohne Konfiguration ist die Anreicherung in der UI deaktiviert, statt beim Start zu scheitern.
 7. **Keine dauerhaft gespeicherten Gesprächsdaten:** Jeder Aufruf ist eigenständig. Wenn möglich ohne Speicherung (`store: false`); sonst werden Conversation bzw. Response unmittelbar nach dem Lauf gelöscht. Ohne Löschung blieben sie im Basic Setup 60 Tage in einem von Microsoft verwalteten Cosmos DB. Ein Standard Setup mit eigenem Cosmos DB ist für einen Single-User überdimensioniert.
 8. **Datenminimierung:** An den Agent gehen nur Firmenname und, falls vorhanden, die Domain aus `Organization.Website`, keine Notizen, Kontakte oder sonstigen CRM-Daten. In Logs stehen nur Ids, Status, Dauer, Tokenzahlen und Anzahl der Suchen, nie Suchanfragen, URLs mit Pfad oder extrahierte Werte.
 9. **Kosten:** Pro Anreicherung fallen Token- und Suchkosten an. Ein Tagesdeckel `Enrichment__MaxRequestsPerDay` (Default 20) begrenzt sie.
@@ -70,15 +70,32 @@ Bewertung: Die Suchanfragen formuliert das Modell aus Firmenname und Domain; sie
 **Pro:** Volle Kontrolle über Routing, Budgets und Logging. **Contra:** Ein weiterer Dienst im Betrieb, Upstream-Anbieter und -Verträge braucht es trotzdem. Für einen Single-User ohne Nutzen.
 
 ## Konsequenzen
-- Leichter: Kein Abruf fremder Websites in der App, kein eigener SSRF-Schutz. Modell und Suchverhalten lassen sich in Foundry anpassen. Neue Enrichment-Provider bleiben Zusatz-Implementierungen.
-- Schwerer: Die Qualität hängt an einer Konfiguration außerhalb des Repos; die Referenzdefinition in `docs/` muss gepflegt werden. Tests der App laufen gegen einen Fake-Provider; das Verhalten des Agents selbst wird nur manuell geprüft.
-- **SOL-14 und SOL-15** sind nicht mehr Teil dieser Entscheidung. Die frühere Festlegung auf `Microsoft.Extensions.AI` (`IChatClient`) als gemeinsame LLM-Anbindung entfällt; SOL-14 und SOL-15 entscheiden ihre Anbindung selbst (direktes Modell-Deployment oder Agent).
-- **Missbrauchsüberwachung bei Microsoft (akzeptiertes Restrisiko):** Jeder Prompt wird in Echtzeit klassifiziert. Gespeichert werden nur markierte Prompts und Antworten, in der Geografie der Ressource; Zugriff nur für autorisierte Microsoft-Mitarbeitende mit Just-in-Time-Freigabe, bei EWR-Ressourcen mit Sitz im EWR. Eine Aufbewahrungsdauer nennt die Doku nicht. Akzeptiert, weil Firmennamen und Firmendaten praktisch nie markiert werden.
-- **Bei Umsetzung (SOL-41) prüfen:**
-  - SDK und Pakete für den Aufruf eines Agents aus .NET (Agent-Referenz über die Responses API); Aufnahme in `Directory.Packages.props` nach Rückfrage (Regel 10).
-  - Anmeldung: Unterstützt der Agent Service einen API-Key, oder ist Entra ID nötig (Service Principal mit passender Rolle, `Azure.Identity`, nach Rückfrage)?
-  - Ob das Antwortschema pro Aufruf mitgegeben werden kann oder in der Agent-Definition stehen muss.
-  - Ob `store: false` mit Agents möglich ist oder gelöscht werden muss.
-  - Verfügbarkeit von Agent Service und Web-Search-Tool in Germany West Central sowie die Unterstützung von `gpt-5-mini` durch das Web-Search-Tool im Portal gegenprüfen.
-- Datenschutz-Doku (`docs/datenschutz.md`): Anreicherung als Dritterhebung (Art. 14), Microsoft als Auftragsverarbeiter für Agent und Modell mit Verarbeitung in Germany West Central, Websuche über Web IQ außerhalb des Auftragsverarbeitungsvertrags, Missbrauchsüberwachung wie oben, Herkunft in der DSGVO-Auskunft (SOL-5).
-- Später prüfen: automatische Anreicherung bei Anlage (SOL-47); Anreicherung von Kontakten.
+**Leichter**
+- Die App ruft keine fremden Websites ab und braucht deshalb keinen eigenen Schutz davor. Modell und Suchverhalten lassen sich in Foundry ändern, ohne die App anzufassen.
+- Weitere Provider (z. B. SOL-47) kommen als zusätzliche Implementierungen dazu.
+
+**Schwerer**
+- Die Qualität hängt an einer Konfiguration außerhalb des Repos. Die Referenzdefinition des Agents steht in `docs/foundry-einrichtung.md` und muss gepflegt werden.
+- Die Tests der App laufen gegen einen Fake-Provider. Das Verhalten des echten Agents wird nur von Hand geprüft.
+- Die Anmeldung läuft über Entra ID (Service Principal), nicht über einen API-Key. Einrichtung: `docs/foundry-einrichtung.md`.
+
+**Akzeptiertes Restrisiko**
+- Microsoft prüft jeden Prompt automatisch auf Missbrauch und speichert nur markierte Prompts und Antworten, in der Region der Ressource. Firmennamen und Firmendaten werden praktisch nie markiert. Die Aufbewahrungsdauer nennt die Doku nicht.
+
+**Folgen für andere Tickets**
+- SOL-14 und SOL-15 sind nicht mehr Teil dieser Entscheidung. Die Festlegung auf `Microsoft.Extensions.AI` entfällt; beide entscheiden ihre Anbindung selbst.
+- Die Datenschutz-Doku (`docs/datenschutz.md`) beschreibt die Anreicherung als Dritterhebung (Art. 14), Microsoft als Auftragsverarbeiter, die Websuche außerhalb des Auftragsverarbeitungsvertrags und die Herkunft in der DSGVO-Auskunft (SOL-5).
+- Später: automatische Anreicherung bei Anlage (SOL-47), Anreicherung von Kontakten.
+
+**Erkenntnis aus dem ersten Lauf gegen den echten Agent (2026-11-27)**
+- Ursprünglich sollten nur Quellen gespeichert werden, die der Dienst als URL-Zitate (`url_citation`) in der Antwort ausweist. Das hat sich als nicht tragfähig erwiesen: Der Dienst liefert Zitate nur bei frei formuliertem Text, nicht bei einer strukturierten Antwort (JSON oder feste Zeilen, jeweils mit Quell-Links im Text). In allen Testläufen waren es null, die App hat deshalb zunächst alle Werte verworfen. Der Suchaufruf enthält nur die Suchanfragen, keine Quellen.
+- Entscheidung: Die vom Agent im JSON genannten Quellen gelten. Technisch geprüft ist das nicht; abgesichert ist es durch die Pflicht zur Zustimmung je Feld und den Quell-Link in der Oberfläche. Liefert der Dienst doch Zitate, werden sie im Log gezählt („confirmed by citations“), aber nicht verlangt. Ein Abruf der Quelle durch die App (Wert auf der Seite suchen) wurde verworfen: er widerspricht der Entscheidung gegen eigenen Seitenabruf und bräuchte SSRF-Schutz.
+- Die App ruft den Agent über die Projekt-Adresse mit Agent-Referenz auf (`GetProjectResponsesClientForAgent`), nicht über den eigenen Endpunkt des Agents. Der gibt es nur für veröffentlichte Agents und antwortet sonst mit 404.
+
+**Beim ersten Lauf gegen den echten Agent prüfen** (bisher nur nach Dokumentation angenommen)
+- Der Agent nimmt das Antwortschema im Prompt an und liefert gültiges JSON mit Quellen (bestätigt).
+- `store: false` wird eingehalten, es bleibt nichts bei Microsoft gespeichert.
+- Das Modell `gpt-5-mini` mit Websuche ist in Germany West Central verfügbar.
+- Die Antwort enthält Tokenzahlen für die Kostenkontrolle.
+
+Wie es umgesetzt ist (Warteschlange, Versuche, Tageslimit, Übernehmen, Timeline), steht im Code und in den Jira-Tickets SOL-40 bis SOL-45. Einstellungen: `deploy/coolify.md`.

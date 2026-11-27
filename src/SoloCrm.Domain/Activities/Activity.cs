@@ -38,7 +38,7 @@ public sealed class Activity : Entity, IAuditable, IAuditFieldExclusions
     /// <summary>Markdown; rendered without raw HTML.</summary>
     public string Body { get; private set; }
 
-    /// <summary><see cref="ActivityOrigin.Mail"/> for emails imported from the mailbox (ADR-013).</summary>
+    /// <summary><see cref="ActivityOrigin.Mail"/> for emails imported from the mailbox (ADR-013), <see cref="ActivityOrigin.Enrichment"/> for an accepted company profile (ADR-016).</summary>
     public ActivityOrigin Origin { get; private set; }
 
     /// <summary>Only set for imported emails.</summary>
@@ -71,6 +71,11 @@ public sealed class Activity : Entity, IAuditable, IAuditFieldExclusions
 
         return Create(ActivityType.Email, ActivityOrigin.Mail, direction, occurredAt, subject, body, linkedTo);
     }
+
+    /// <summary>Logs the company profile accepted from an enrichment suggestion as a note (ADR-016).</summary>
+    /// <exception cref="ArgumentException">No linked record or blank body.</exception>
+    public static Activity LogEnrichment(DateTimeOffset occurredAt, string? subject, string body, LinkedRecords linkedTo) =>
+        Create(ActivityType.Note, ActivityOrigin.Enrichment, null, occurredAt, subject, body, linkedTo);
 
     /// <summary>Imported content is stored on the activity itself and must not be duplicated into the audit trail.</summary>
     public bool IsExcludedFromAudit(string fieldName) =>

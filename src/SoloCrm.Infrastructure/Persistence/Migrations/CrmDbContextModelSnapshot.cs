@@ -557,6 +557,148 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SoloCrm.Domain.Enrichment.EnrichmentRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("error");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("provider");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_id");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("target_type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_enrichment_requests");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_enrichment_requests_created_at");
+
+                    b.HasIndex("RequestedAt")
+                        .HasDatabaseName("ix_enrichment_requests_requested_at")
+                        .HasFilter("status IN ('Pending', 'Running')");
+
+                    b.HasIndex("TargetType", "TargetId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_enrichment_requests_target_type_target_id")
+                        .HasFilter("status IN ('Pending', 'Running')");
+
+                    b.ToTable("enrichment_requests", (string)null);
+                });
+
+            modelBuilder.Entity("SoloCrm.Domain.Enrichment.EnrichmentSuggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Confidence")
+                        .HasPrecision(3, 2)
+                        .HasColumnType("numeric(3,2)")
+                        .HasColumnName("confidence");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CurrentValue")
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("current_value");
+
+                    b.Property<DateTimeOffset?>("DecidedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_at");
+
+                    b.Property<string>("Field")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("field");
+
+                    b.Property<string>("ProposedValue")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("character varying(8000)")
+                        .HasColumnName("proposed_value");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("request_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.PrimitiveCollection<string[]>("_sourceUrls")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("source_urls");
+
+                    b.HasKey("Id")
+                        .HasName("pk_enrichment_suggestions");
+
+                    b.HasIndex("RequestId")
+                        .HasDatabaseName("ix_enrichment_suggestions_request_id");
+
+                    b.ToTable("enrichment_suggestions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_enrichment_suggestions_confidence", "confidence BETWEEN 0 AND 1");
+                        });
+                });
+
             modelBuilder.Entity("SoloCrm.Domain.Mail.MailConnection", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1778,6 +1920,16 @@ namespace SoloCrm.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_contacts_organizations_organization_id");
 
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("SoloCrm.Domain.Enrichment.EnrichmentSuggestion", b =>
+                {
+                    b.HasOne("SoloCrm.Domain.Enrichment.EnrichmentRequest", null)
+                        .WithMany()
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_enrichment_suggestions_enrichment_requests_request_id");
                 });
 
             modelBuilder.Entity("SoloCrm.Domain.Mail.MailMessage", b =>

@@ -1,10 +1,12 @@
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Enrichment;
 using SoloCrm.Domain.Activities;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
+using SoloCrm.Domain.Enrichment;
 using SoloCrm.Domain.Opportunities;
 using SoloCrm.Domain.Organizations;
 
@@ -26,6 +28,9 @@ public enum TimelineEntryKind
     Updated,
     Archived,
     Restored,
+
+    /// <summary>A field value accepted from an enrichment suggestion (SOL-45).</summary>
+    Enriched,
 }
 
 /// <summary>
@@ -69,7 +74,9 @@ public static class GetTimeline
         string? TaskTitle = null,
         IReadOnlyList<Change>? Changes = null,
         DateOnly? ReceivedOn = null,
-        ActivityDirection? Direction = null);
+        ActivityDirection? Direction = null,
+        ActivityOrigin? Origin = null,
+        string? EnrichedFrom = null);
 
     public sealed record Result(IReadOnlyList<Entry> Entries, Cursor? Next);
 
@@ -114,6 +121,7 @@ public static class GetTimeline
             entries.AddRange(await LoadTasksCreatedAsync(db, scope, query.Before, take, cancellationToken));
             entries.AddRange(await LoadTasksCompletedAsync(db, scope, query.Before, take, cancellationToken));
             entries.AddRange(await LoadAuditEntriesAsync(db, clock, scope, query.Before, take, cancellationToken));
+            entries.AddRange(await LoadEnrichmentsAsync(db, scope, query.Before, take, cancellationToken));
 
             var page = entries
                 .OrderByDescending(e => e.Position.OccurredAt)
@@ -203,7 +211,7 @@ public static class GetTimeline
                 .OrderByDescending(a => a.OccurredAt)
                 .ThenByDescending(a => a.Id)
                 .Take(take)
-                .Select(a => new { a.Id, a.Type, a.OccurredAt, a.Subject, a.Body, a.Direction, a.ContactId, a.OrganizationId, a.OpportunityId })
+                .Select(a => new { a.Id, a.Type, a.OccurredAt, a.Subject, a.Body, a.Direction, a.Origin, a.ContactId, a.OrganizationId, a.OpportunityId })
                 .ToListAsync(cancellationToken);
 
             return rows.Select(a => new Entry(
@@ -215,7 +223,8 @@ public static class GetTimeline
                 ActivityType: a.Type,
                 Subject: a.Subject,
                 Body: a.Body,
-                Direction: a.Direction));
+                Direction: a.Direction,
+                Origin: a.Origin));
         }
 
         private static async Task<IEnumerable<Entry>> LoadTasksCreatedAsync(
@@ -283,6 +292,65 @@ public static class GetTimeline
                 scope.ViaFor(new LinkedRecords(t.ContactId, t.OrganizationId, t.OpportunityId)),
                 new Cursor(t.CompletedAt, TimelineSource.TaskCompleted, t.Id),
                 TaskTitle: t.Title));
+        }
+
+        /// <summary>
+        /// Accepted enrichment suggestions of the organization in scope („Angereichert aus …“). The company profile is
+        /// left out: it appears as its own note.
+        /// </summary>
+        private static async Task<IEnumerable<Entry>> LoadEnrichmentsAsync(
+            ICrmDbContext db, Scope scope, Cursor? before, int take, CancellationToken cancellationToken)
+        {
+            var organizationIds = scope.OrganizationIds.Select(id => id!.Value).ToList();
+            if (organizationIds.Count == 0)
+            {
+                return [];
+            }
+
+            var accepted = db.EnrichmentSuggestions.AsNoTracking().Where(s =>
+                s.Status == EnrichmentSuggestionStatus.Accepted
+                && s.DecidedAt != null
+                && s.Field != EnrichmentField.CompanyProfile);
+
+            if (before is not null)
+            {
+                accepted = before.Source == TimelineSource.Enrichment
+                    ? accepted.Where(s => EF.Functions.LessThan(ValueTuple.Create(s.DecidedAt!.Value, s.Id), ValueTuple.Create(before.OccurredAt, before.Id)))
+                    : TimelineSource.Enrichment < before.Source
+                        ? accepted.Where(s => s.DecidedAt <= before.OccurredAt)
+                        : accepted.Where(s => s.DecidedAt < before.OccurredAt);
+            }
+
+            var rows = await accepted
+                .Join(
+                    db.EnrichmentRequests.Where(r => r.TargetType == EnrichmentTargetType.Organization && organizationIds.Contains(r.TargetId)),
+                    s => s.RequestId,
+                    r => r.Id,
+                    (s, r) => new { Suggestion = s, r.TargetId })
+                .OrderByDescending(x => x.Suggestion.DecidedAt)
+                .ThenByDescending(x => x.Suggestion.Id)
+                .Take(take)
+                .ToListAsync(cancellationToken);
+
+            return rows.Select(x =>
+            {
+                var s = x.Suggestion;
+                var decidedAt = s.DecidedAt!.Value;
+                return new Entry(
+                    TimelineEntryKind.Enriched,
+                    x.TargetId,
+                    decidedAt,
+                    scope.ViaFor(x.TargetId),
+                    new Cursor(decidedAt, TimelineSource.Enrichment, s.Id),
+                    Changes:
+                    [
+                        new Change(
+                            EnrichmentValues.Label(s.Field),
+                            s.CurrentValue is null ? TimelineAuditFilter.Missing : EnrichmentValues.Display(s.Field, s.CurrentValue),
+                            EnrichmentValues.Display(s.Field, s.ProposedValue)),
+                    ],
+                    EnrichedFrom: EnrichmentValues.SourceHosts(s.SourceUrls));
+            });
         }
 
         /// <summary>
@@ -542,6 +610,7 @@ public enum TimelineSource
     TaskCreated,
     Activity,
     TaskCompleted,
+    Enrichment,
 }
 
 public static class TimelineErrors
