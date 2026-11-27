@@ -2,6 +2,7 @@ using Azure.AI.Extensions.OpenAI;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Infrastructure.Enrichment;
 
 namespace SoloCrm.IntegrationTests.Enrichment;
 
@@ -27,6 +28,16 @@ public sealed class EnrichmentRegistrationTests
 
         services.GetRequiredService<IEnrichmentAvailability>().IsAvailable.Should().BeFalse();
         services.GetService<ProjectResponsesClient>().Should().BeNull();
+        services.GetRequiredService<IEnrichmentProvider>().Should().BeOfType<NotConfiguredEnrichmentProvider>();
+    }
+
+    [Fact]
+    public void Services_Configured_UsesTheFoundryProvider()
+    {
+        using var services = Build(Complete);
+
+        services.GetRequiredService<IEnrichmentProvider>().Should().BeOfType<FoundryEnrichmentProvider>()
+            .Which.Name.Should().Be("FoundryAgent");
     }
 
     [Fact]

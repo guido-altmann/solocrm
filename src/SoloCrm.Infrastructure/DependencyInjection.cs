@@ -89,9 +89,12 @@ public static class DependencyInjection
 
         if (!options.IsConfigured)
         {
+            services.AddSingleton<IEnrichmentProvider, NotConfiguredEnrichmentProvider>();
             return;
         }
 
+        services.AddSingleton<IFoundryAgent>(sp => new FoundryAgent(sp.GetRequiredService<ProjectResponsesClient>()));
+        services.AddSingleton<IEnrichmentProvider, FoundryEnrichmentProvider>();
         services.AddSingleton(_ =>
         {
             var project = new AIProjectClient(new Uri(options.ProjectEndpoint!), new DefaultAzureCredential());
