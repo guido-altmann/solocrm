@@ -36,6 +36,10 @@
                         {
                             <MudText Typo="Typo.caption" Class="timeline-mail mud-text-secondary">aus dem Postfach</MudText>
                         }
+                        @if (entry.Origin == ActivityOrigin.Enrichment)
+                        {
+                            <MudText Typo="Typo.caption" Class="timeline-enrichment mud-text-secondary">aus der Anreicherung</MudText>
+                        }
                         <MudText Typo="Typo.caption" Class="mud-text-secondary" title="@Formats.DateTime(Clock.ToLocal(entry.OccurredAt))">
                             @Formats.DateTime(Clock.ToLocal(entry.OccurredAt))
                         </MudText>
@@ -223,6 +227,7 @@
         TimelineEntryKind.Created => "Angelegt",
         TimelineEntryKind.Archived => "Archiviert",
         TimelineEntryKind.Restored => "Wiederhergestellt",
+        TimelineEntryKind.Enriched => string.IsNullOrEmpty(entry.EnrichedFrom) ? "Angereichert" : $"Angereichert aus {entry.EnrichedFrom}",
         _ => "Geändert",
     };
 
@@ -236,6 +241,7 @@
         TimelineEntryKind.Created => Icons.Material.Outlined.AddCircleOutline,
         TimelineEntryKind.Archived => Icons.Material.Outlined.Archive,
         TimelineEntryKind.Restored => Icons.Material.Outlined.Unarchive,
+        TimelineEntryKind.Enriched => Icons.Material.Outlined.AutoFixHigh,
         _ => Icons.Material.Outlined.Edit,
     };
 

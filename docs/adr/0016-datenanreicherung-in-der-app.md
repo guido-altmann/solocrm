@@ -70,35 +70,27 @@ Bewertung: Die Suchanfragen formuliert das Modell aus Firmenname und Domain; sie
 **Pro:** Volle Kontrolle über Routing, Budgets und Logging. **Contra:** Ein weiterer Dienst im Betrieb, Upstream-Anbieter und -Verträge braucht es trotzdem. Für einen Single-User ohne Nutzen.
 
 ## Konsequenzen
-- Leichter: Kein Abruf fremder Websites in der App, kein eigener SSRF-Schutz. Modell und Suchverhalten lassen sich in Foundry anpassen. Neue Enrichment-Provider bleiben Zusatz-Implementierungen.
-- Schwerer: Die Qualität hängt an einer Konfiguration außerhalb des Repos; die Referenzdefinition in `docs/` muss gepflegt werden. Tests der App laufen gegen einen Fake-Provider; das Verhalten des Agents selbst wird nur manuell geprüft.
-- **SOL-14 und SOL-15** sind nicht mehr Teil dieser Entscheidung. Die frühere Festlegung auf `Microsoft.Extensions.AI` (`IChatClient`) als gemeinsame LLM-Anbindung entfällt; SOL-14 und SOL-15 entscheiden ihre Anbindung selbst (direktes Modell-Deployment oder Agent).
-- **Missbrauchsüberwachung bei Microsoft (akzeptiertes Restrisiko):** Jeder Prompt wird in Echtzeit klassifiziert. Gespeichert werden nur markierte Prompts und Antworten, in der Geografie der Ressource; Zugriff nur für autorisierte Microsoft-Mitarbeitende mit Just-in-Time-Freigabe, bei EWR-Ressourcen mit Sitz im EWR. Eine Aufbewahrungsdauer nennt die Doku nicht. Akzeptiert, weil Firmennamen und Firmendaten praktisch nie markiert werden.
-- **Bei Umsetzung (SOL-41) prüfen:**
-  - SDK und Pakete für den Aufruf eines Agents aus .NET (Agent-Referenz über die Responses API); Aufnahme in `Directory.Packages.props` nach Rückfrage (Regel 10).
-  - Anmeldung: Unterstützt der Agent Service einen API-Key, oder ist Entra ID nötig (Service Principal mit passender Rolle, `Azure.Identity`, nach Rückfrage)?
-  - Ob das Antwortschema pro Aufruf mitgegeben werden kann oder in der Agent-Definition stehen muss.
-  - Ob `store: false` mit Agents möglich ist oder gelöscht werden muss.
-  - Verfügbarkeit von Agent Service und Web-Search-Tool in Germany West Central sowie die Unterstützung von `gpt-5-mini` durch das Web-Search-Tool im Portal gegenprüfen.
-- **Ergebnis der Klärungen (SOL-41, 2026-11-27, nach Microsoft-Doku; noch nicht gegen einen echten Agent geprüft):**
-  - **Pakete (freigegeben):** `Azure.AI.Projects` 2.1.0-beta.4 (Preview) und `Azure.Identity` 1.21.0; `ProjectResponsesClient` kommt über `AIProjectClient.ProjectOpenAIClient.GetProjectResponsesClientForAgentEndpoint(agentName)`. Die Doku-Seiten widersprechen sich bei Paketnamen und Methoden; maßgeblich ist, was kompiliert.
-  - **Anmeldung:** Dokumentiert ist nur Entra ID (Token-Scope `https://ai.azure.com/.default`), kein API-Key. Die App nutzt `DefaultAzureCredential`: Im Betrieb liest es die Standardvariablen `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET` eines Service Principals (Rolle „Azure AI User“ auf dem Projekt), lokal die Azure-CLI-Anmeldung (`az login`). Eigene Optionen dafür gibt es nicht; `Ai__*` enthält nur `ProjectEndpoint` und `AgentName`.
-  - **`store: false`:** Laut Doku mit `agent_reference` zulässig („the service doesn't persist the response“). Ohne `store: false` liegen Daten 60 Tage im Basic Setup. Löschen einer Conversation ist dokumentiert (`DeleteConversation`), das Löschen einer einzelnen Response bei normalen Agents nicht. Daher gilt: `store: false` setzen und beim ersten Lauf gegen den echten Agent prüfen, dass nichts gespeichert wird.
-  - **Schema pro Aufruf:** Für Agents nicht dokumentiert; die Doku legt das Schema in die Agent-Definition (`TextOptions` der `PromptAgentDefinition`). Die App validiert die Antwort in jedem Fall selbst (Punkt 5). Ob `text.format` pro Aufruf akzeptiert wird, ist in SOL-43 gegen den echten Agent zu prüfen; sonst steht das Schema in der Referenzdefinition des Agents (SOL-46).
-  - **Zitate und Nutzung:** URL-Zitate stehen als `url_citation`-Annotationen (`url`, `title`) in der Antwort, Suchaufrufe als Items vom Typ `web_search_call`. Tokenzahlen sind in der gelesenen Doku nicht beschrieben (SOL-43 prüft `usage` der Antwort).
-  - **Region:** Germany West Central unterstützt Responses API und Agents, laut Tabelle auch das Web-Search-Tool; `gpt-5-mini` ist laut Modell-Tool-Tabelle für Web Search markiert. Für `gpt-5`-Modelle ist eine Registrierung nötig; die Verfügbarkeit des Modell-Deployments in der Region ist im Portal gegenzuprüfen.
-  - **Web IQ:** Direkt am Agent eingebunden läuft die Websuche über Web IQ (nicht über Bing); der Hinweis auf Datenübermittlung außerhalb der Azure-Compliance-Grenze steht in der Doku und deckt sich mit „Datenschutz der Websuche“.
-- **Umsetzung (SOL-43):**
-  - **Schema im Prompt:** Ob `text.format` pro Aufruf akzeptiert wird, ist ohne echten Agent nicht prüfbar. Deshalb steht das JSON-Schema im Code und wird als Teil des Eingabetexts mitgegeben (zusammen mit Firmenname und Domain); die Antwort wird strikt dagegen geprüft. Ein Verstoß gegen die Struktur (kein JSON, abgeschnitten, fehlende oder unbekannte Eigenschaft, falscher Typ, Konfidenz außerhalb 0–1) lässt die ganze Antwort scheitern. Nur unbrauchbare Einzelwerte (leer, ohne Quelle, ungültiger Ländercode, zu lang) werden verworfen. Eine Antwort in einem Markdown-Codeblock wird akzeptiert.
-  - **Quellenpflicht:** Von den Quell-URLs eines Werts bleiben nur die, die unter den `url_citation`-Annotationen der Antwort stehen (Vergleich ohne Fragment, ohne abschließenden Schrägstrich, mit kleingeschriebenem Host, Query unverändert). Bleibt keine übrig, wird der Wert verworfen.
-  - **Fehlerarten:** `EnrichmentProviderException` trägt `IsTransient`: Timeout, Überlastung (408/429/5xx), Netzwerk und unvollständige Antwort sind wiederholbar; Anmeldung, Rolle, falscher Agent und Schemaverstoß nicht.
-  - **Gespeichert wird nichts:** Jeder Aufruf setzt `store: false`; es gibt keine Conversation, die zu löschen wäre. Ob der Dienst das tatsächlich einhält, ist beim ersten Lauf gegen den echten Agent zu prüfen.
-- **Umsetzung (SOL-44):**
-  - **Eine Anfrage je Aufruf des Prozessors:** `ProcessDueAsync` beansprucht die älteste fällige Anfrage (`LIMIT 1`), die Zeitschleife ruft es auf, bis nichts mehr fällig ist. So laufen die teuren Agent-Aufrufe nacheinander. Der `EnrichmentBackgroundService` startet nur, wenn `Ai__*` gesetzt ist und `Enrichment__Enabled` nicht `false` ist.
-  - **Timeout und Lease:** Ein Agent-Aufruf hat `Enrichment__RunTimeout` (Default 3 Minuten); die Lease (5 Minuten) ist länger. Ein Timeout zählt als wiederholbarer Fehler. Wird die App beim Lauf beendet, bleibt die Anfrage `Running` und wird nach Ablauf der Lease erneut beansprucht.
-  - **Versuche:** Jeder Claim zählt als Versuch (auch die Übernahme nach abgelaufener Lease). Wiederholbare Fehler gehen zurück auf `Pending`, bis `Enrichment__MaxAttempts` (Default 3) erreicht ist; danach, bei nicht wiederholbaren Fehlern und bei ständig unterbrochener Verarbeitung ist die Anfrage `Failed` mit Fehlertext. Es gibt keine Wartezeit zwischen den Versuchen außer dem Abfrageabstand.
-  - **Abschluss in einer Transaktion:** Vorschläge speichern, offene Vorschläge älterer Anfragen derselben Organisation auf `Superseded` setzen (auch wenn die neue Anfrage nichts findet), Anfrage auf `Completed`. Ist die Anfrage zwischenzeitlich nicht mehr `Running` (Übernahme durch einen anderen Prozess), wird das Ergebnis verworfen. Scheitert die Anfrage, bleiben ältere Vorschläge offen.
-  - **Aktueller Wert:** Beim Speichern wird der Wert der Organisation festgehalten (Adresse als JSON, Telefon, E-Mail, ExtraFields-Schlüssel); ein Vorschlag mit gleichem Wert wird nicht unterdrückt.
-  - **Tagesdeckel:** `Enrichment__MaxRequestsPerDay` zählt alle Anfragen seit Tagesbeginn in `App__TimeZone`, auch fehlgeschlagene, weil auch sie Kosten verursachen.
-- Datenschutz-Doku (`docs/datenschutz.md`): Anreicherung als Dritterhebung (Art. 14), Microsoft als Auftragsverarbeiter für Agent und Modell mit Verarbeitung in Germany West Central, Websuche über Web IQ außerhalb des Auftragsverarbeitungsvertrags, Missbrauchsüberwachung wie oben, Herkunft in der DSGVO-Auskunft (SOL-5).
-- Später prüfen: automatische Anreicherung bei Anlage (SOL-47); Anreicherung von Kontakten.
+**Leichter**
+- Die App ruft keine fremden Websites ab und braucht deshalb keinen eigenen Schutz davor. Modell und Suchverhalten lassen sich in Foundry ändern, ohne die App anzufassen.
+- Weitere Provider (z. B. SOL-47) kommen als zusätzliche Implementierungen dazu.
+
+**Schwerer**
+- Die Qualität hängt an einer Konfiguration außerhalb des Repos. Die Referenzdefinition des Agents steht in `docs/foundry-einrichtung.md` und muss gepflegt werden.
+- Die Tests der App laufen gegen einen Fake-Provider. Das Verhalten des echten Agents wird nur von Hand geprüft.
+- Die Anmeldung läuft über Entra ID (Service Principal), nicht über einen API-Key. Einrichtung: `docs/foundry-einrichtung.md`.
+
+**Akzeptiertes Restrisiko**
+- Microsoft prüft jeden Prompt automatisch auf Missbrauch und speichert nur markierte Prompts und Antworten, in der Region der Ressource. Firmennamen und Firmendaten werden praktisch nie markiert. Die Aufbewahrungsdauer nennt die Doku nicht.
+
+**Folgen für andere Tickets**
+- SOL-14 und SOL-15 sind nicht mehr Teil dieser Entscheidung. Die Festlegung auf `Microsoft.Extensions.AI` entfällt; beide entscheiden ihre Anbindung selbst.
+- Die Datenschutz-Doku (`docs/datenschutz.md`) beschreibt die Anreicherung als Dritterhebung (Art. 14), Microsoft als Auftragsverarbeiter, die Websuche außerhalb des Auftragsverarbeitungsvertrags und die Herkunft in der DSGVO-Auskunft (SOL-5).
+- Später: automatische Anreicherung bei Anlage (SOL-47), Anreicherung von Kontakten.
+
+**Beim ersten Lauf gegen den echten Agent prüfen** (bisher nur nach Dokumentation angenommen)
+- Der Agent nimmt das Antwortschema im Prompt an und liefert gültiges JSON mit Quellen.
+- `store: false` wird eingehalten, es bleibt nichts bei Microsoft gespeichert.
+- Das Modell `gpt-5-mini` mit Websuche ist in Germany West Central verfügbar.
+- Die Antwort enthält Tokenzahlen für die Kostenkontrolle.
+
+Wie es umgesetzt ist (Warteschlange, Versuche, Tageslimit, Übernehmen, Timeline), steht im Code und in den Jira-Tickets SOL-40 bis SOL-45. Einstellungen: `deploy/coolify.md`.

@@ -105,6 +105,32 @@ public sealed class ActivityTests
     }
 
     [Fact]
+    public void LogEnrichment_ValidValues_CreatesNoteWithEnrichmentOrigin()
+    {
+        var organizationId = Guid.CreateVersion7();
+
+        var activity = Activity.LogEnrichment(Yesterday, " Firmenprofil ", " Profil ", new LinkedRecords(OrganizationId: organizationId));
+
+        activity.Type.Should().Be(ActivityType.Note);
+        activity.Origin.Should().Be(ActivityOrigin.Enrichment);
+        activity.Direction.Should().BeNull();
+        activity.Subject.Should().Be("Firmenprofil");
+        activity.Body.Should().Be("Profil");
+        activity.OrganizationId.Should().Be(organizationId);
+        activity.IsExcludedFromAudit(nameof(Activity.Body)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void LogEnrichment_NoLinkedRecordOrBlankBody_Throws()
+    {
+        var noLink = () => Activity.LogEnrichment(Yesterday, null, "Text", LinkedRecords.None);
+        var blank = () => Activity.LogEnrichment(Yesterday, null, " ", new LinkedRecords(OrganizationId: Guid.CreateVersion7()));
+
+        noLink.Should().Throw<ArgumentException>();
+        blank.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
     public void LogMail_UnknownDirection_Throws()
     {
         var act = () => Activity.LogMail((ActivityDirection)42, Yesterday, null, "Text", new LinkedRecords(ContactId: Guid.CreateVersion7()));

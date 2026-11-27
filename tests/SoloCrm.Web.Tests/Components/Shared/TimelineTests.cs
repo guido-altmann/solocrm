@@ -82,6 +82,38 @@ public sealed class TimelineTests : BunitContext
     }
 
     [Fact]
+    public void Render_EnrichedField_ShowsSourceAndChange()
+    {
+        var enriched = Entry(Kind.Enriched, Now) with
+        {
+            Changes = [new GetTimeline.Change("Telefon", "–", "+49 30 1")],
+            EnrichedFrom = "beispiel.test",
+        };
+        Returns(null, new GetTimeline.Result([enriched], null));
+
+        var timeline = RenderTimeline();
+
+        var entry = timeline.Find(".timeline-entry");
+        entry.QuerySelector(".timeline-title")!.TextContent.Should().Be("Angereichert aus beispiel.test");
+        entry.QuerySelector(".timeline-change")!.TextContent.Should().Be("Telefon: – → +49 30 1");
+        entry.QuerySelector(".mud-menu").Should().BeNull();
+    }
+
+    [Fact]
+    public void Render_EnrichmentNote_ShowsOrigin()
+    {
+        var note = Entry(Kind.Activity, Now) with { ActivityType = ActivityType.Note, Body = "Profil", Origin = ActivityOrigin.Enrichment };
+        var manual = Entry(Kind.Activity, Now.AddHours(-1)) with { ActivityType = ActivityType.Note, Body = "Eigene Notiz", Origin = ActivityOrigin.Manual };
+        Returns(null, new GetTimeline.Result([note, manual], null));
+
+        var timeline = RenderTimeline();
+
+        var entries = timeline.FindAll(".timeline-entry");
+        entries[0].QuerySelector(".timeline-enrichment")!.TextContent.Should().Be("aus der Anreicherung");
+        entries[1].QuerySelector(".timeline-enrichment").Should().BeNull();
+    }
+
+    [Fact]
     public void Render_CreatedOfLateRecordedRequest_ShowsReceivedOn()
     {
         var late = Entry(Kind.Created, Now) with { ReceivedOn = new DateOnly(2026, 9, 1) };

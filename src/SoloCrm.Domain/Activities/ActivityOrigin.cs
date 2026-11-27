@@ -8,4 +8,7 @@ public enum ActivityOrigin
 
     /// <summary>Imported from the connected mailbox; subject and body are kept out of the audit trail.</summary>
     Mail,
+
+    /// <summary>The company profile accepted from an enrichment suggestion (ADR-016, SOL-45).</summary>
+    Enrichment,
 }
