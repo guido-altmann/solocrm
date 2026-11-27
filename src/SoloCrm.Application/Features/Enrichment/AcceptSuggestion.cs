@@ -140,7 +140,18 @@ public static class AcceptSuggestion
                 phone ?? organization.Phone,
                 email ?? organization.Email);
 
-        private static string ProfileBody(EnrichmentSuggestion suggestion) =>
-            $"{suggestion.ProposedValue}\n\n**Quellen:**\n{string.Join('\n', suggestion.SourceUrls.Select(u => $"- {u}"))}";
+        /// <summary>
+        /// The profile text followed by the sources. Sources the text already names (the agent sometimes adds them) are
+        /// not repeated.
+        /// </summary>
+        private static string ProfileBody(EnrichmentSuggestion suggestion)
+        {
+            var missing = suggestion.SourceUrls
+                .Where(url => !suggestion.ProposedValue.Contains(url, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            return missing.Count == 0
+                ? suggestion.ProposedValue
+                : $"{suggestion.ProposedValue}\n\n**Quellen:**\n{string.Join('\n', missing.Select(u => $"- {u}"))}";
+        }
     }
 }

@@ -28,7 +28,7 @@ public sealed record EnrichmentSubject(Guid TargetId, string Name, string? Domai
 /// One verified value. <paramref name="Value"/> is plain text, except for <see cref="EnrichmentField.Address"/> (JSON of
 /// <c>EnrichmentAddress</c>) and <see cref="EnrichmentField.CompanyProfile"/> (Markdown).
 /// </summary>
-/// <param name="SourceUrls">Absolute <c>http</c>/<c>https</c> URLs, all of them cited by the provider's answer.</param>
+/// <param name="SourceUrls">Absolute <c>http</c>/<c>https</c> URLs, as named by the provider's answer; not verified by the app.</param>
 /// <param name="Confidence">0 to 1.</param>
 public sealed record ProposedValue(EnrichmentField Field, string Value, IReadOnlyList<string> SourceUrls, decimal Confidence);
 

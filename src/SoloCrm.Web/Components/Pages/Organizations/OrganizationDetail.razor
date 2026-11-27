@@ -110,6 +110,8 @@ else
                 </MudPaper>
 
                 <OpenTasksCard LinkedTo="_linkedTo" OnChanged="ReloadTimelineAsync" />
+
+                <EnrichmentCard OrganizationId="Id" IsArchived="_organization.IsArchived" OnApplied="OnEnrichmentAppliedAsync" />
             </MudStack>
         </MudItem>
 
@@ -179,6 +181,13 @@ else
         // The save is triggered by an event of the field, so this page does not re-render on its own.
         StateHasChanged();
         return null;
+    }
+
+    /// <summary>An accepted suggestion changed the master data and added a timeline entry.</summary>
+    private async Task OnEnrichmentAppliedAsync()
+    {
+        await LoadAsync();
+        await ReloadTimelineAsync();
     }
 
     private Task ReloadTimelineAsync() => _timeline?.ReloadAsync() ?? Task.CompletedTask;

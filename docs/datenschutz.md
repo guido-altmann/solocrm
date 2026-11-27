@@ -18,6 +18,7 @@ SoloCRM ist ein Single-User-System: Verantwortlicher und einziger Nutzer ist der
 | Postgres: `mail_connections` | verbundenes Postfach des Betreibers: Adresse und verschlüsseltes Refresh-Token (Data Protection), Status des letzten Abgleichs (ADR-013, in Vorbereitung) | Betreiber | bis zum Trennen des Postfachs |
 | Postgres: `opportunities` | Anfragen; `primary_contact_id` verweist auf den Ansprechpartner | nur über die Id | bis zur Löschung (Archivieren als Normalfall) |
 | Postgres: `organizations` | Firmen (keine natürlichen Personen) | in der Regel nein | bis zur Löschung |
+| Postgres: `enrichment_requests`, `enrichment_suggestions` | Anreicherung von Organisationen (ADR-016): Anfrage mit Status und Fehlertext; Vorschläge mit Wert, Quell-URLs, Konfidenz und Entscheidung. Angenommene Vorschläge bleiben als Herkunftsnachweis | in der Regel nein (Firmendaten; ein Geschäftsführer-Name kann personenbezogen sein) | keine automatische Löschung; die Tabellen haben keinen Fremdschlüssel zur Organisation |
 | Postgres: `contact_tags` | Tag-Zuordnungen | über den Kontakt | mit dem Kontakt |
 | Postgres: `audit_entries` | Änderungsprotokoll mit alten und neuen Feldwerten (ADR-006) | ja | unbegrenzt; bei der DSGVO-Löschung anonymisiert (siehe unten) |
 | Postgres: `outbox_messages` | Domain Events für Webhooks | nur Ids und Status, keine Inhalte | 30 Tage nach der Verarbeitung |
@@ -31,6 +32,18 @@ SoloCRM ist ein Single-User-System: Verantwortlicher und einziger Nutzer ist der
 Die DSGVO-Auskunft wird direkt im Browser erzeugt und heruntergeladen; auf dem Server wird keine Datei abgelegt.
 
 Externe Empfänger: die selbst konfigurierten Webhook-Ziele (z. B. n8n). Sie erhalten ausschließlich Ids und Status (SPEC 5); Details holt n8n bei Bedarf über die REST-API. Ist Nextcloud verbunden (ADR-014), erhält die eigene Nextcloud-Instanz die Kontaktdaten als vCard (siehe Tabelle).
+
+## Anreicherung mit öffentlichen Daten (ADR-016)
+
+Der Knopf „Anreichern“ an einer Organisation sendet **nur Firmenname und Domain** an einen Agent im Azure AI Foundry Agent Service. Keine Notizen, Kontakte oder sonstigen CRM-Daten verlassen das System. Die Antwort sind Vorschläge mit Quellen; übernommen wird nur, was du bestätigst.
+
+- **Dritterhebung (Art. 14):** Die Daten stammen aus öffentlichen Quellen, nicht von den Betroffenen. Es geht überwiegend um Firmendaten. Personenbezug entsteht vor allem bei Geschäftsführern im Impressum. Rechtsgrundlage ist das berechtigte Interesse (Art. 6 Abs. 1 lit. f); die Informationspflicht ist im Einzelfall zu beachten.
+- **Auftragsverarbeitung:** Microsoft verarbeitet Agent und Modell als Auftragsverarbeiter. Der Standort (z. B. Germany West Central) hängt von der Konfiguration in Foundry ab und liegt in der Verantwortung des Betreibers.
+- **Websuche:** Die Suche des Agents läuft über Web IQ und fällt **nicht** unter den Auftragsverarbeitungsvertrag; sie kann die EU verlassen, Microsoft ist dafür eigener Verantwortlicher. Als Restrisiko akzeptiert, weil nur Firmenname und Domain in die Suche eingehen.
+- **Missbrauchsüberwachung:** Microsoft klassifiziert Prompts automatisch und speichert nur markierte Prompts und Antworten in der Region der Ressource. Firmennamen werden praktisch nie markiert.
+- **Keine Speicherung bei Microsoft gewollt:** Jeder Aufruf setzt `store: false`. Das ist beim ersten Lauf gegen den echten Agent zu prüfen.
+- **Herkunft:** Jeder angenommene Vorschlag hält Quelle, Zeitpunkt und Konfidenz fest. Die Aufnahme in die DSGVO-Auskunft ist noch offen (SOL-5).
+- **Logs:** Es werden nur Ids und Zahlen protokolliert, nie Firmennamen, Antworten oder Quellen.
 
 ## Auskunft (Art. 15, US-19)
 

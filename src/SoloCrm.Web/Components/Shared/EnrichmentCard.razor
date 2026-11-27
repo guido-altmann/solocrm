@@ -1,0 +1,277 @@
+@using System.Globalization
+@using SoloCrm.Application.Abstractions
+@using SoloCrm.Application.Features.Enrichment
+@using SoloCrm.Domain.Enrichment
+@implements IDisposable
+@inject IEnrichmentAvailability Availability
+@inject IQueryHandler<GetEnrichmentSuggestions.Query, GetEnrichmentSuggestions.Result> GetSuggestionsHandler
+@inject ICommandHandler<RequestEnrichment.Command, RequestEnrichment.Result> RequestHandler
+@inject ICommandHandler<AcceptSuggestion.Command, AcceptSuggestion.Result> AcceptHandler
+@inject ICommandHandler<RejectSuggestion.Command, RejectSuggestion.Result> RejectHandler
+@inject ISnackbar Snackbar
+
+@* Enrichment of an organization with public data (ADR-016): request, wait, accept or reject each suggestion. *@
+<MudPaper Outlined="true" Class="pa-4" data-test="enrichment-card">
+    <div class="d-flex align-center mb-1">
+        <MudText Typo="Typo.h6">Anreicherung</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Outlined" Size="Size.Small" StartIcon="@Icons.Material.Outlined.AutoFixHigh"
+                   Disabled="@(!CanRequest)" OnClick="RequestAsync" data-test="enrich-button">Anreichern</MudButton>
+    </div>
+
+    @if (!Availability.IsAvailable)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary" data-test="enrichment-unavailable">
+            Die Anreicherung ist nicht eingerichtet. Die Anleitung steht in <code>docs/foundry-einrichtung.md</code>.
+        </MudText>
+    }
+    else if (_state is null)
+    {
+        <MudProgressLinear Indeterminate="true" />
+    }
+    else
+    {
+        @if (IsActive)
+        {
+            <MudProgressLinear Indeterminate="true" Class="my-2" />
+            <MudText Typo="Typo.body2" Class="mud-text-secondary" data-test="enrichment-running">
+                Die Anreicherung läuft. Die Websuche kann ein, zwei Minuten dauern.
+            </MudText>
+        }
+        else if (_state.LatestRequest is { Status: EnrichmentRequestStatus.Failed } failed)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="my-2" data-test="enrichment-failed">
+                Die letzte Anreicherung ist fehlgeschlagen@(string.IsNullOrWhiteSpace(failed.Error) ? "." : $": {failed.Error}")
+            </MudAlert>
+        }
+        else if (IsArchived)
+        {
+            <MudText Typo="Typo.body2" Class="mud-text-secondary">Eine archivierte Organisation wird nicht angereichert.</MudText>
+        }
+
+        @if (_state.Suggestions.Count == 0)
+        {
+            @if (!IsActive && _state.LatestRequest is not null)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary" data-test="no-suggestions">Keine offenen Vorschläge.</MudText>
+            }
+            else if (_state.LatestRequest is null)
+            {
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
+                    Sucht öffentliche Angaben zur Organisation (Adresse, Impressum, Firmenprofil). Nichts wird ohne deine Zustimmung übernommen.
+                </MudText>
+            }
+        }
+
+        @foreach (var suggestion in _state.Suggestions)
+        {
+            <div class="enrichment-suggestion py-2" @key="suggestion.Id" data-test="suggestion" data-field="@suggestion.Field">
+                <div class="d-flex align-center flex-wrap gap-x-2">
+                    <MudText Typo="Typo.subtitle2">@suggestion.Label</MudText>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Konfidenz @Percent(suggestion.Confidence)</MudText>
+                    @if (suggestion.IsUnchanged)
+                    {
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Text">entspricht dem aktuellen Wert</MudChip>
+                    }
+                </div>
+
+                @if (suggestion.Field == EnrichmentField.CompanyProfile)
+                {
+                    <div class="timeline-body mud-typography-body2" data-test="profile-preview">@Markdown.ToHtml(suggestion.ProposedText)</div>
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Wird als Notiz in der Timeline angelegt.</MudText>
+                }
+                else
+                {
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary" data-test="current-value">Aktuell: @(suggestion.LiveText ?? "–")</MudText>
+                    <MudText Typo="Typo.body2" data-test="proposed-value">Vorschlag: @suggestion.ProposedText</MudText>
+                }
+
+                <div class="d-flex align-center flex-wrap gap-x-2" data-test="sources">
+                    <MudText Typo="Typo.caption" Class="mud-text-secondary">Quelle:</MudText>
+                    @foreach (var url in suggestion.SourceUrls.Where(IsWebUrl))
+                    {
+                        <MudLink Href="@url" Target="_blank" rel="noopener noreferrer" Typo="Typo.caption">@HostOf(url)</MudLink>
+                    }
+                </div>
+
+                <div class="d-flex gap-2 mt-1">
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small" Disabled="_deciding"
+                               OnClick="() => AcceptAsync(suggestion)" data-test="accept">Übernehmen</MudButton>
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Disabled="_deciding"
+                               OnClick="() => RejectAsync(suggestion)" data-test="reject">Verwerfen</MudButton>
+                </div>
+            </div>
+        }
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid OrganizationId { get; set; }
+
+    [Parameter]
+    public bool IsArchived { get; set; }
+
+    /// <summary>Raised after a suggestion was applied, so the page can reload the master data and the timeline.</summary>
+    [Parameter]
+    public EventCallback OnApplied { get; set; }
+
+    /// <summary>How often the state is refreshed while a request is queued or running.</summary>
+    [Parameter]
+    public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(3);
+
+    private readonly CancellationTokenSource _disposed = new();
+    private GetEnrichmentSuggestions.Result? _state;
+    private Guid _loadedFor;
+    private bool _busy;
+    private bool _deciding;
+    private bool _polling;
+
+    private bool IsActive => _state?.LatestRequest?.Status is EnrichmentRequestStatus.Pending or EnrichmentRequestStatus.Running;
+
+    private bool CanRequest => Availability.IsAvailable && _state is not null && !_busy && !IsActive && !IsArchived;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedFor != OrganizationId && Availability.IsAvailable)
+        {
+            _loadedFor = OrganizationId;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var result = await GetSuggestionsHandler.Handle(new GetEnrichmentSuggestions.Query(OrganizationId), CancellationToken.None);
+        if (result.IsFailure)
+        {
+            Snackbar.Add(result.Error.Message, Severity.Error);
+            _state ??= new GetEnrichmentSuggestions.Result(null, []);
+            return;
+        }
+
+        _state = result.Value;
+        StartPollingIfActive();
+    }
+
+    private async Task RequestAsync()
+    {
+        _busy = true;
+        try
+        {
+            var result = await RequestHandler.Handle(new RequestEnrichment.Command(OrganizationId), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Warning);
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task AcceptAsync(GetEnrichmentSuggestions.SuggestionItem suggestion)
+    {
+        _deciding = true;
+        try
+        {
+            var result = await AcceptHandler.Handle(new AcceptSuggestion.Command(suggestion.Id), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Warning);
+            }
+            else
+            {
+                Snackbar.Add($"{suggestion.Label} übernommen.", Severity.Success);
+            }
+
+            await LoadAsync();
+            if (result.IsSuccess)
+            {
+                await OnApplied.InvokeAsync();
+            }
+        }
+        finally
+        {
+            _deciding = false;
+        }
+    }
+
+    private async Task RejectAsync(GetEnrichmentSuggestions.SuggestionItem suggestion)
+    {
+        _deciding = true;
+        try
+        {
+            var result = await RejectHandler.Handle(new RejectSuggestion.Command(suggestion.Id), CancellationToken.None);
+            if (result.IsFailure)
+            {
+                Snackbar.Add(result.Error.Message, Severity.Warning);
+            }
+
+            await LoadAsync();
+        }
+        finally
+        {
+            _deciding = false;
+        }
+    }
+
+    /// <summary>Refreshes the state until the queued request is finished.</summary>
+    private void StartPollingIfActive()
+    {
+        if (!IsActive || _polling)
+        {
+            return;
+        }
+
+        _polling = true;
+        _ = PollAsync(_disposed.Token);
+    }
+
+    private async Task PollAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var active = true;
+            while (active && !cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(PollInterval, cancellationToken);
+                await InvokeAsync(async () =>
+                {
+                    await LoadAsync();
+                    active = IsActive;
+                    StateHasChanged();
+                });
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The component was disposed.
+        }
+        catch (ObjectDisposedException)
+        {
+            // The circuit ended while a refresh was running.
+        }
+        finally
+        {
+            _polling = false;
+        }
+    }
+
+    private static string Percent(decimal confidence) =>
+        (confidence * 100).ToString("0", CultureInfo.InvariantCulture) + " %";
+
+    private static bool IsWebUrl(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https";
+
+    private static string HostOf(string url) => EnrichmentValues.SourceHosts([url]);
+
+    public void Dispose()
+    {
+        _disposed.Cancel();
+        _disposed.Dispose();
+    }
+}

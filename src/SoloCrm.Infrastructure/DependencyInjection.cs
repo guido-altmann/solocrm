@@ -118,7 +118,9 @@ public static class DependencyInjection
         services.AddSingleton(_ =>
         {
             var project = new AIProjectClient(new Uri(options.ProjectEndpoint!), new DefaultAzureCredential());
-            return project.ProjectOpenAIClient.GetProjectResponsesClientForAgentEndpoint(options.AgentName!);
+            // The agent is referenced in the request body (project-level Responses API), so it works for every agent of the
+            // project; the dedicated agent endpoint only exists for published agents and answers 404 otherwise.
+            return project.ProjectOpenAIClient.GetProjectResponsesClientForAgent(new AgentReference(options.AgentName!));
         });
     }
 

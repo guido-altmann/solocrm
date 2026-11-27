@@ -21,7 +21,7 @@ public sealed class FoundryEnrichmentProviderTests
         new(answer.ToJsonString(), cited, 3, 1200, 340, true);
 
     [Fact]
-    public async Task EnrichAsync_ValidAnswerWithCitedSources_ReturnsTheValues()
+    public async Task EnrichAsync_ValidAnswerWithConfirmedSources_ReturnsTheValues()
     {
         _agent.Reply = Reply(
             Answer(
@@ -37,66 +37,49 @@ public sealed class FoundryEnrichmentProviderTests
     }
 
     [Fact]
-    public async Task EnrichAsync_SourceNotCited_DropsTheValue()
+    public async Task EnrichAsync_NoCitationsFromTheService_KeepsTheValuesWithTheirNamedSources()
+    {
+        // The service only delivers url_citation annotations for free text, not for a structured answer.
+        _agent.Reply = Reply(Answer(("phone", Field("+49 30 1", 0.9m, Imprint))));
+
+        var values = await CreateProvider().EnrichAsync(Subject, TestContext.Current.CancellationToken);
+
+        values.Should().ContainSingle().Which.SourceUrls.Should().Equal(Imprint);
+    }
+
+    [Fact]
+    public async Task EnrichAsync_SourceDiffersFromTheCitations_IsStillKept()
     {
         _agent.Reply = Reply(
-            Answer(
-                ("phone", Field("+49 30 1", 0.9m, "https://erfunden.test/kontakt")),
-                ("email", Field("info@example.test", 0.9m, Imprint))),
+            Answer(("phone", Field("+49 30 1", 0.9m, "https://andere-seite.test/kontakt"))),
             Imprint);
 
         var values = await CreateProvider().EnrichAsync(Subject, TestContext.Current.CancellationToken);
 
-        values.Should().ContainSingle().Which.Field.Should().Be(EnrichmentField.Email);
+        values.Should().ContainSingle().Which.SourceUrls.Should().Equal("https://andere-seite.test/kontakt");
     }
 
     [Fact]
-    public async Task EnrichAsync_OnlySomeSourcesCited_KeepsOnlyTheCitedOnes()
+    public async Task EnrichAsync_SeveralSources_KeepsAllWebSourcesOnce()
     {
         _agent.Reply = Reply(
-            Answer(("companyProfile", Field("**Branche:** Software", 0.6m, "https://a.test/", "https://erfunden.test/", "https://b.test/x"))),
-            "https://a.test/", "https://b.test/x");
+            Answer(("companyProfile", Field("**Branche:** Software", 0.6m, "https://a.test/", "https://a.test/", "https://b.test/x"))));
 
         var values = await CreateProvider().EnrichAsync(Subject, TestContext.Current.CancellationToken);
 
         values.Single().SourceUrls.Should().Equal("https://a.test/", "https://b.test/x");
     }
 
-    [Theory]
-    [InlineData("https://Example.TEST/impressum/", "https://example.test/impressum")]
-    [InlineData("https://example.test/impressum#kontakt", "https://example.test/impressum")]
-    [InlineData("https://example.test:443/impressum", "https://example.test/impressum")]
-    public async Task EnrichAsync_CitationDiffersOnlyInSpelling_CountsAsCited(string source, string cited)
-    {
-        _agent.Reply = Reply(Answer(("phone", Field("1", 0.9m, source))), cited);
-
-        var values = await CreateProvider().EnrichAsync(Subject, TestContext.Current.CancellationToken);
-
-        values.Should().ContainSingle();
-    }
-
-    [Theory]
-    [InlineData("https://example.test/impressum", "https://example.test/datenschutz")]
-    [InlineData("https://example.test/impressum", "http://example.test/impressum")]
-    [InlineData("https://example.test/impressum?a=1", "https://example.test/impressum?a=2")]
-    [InlineData("https://example.test/impressum", "https://other.test/impressum")]
-    public async Task EnrichAsync_CitationIsAnotherUrl_DropsTheValue(string source, string cited)
-    {
-        _agent.Reply = Reply(Answer(("phone", Field("1", 0.9m, source))), cited);
-
-        var values = await CreateProvider().EnrichAsync(Subject, TestContext.Current.CancellationToken);
-
-        values.Should().BeEmpty();
-    }
-
     [Fact]
-    public async Task EnrichAsync_NoCitationsAtAll_ReturnsNothing()
+    public async Task EnrichAsync_ValueWithoutAnyWebSource_IsDropped()
     {
-        _agent.Reply = Reply(Answer(("phone", Field("1", 0.9m, Imprint))));
+        _agent.Reply = Reply(Answer(
+            ("phone", Field("+49 30 1", 0.9m, "ftp://files.test/kontakt.txt")),
+            ("email", Field("info@example.test", 0.9m, Imprint))));
 
         var values = await CreateProvider().EnrichAsync(Subject, TestContext.Current.CancellationToken);
 
-        values.Should().BeEmpty();
+        values.Should().ContainSingle().Which.Field.Should().Be(EnrichmentField.Email);
     }
 
     [Fact]
@@ -190,7 +173,7 @@ public sealed class FoundryEnrichmentProviderTests
             message.Should().Contain(Subject.TargetId.ToString());
         }
 
-        _logger.Messages[0].Should().Contain("1 suggestions").And.Contain("1 without cited source").And.Contain("3 searches").And.Contain("1200/340 tokens");
+        _logger.Messages[0].Should().Contain("2 suggestions").And.Contain("0 without source").And.Contain("1 confirmed by citations").And.Contain("3 searches").And.Contain("1200/340 tokens");
     }
 
     [Fact]

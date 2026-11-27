@@ -156,6 +156,37 @@ public sealed class SuggestionDecisionTests(PostgresFixture postgres) : HandlerT
     }
 
     [Fact]
+    public async Task Accept_CompanyProfileAlreadyNamingTheSources_DoesNotRepeatThem()
+    {
+        var organization = await AddOrganizationAsync();
+        var suggestion = await AddSuggestionAsync(
+            organization,
+            EnrichmentField.CompanyProfile,
+            $"**Branche:** Software\n\nQuellen: [Impressum]({Source}), https://handelsregister.test/x");
+
+        var result = await AcceptAsync(suggestion.Id);
+
+        await using var db = OpenDb();
+        var note = await db.Activities.AsNoTracking().SingleAsync(a => a.Id == result.Value.ActivityId, Ct);
+        note.Body.Should().NotContain("**Quellen:**");
+        note.Body.Split(Source).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task Accept_CompanyProfileNamingOnlyOneSource_AddsTheMissingOne()
+    {
+        var organization = await AddOrganizationAsync();
+        var suggestion = await AddSuggestionAsync(organization, EnrichmentField.CompanyProfile, $"Profil, siehe {Source}");
+
+        var result = await AcceptAsync(suggestion.Id);
+
+        await using var db = OpenDb();
+        var note = await db.Activities.AsNoTracking().SingleAsync(a => a.Id == result.Value.ActivityId, Ct);
+        note.Body.Split(Source).Should().HaveCount(2);
+        note.Body.Should().Contain("- https://handelsregister.test/x");
+    }
+
+    [Fact]
     public async Task Accept_CompanyProfile_LeavesTheOrganizationUnchanged()
     {
         var organization = await AddOrganizationAsync(phone: "030 1");

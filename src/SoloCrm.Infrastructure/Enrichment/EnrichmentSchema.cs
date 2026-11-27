@@ -108,7 +108,7 @@ internal static class EnrichmentSchema
             - confidence ist deine Sicherheit von 0 bis 1.
             - address.countryCode ist ein ISO-3166-1-Alpha-2-Code, z. B. DE.
             - managingDirectors ist eine kommagetrennte Liste der Geschäftsführer.
-            - companyProfile ist Markdown: Branche, Größe, Leistungen, Gründungsjahr und eine Kurzbeschreibung, soweit belegt. Gib hier alle Quellen an.
+            - companyProfile ist Markdown: Branche, Größe, Leistungen, Gründungsjahr und eine Kurzbeschreibung, soweit belegt. Nenne die Quellen nicht im Text, sie stehen in sourceUrls.
             """;
     }
 }
