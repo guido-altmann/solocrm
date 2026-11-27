@@ -1,3 +1,6 @@
+using Azure.AI.Extensions.OpenAI;
+using Azure.AI.Projects;
+using Azure.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -8,6 +11,7 @@ using SoloCrm.Application.Abstractions;
 using SoloCrm.Application.Features.Mail;
 using SoloCrm.Application.Features.Nextcloud;
 using SoloCrm.Application.Features.Webhooks;
+using SoloCrm.Infrastructure.Enrichment;
 using SoloCrm.Infrastructure.Identity;
 using SoloCrm.Infrastructure.Mail;
 using SoloCrm.Infrastructure.Nextcloud;
@@ -50,6 +54,7 @@ public static class DependencyInjection
         services.Configure<MailSyncOptions>(configuration.GetSection(MailSyncOptions.SectionName));
         services.AddTransient(sp => sp.GetRequiredService<IOptions<MailSyncOptions>>().Value);
         services.AddMailSource(configuration);
+        services.AddEnrichmentAgent(configuration);
         services.AddSingleton<IAppSettings, AppSettings>();
 
         services.AddWebhooks(configuration);
@@ -70,6 +75,28 @@ public static class DependencyInjection
         }
 
         return services;
+    }
+
+    /// <summary>
+    /// The Foundry agent for data enrichment (ADR-016) if <c>Ai</c> is set up: registers the agent-scoped client, which signs in
+    /// with <c>DefaultAzureCredential</c>. Without configuration no client exists and <see cref="IEnrichmentAvailability"/> is
+    /// <c>false</c>; the host still starts. Creating the client makes no network call.
+    /// </summary>
+    private static void AddEnrichmentAgent(this IServiceCollection services, IConfiguration configuration)
+    {
+        var options = configuration.GetSection(AiOptions.SectionName).Get<AiOptions>() ?? new AiOptions();
+        services.AddSingleton<IEnrichmentAvailability>(new EnrichmentAvailability(options.IsConfigured));
+
+        if (!options.IsConfigured)
+        {
+            return;
+        }
+
+        services.AddSingleton(_ =>
+        {
+            var project = new AIProjectClient(new Uri(options.ProjectEndpoint!), new DefaultAzureCredential());
+            return project.ProjectOpenAIClient.GetProjectResponsesClientForAgentEndpoint(options.AgentName!);
+        });
     }
 
     /// <summary>
