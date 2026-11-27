@@ -631,9 +631,9 @@ public static class CreateContact
 
 Bewusst **nicht** vorgesehen: Scraping von LinkedIn-Profilen, da das gegen die Nutzungsbedingungen verstößt und rechtlich heikel ist. Die LinkedIn-URL wird weiterhin manuell gepflegt.
 
-### 9.3 Datenmodell (Entwurf)
-- `EnrichmentRequest`: Zielobjekt (Typ/Id), Provider, Status (`Pending`, `Running`, `Completed`, `Failed`), angefordert am, Fehler
-- `EnrichmentSuggestion`: RequestId, Feldname, vorgeschlagener Wert, aktueller Wert, Quelle (URL), Konfidenz (0–1), Status (`Open`, `Accepted`, `Rejected`, `Superseded`); offene Vorschläge älterer Anfragen werden beim Abschluss einer neuen Anfrage `Superseded`
+### 9.3 Datenmodell (umgesetzt in SOL-40)
+- `EnrichmentRequest`: Zielobjekt (Typ/Id, ohne Fremdschlüssel), Provider, Status (`Pending`, `Running`, `Completed`, `Failed`), angefordert am, Lease-Ende, Versuche, abgeschlossen am, Fehler. Höchstens eine aktive Anfrage (`Pending`/`Running`) je Zielobjekt (partieller Unique-Index). Statuswechsel: `Claim` (auch nach abgelaufener Lease), `Complete`, `ScheduleRetry` (zurück auf `Pending`), `Fail`
+- `EnrichmentSuggestion`: RequestId, Feldname, vorgeschlagener Wert, aktueller Wert, Quelle (URL), Konfidenz (0–1), Entscheidungszeitpunkt, Status (`Open`, `Accepted`, `Rejected`, `Superseded`); die Quelle sind 1–10 absolute `http`/`https`-URLs (`text[]`), die Adresse als Ganzes ein JSON-Wert; offene Vorschläge älterer Anfragen werden beim Abschluss einer neuen Anfrage `Superseded`
 - Vorschläge je Feld: Adresse (als Ganzes), Telefon und E-Mail (feste Felder der Organisation, SOL-49), Rechtsform, Registergericht und -nummer, Geschäftsführung, USt-IdNr. (in `ExtraFields`) sowie ein Firmenprofil mit allgemeinen Informationen (Branche, Größe, Leistungen, Kurzbeschreibung …) als Markdown mit Quellen.
 - Übernahme schreibt den Wert regulär über einen Handler, d. h. mit Audit-Eintrag und Timeline-Hinweis „Angereichert aus <Quelle>“. Das Firmenprofil wird als Activity vom Typ `Note` mit Herkunft `Enrichment` angelegt (neuer Wert von `ActivityOrigin`, SOL-45) und erscheint dadurch selbst in der Timeline.
 - Verarbeitung: `EnrichmentRequest` mit Status `Pending` dient als Queue; ein eigener `EnrichmentProcessor` beansprucht Anfragen per Claim mit Lease wie die Outbox (ADR-008, ADR-016).

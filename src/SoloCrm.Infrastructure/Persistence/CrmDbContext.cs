@@ -7,6 +7,7 @@ using SoloCrm.Domain.CalendarFeeds;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Common;
 using SoloCrm.Domain.Contacts;
+using SoloCrm.Domain.Enrichment;
 using SoloCrm.Domain.Mail;
 using SoloCrm.Domain.Nextcloud;
 using SoloCrm.Domain.Opportunities;
@@ -52,6 +53,10 @@ public class CrmDbContext(DbContextOptions options)
     public DbSet<ApiKey> ApiKeys => Set<ApiKey>();
 
     public DbSet<CalendarFeed> CalendarFeeds => Set<CalendarFeed>();
+
+    public DbSet<EnrichmentRequest> EnrichmentRequests => Set<EnrichmentRequest>();
+
+    public DbSet<EnrichmentSuggestion> EnrichmentSuggestions => Set<EnrichmentSuggestion>();
 
     public DbSet<MailMessage> MailMessages => Set<MailMessage>();
 

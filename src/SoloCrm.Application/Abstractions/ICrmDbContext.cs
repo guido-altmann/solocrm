@@ -4,6 +4,7 @@ using SoloCrm.Domain.ApiKeys;
 using SoloCrm.Domain.CalendarFeeds;
 using SoloCrm.Domain.Auditing;
 using SoloCrm.Domain.Contacts;
+using SoloCrm.Domain.Enrichment;
 using SoloCrm.Domain.Mail;
 using SoloCrm.Domain.Nextcloud;
 using SoloCrm.Domain.Opportunities;
@@ -50,6 +51,10 @@ public interface ICrmDbContext : IAsyncDisposable, IDisposable
     DbSet<ApiKey> ApiKeys { get; }
 
     DbSet<CalendarFeed> CalendarFeeds { get; }
+
+    DbSet<EnrichmentRequest> EnrichmentRequests { get; }
+
+    DbSet<EnrichmentSuggestion> EnrichmentSuggestions { get; }
 
     DbSet<MailMessage> MailMessages { get; }
 
