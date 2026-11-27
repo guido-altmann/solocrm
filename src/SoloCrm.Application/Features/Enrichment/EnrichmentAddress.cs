@@ -29,6 +29,15 @@ public sealed record EnrichmentAddress(
             : new EnrichmentAddress(address.Street, address.Street2, address.PostalCode, address.City, address.Region, address.CountryCode);
     }
 
+    /// <summary>The address of a record as suggestion value; <c>null</c> if the record has none.</summary>
+    public static EnrichmentAddress? FromAddress(Address address)
+    {
+        ArgumentNullException.ThrowIfNull(address);
+        return address.IsEmpty
+            ? null
+            : new EnrichmentAddress(address.Street, address.Street2, address.PostalCode, address.City, address.Region, address.CountryCode);
+    }
+
     public string ToJson() => JsonSerializer.Serialize(this, Options);
 
     /// <summary>Reads the stored suggestion value; <c>null</c> if it is not an address.</summary>

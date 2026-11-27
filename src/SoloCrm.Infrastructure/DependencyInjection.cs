@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using SoloCrm.Application.Abstractions;
+using SoloCrm.Application.Features.Enrichment;
 using SoloCrm.Application.Features.Mail;
 using SoloCrm.Application.Features.Nextcloud;
 using SoloCrm.Application.Features.Webhooks;
@@ -64,6 +65,22 @@ public static class DependencyInjection
     }
 
     /// <summary>
+    /// Starts the enrichment processor (ADR-016) if the agent is configured and <c>Enrichment:Enabled</c> is not
+    /// <c>false</c>. Only the web host calls this; tests drive <see cref="EnrichmentProcessor"/> directly.
+    /// </summary>
+    public static IServiceCollection AddEnrichmentProcessing(this IServiceCollection services, IConfiguration configuration)
+    {
+        var enabled = configuration.GetValue($"{EnrichmentProcessingOptions.SectionName}:{nameof(EnrichmentProcessingOptions.Enabled)}", true);
+        if (enabled && (configuration.GetSection(AiOptions.SectionName).Get<AiOptions>()?.IsConfigured ?? false))
+        {
+            services.AddSingleton<EnrichmentProcessor>();
+            services.AddHostedService<EnrichmentBackgroundService>();
+        }
+
+        return services;
+    }
+
+    /// <summary>
     /// Starts the outbox processor (ADR-008) unless <c>Outbox:Enabled</c> is <c>false</c>.
     /// Only the web host calls this; handler tests drive <see cref="OutboxProcessor"/> directly.
     /// </summary>
@@ -86,6 +103,9 @@ public static class DependencyInjection
     {
         var options = configuration.GetSection(AiOptions.SectionName).Get<AiOptions>() ?? new AiOptions();
         services.AddSingleton<IEnrichmentAvailability>(new EnrichmentAvailability(options.IsConfigured));
+        services.Configure<EnrichmentOptions>(configuration.GetSection(EnrichmentOptions.SectionName));
+        services.Configure<EnrichmentProcessingOptions>(configuration.GetSection(EnrichmentProcessingOptions.SectionName));
+        services.AddTransient(sp => sp.GetRequiredService<IOptions<EnrichmentOptions>>().Value);
 
         if (!options.IsConfigured)
         {
